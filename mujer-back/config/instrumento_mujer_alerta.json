@@ -1,0 +1,549 @@
+{
+  "instrument_id": "mujer_alerta_v1",
+  "name": "Diagnóstico Mujer Alerta",
+  "subtitle": "Percepción del entorno escolar o laboral respecto a la violencia contra las mujeres (Tarjetas reflexivas personalizadas por pregunta)",
+  "version": "1.0.0",
+  "language": "es-MX",
+  "context": ["escolar", "laboral"],
+  "instructions": "Las siguientes preguntas te invitan a reflexionar sobre prácticas y situaciones que pueden formar parte de la vida cotidiana en tu centro escolar o laboral. No se refieren a experiencias personales, sino a cómo se vive y se percibe el entorno cuando estas situaciones involucran a mujeres.",
+  "dimensions": [
+    {
+      "key": "frecuencia",
+      "label": "Frecuencia",
+      "icon": "blue",
+      "scale_id": "frecuencia_1_5"
+    },
+    {
+      "key": "normalidad",
+      "label": "Normalidad",
+      "icon": "yellow",
+      "scale_id": "normalidad_1_5"
+    },
+    {
+      "key": "gravedad",
+      "label": "Gravedad",
+      "icon": "red",
+      "scale_id": "gravedad_1_5"
+    }
+  ],
+  "scales": {
+    "frecuencia_1_5": {
+      "type": "likert",
+      "min": 1,
+      "max": 5,
+      "options": [
+        { "value": 1, "label": "Nunca" },
+        { "value": 2, "label": "Rara vez" },
+        { "value": 3, "label": "A veces" },
+        { "value": 4, "label": "Frecuentemente" },
+        { "value": 5, "label": "Muy frecuentemente" }
+      ]
+    },
+    "normalidad_1_5": {
+      "type": "likert",
+      "min": 1,
+      "max": 5,
+      "options": [
+        { "value": 1, "label": "Nada normal" },
+        { "value": 2, "label": "Poco normal" },
+        { "value": 3, "label": "Algo normal" },
+        { "value": 4, "label": "Muy normal" },
+        { "value": 5, "label": "Totalmente normal" }
+      ]
+    },
+    "gravedad_1_5": {
+      "type": "likert",
+      "min": 1,
+      "max": 5,
+      "options": [
+        { "value": 1, "label": "Nada grave" },
+        { "value": 2, "label": "Poco grave" },
+        { "value": 3, "label": "Moderadamente grave" },
+        { "value": 4, "label": "Grave" },
+        { "value": 5, "label": "Muy grave" }
+      ]
+    }
+  },
+  "types_of_violence": [
+    {
+      "type_id": "tv1_descalificacion_humillacion",
+      "order": 1,
+      "label": "Descalificación / Humillación",
+      "notes": "Violencia psicológica – desvalorización cotidiana",
+      "questions": [
+        {
+          "question_id": "P1",
+          "order": 1,
+          "stem": "Cuando una mujer expresa una opinión, ¿qué tan común es que no se le dé la misma importancia que a otras voces?",
+          "cards": [
+            {
+              "dimension": "frecuencia",
+              "prompt": "¿Cada cuánto notas que las opiniones de las mujeres se minimizan o se ignoran?",
+              "scale_id": "frecuencia_1_5",
+              "required": true
+            },
+            {
+              "dimension": "normalidad",
+              "prompt": "En este lugar, ¿qué tan aceptado está que eso ocurra sin que se cuestione?",
+              "scale_id": "normalidad_1_5",
+              "required": true
+            },
+            {
+              "dimension": "gravedad",
+              "prompt": "Para ti, ¿qué tan dañino es que se reste valor a la voz de una mujer?",
+              "scale_id": "gravedad_1_5",
+              "required": true
+            }
+          ]
+        },
+        {
+          "question_id": "P2",
+          "order": 2,
+          "stem": "¿Qué tan normalizado percibes que se hagan comentarios que ridiculizan o minimizan a una mujer?",
+          "cards": [
+            {
+              "dimension": "frecuencia",
+              "prompt": "¿Cada cuánto escuchas este tipo de comentarios en el entorno?",
+              "scale_id": "frecuencia_1_5",
+              "required": true
+            },
+            {
+              "dimension": "normalidad",
+              "prompt": "¿Se perciben como bromas aceptables o comentarios “sin problema”?",
+              "scale_id": "normalidad_1_5",
+              "required": true
+            },
+            {
+              "dimension": "gravedad",
+              "prompt": "¿Qué tan grave consideras que es ridiculizar a una mujer de esta forma?",
+              "scale_id": "gravedad_1_5",
+              "required": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type_id": "tv2_discriminacion_por_ser_mujer",
+      "order": 2,
+      "label": "Discriminación por ser mujer",
+      "notes": "Violencia estructural e institucional",
+      "questions": [
+        {
+          "question_id": "P3",
+          "order": 3,
+          "stem": "¿En qué medida notas que a las mujeres se les exige demostrar más para recibir el mismo reconocimiento?",
+          "cards": [
+            {
+              "dimension": "frecuencia",
+              "prompt": "¿Con qué frecuencia observas esta exigencia diferenciada?",
+              "scale_id": "frecuencia_1_5",
+              "required": true
+            },
+            {
+              "dimension": "normalidad",
+              "prompt": "¿Se percibe como algo “normal” o parte de cómo funcionan las cosas aquí?",
+              "scale_id": "normalidad_1_5",
+              "required": true
+            },
+            {
+              "dimension": "gravedad",
+              "prompt": "Para ti, ¿qué tan grave es que se trate distinto a una mujer por su género?",
+              "scale_id": "gravedad_1_5",
+              "required": true
+            }
+          ]
+        },
+        {
+          "question_id": "P4",
+          "order": 4,
+          "stem": "¿Qué tan presente está la idea de que ciertas capacidades no corresponden a las mujeres?",
+          "cards": [
+            {
+              "dimension": "frecuencia",
+              "prompt": "¿Cada cuánto notas que se expresan o actúan estas ideas?",
+              "scale_id": "frecuencia_1_5",
+              "required": true
+            },
+            {
+              "dimension": "normalidad",
+              "prompt": "¿Estas ideas se cuestionan o se asumen como algo natural?",
+              "scale_id": "normalidad_1_5",
+              "required": true
+            },
+            {
+              "dimension": "gravedad",
+              "prompt": "¿Qué tan grave consideras que estas creencias limiten a las mujeres?",
+              "scale_id": "gravedad_1_5",
+              "required": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type_id": "tv3_sexualizacion_comentarios_sexuales",
+      "order": 3,
+      "label": "Sexualización / Comentarios sexuales",
+      "notes": "Violencia simbólica y sexual normalizada",
+      "questions": [
+        {
+          "question_id": "P5",
+          "order": 5,
+          "stem": "¿Qué tan frecuente es que se hagan bromas o comentarios sexuales dirigidos a mujeres?",
+          "cards": [
+            {
+              "dimension": "frecuencia",
+              "prompt": "¿Cada cuánto forman parte de la convivencia diaria?",
+              "scale_id": "frecuencia_1_5",
+              "required": true
+            },
+            {
+              "dimension": "normalidad",
+              "prompt": "¿Se ven como bromas inofensivas o algo común del ambiente?",
+              "scale_id": "normalidad_1_5",
+              "required": true
+            },
+            {
+              "dimension": "gravedad",
+              "prompt": "Para ti, ¿qué tan grave es este tipo de trato hacia las mujeres?",
+              "scale_id": "gravedad_1_5",
+              "required": true
+            }
+          ]
+        },
+        {
+          "question_id": "P6",
+          "order": 6,
+          "stem": "¿Qué tan aceptado está opinar o juzgar la apariencia de una mujer?",
+          "cards": [
+            {
+              "dimension": "frecuencia",
+              "prompt": "¿Cada cuánto se hacen este tipo de comentarios?",
+              "scale_id": "frecuencia_1_5",
+              "required": true
+            },
+            {
+              "dimension": "normalidad",
+              "prompt": "¿Se percibe como algo permitido o esperado?",
+              "scale_id": "normalidad_1_5",
+              "required": true
+            },
+            {
+              "dimension": "gravedad",
+              "prompt": "¿Qué tan grave consideras que se juzgue a una mujer por su apariencia?",
+              "scale_id": "gravedad_1_5",
+              "required": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type_id": "tv4_hostigamiento_sexual",
+      "order": 4,
+      "label": "Hostigamiento sexual",
+      "notes": "Violencia sexual facilitada por el entorno",
+      "questions": [
+        {
+          "question_id": "P7",
+          "order": 7,
+          "stem": "Cuando hay insinuaciones sexuales no deseadas hacia una mujer, ¿qué tan común es que se minimicen?",
+          "cards": [
+            {
+              "dimension": "frecuencia",
+              "prompt": "¿Cada cuánto se restan importancia a estas situaciones?",
+              "scale_id": "frecuencia_1_5",
+              "required": true
+            },
+            {
+              "dimension": "normalidad",
+              "prompt": "¿Se ven como algo “normal” o inevitable?",
+              "scale_id": "normalidad_1_5",
+              "required": true
+            },
+            {
+              "dimension": "gravedad",
+              "prompt": "Para ti, ¿qué tan grave es normalizar este tipo de conductas?",
+              "scale_id": "gravedad_1_5",
+              "required": true
+            }
+          ]
+        },
+        {
+          "question_id": "P8",
+          "order": 8,
+          "stem": "¿En qué medida las relaciones de poder influyen para que estas situaciones continúen?",
+          "cards": [
+            {
+              "dimension": "frecuencia",
+              "prompt": "¿Con qué frecuencia notas que el poder impide que se detengan?",
+              "scale_id": "frecuencia_1_5",
+              "required": true
+            },
+            {
+              "dimension": "normalidad",
+              "prompt": "¿Se acepta que “así funcionan las jerarquías”?",
+              "scale_id": "normalidad_1_5",
+              "required": true
+            },
+            {
+              "dimension": "gravedad",
+              "prompt": "¿Qué tan grave es que el poder proteja este tipo de situaciones?",
+              "scale_id": "gravedad_1_5",
+              "required": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type_id": "tv5_abuso_de_poder",
+      "order": 5,
+      "label": "Abuso de poder",
+      "notes": "Violencia institucional y jerárquica",
+      "questions": [
+        {
+          "question_id": "P9",
+          "order": 9,
+          "stem": "¿Qué tan habitual es que una autoridad presione o controle a una mujer?",
+          "cards": [
+            {
+              "dimension": "frecuencia",
+              "prompt": "¿Cada cuánto observas este tipo de presión?",
+              "scale_id": "frecuencia_1_5",
+              "required": true
+            },
+            {
+              "dimension": "normalidad",
+              "prompt": "¿Se justifica por la posición o jerarquía?",
+              "scale_id": "normalidad_1_5",
+              "required": true
+            },
+            {
+              "dimension": "gravedad",
+              "prompt": "Para ti, ¿qué tan grave es este abuso de autoridad?",
+              "scale_id": "gravedad_1_5",
+              "required": true
+            }
+          ]
+        },
+        {
+          "question_id": "P10",
+          "order": 10,
+          "stem": "¿Qué tan frecuente es que una mujer enfrente consecuencias por cuestionar a una autoridad?",
+          "cards": [
+            {
+              "dimension": "frecuencia",
+              "prompt": "¿Cada cuánto ocurre esto en el entorno?",
+              "scale_id": "frecuencia_1_5",
+              "required": true
+            },
+            {
+              "dimension": "normalidad",
+              "prompt": "¿Se percibe como algo “normal” al cuestionar?",
+              "scale_id": "normalidad_1_5",
+              "required": true
+            },
+            {
+              "dimension": "gravedad",
+              "prompt": "¿Qué tan grave es castigar a una mujer por cuestionar decisiones?",
+              "scale_id": "gravedad_1_5",
+              "required": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type_id": "tv6_obstaculizacion_academica_laboral",
+      "order": 6,
+      "label": "Obstaculización académica o laboral",
+      "notes": "Violencia económica y patrimonial encubierta",
+      "questions": [
+        {
+          "question_id": "P11",
+          "order": 11,
+          "stem": "¿Qué tan difícil es para las mujeres acceder a oportunidades de desarrollo?",
+          "cards": [
+            {
+              "dimension": "frecuencia",
+              "prompt": "¿Cada cuánto observas estas dificultades?",
+              "scale_id": "frecuencia_1_5",
+              "required": true
+            },
+            {
+              "dimension": "normalidad",
+              "prompt": "¿Se ve como algo “normal” o esperado?",
+              "scale_id": "normalidad_1_5",
+              "required": true
+            },
+            {
+              "dimension": "gravedad",
+              "prompt": "¿Qué tan grave es limitar el desarrollo de las mujeres?",
+              "scale_id": "gravedad_1_5",
+              "required": true
+            }
+          ]
+        },
+        {
+          "question_id": "P12",
+          "order": 12,
+          "stem": "¿Qué tan común es que las mujeres carguen con tareas que frenan su crecimiento?",
+          "cards": [
+            {
+              "dimension": "frecuencia",
+              "prompt": "¿Cada cuánto se repite esta situación?",
+              "scale_id": "frecuencia_1_5",
+              "required": true
+            },
+            {
+              "dimension": "normalidad",
+              "prompt": "¿Estas cargas se asumen como algo natural?",
+              "scale_id": "normalidad_1_5",
+              "required": true
+            },
+            {
+              "dimension": "gravedad",
+              "prompt": "Para ti, ¿qué tan grave es que esto limite su desarrollo?",
+              "scale_id": "gravedad_1_5",
+              "required": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type_id": "tv7_violencia_digital",
+      "order": 7,
+      "label": "Violencia digital / mediática",
+      "notes": "Violencia normalizada en espacios digitales",
+      "questions": [
+        {
+          "question_id": "P13",
+          "order": 13,
+          "stem": "¿Qué tan frecuente es que mujeres reciban mensajes ofensivos o incómodos en espacios digitales?",
+          "cards": [
+            {
+              "dimension": "frecuencia",
+              "prompt": "¿Cada cuánto ocurre en estos espacios?",
+              "scale_id": "frecuencia_1_5",
+              "required": true
+            },
+            {
+              "dimension": "normalidad",
+              "prompt": "¿Se minimiza por tratarse de “mensajes en línea”?",
+              "scale_id": "normalidad_1_5",
+              "required": true
+            },
+            {
+              "dimension": "gravedad",
+              "prompt": "¿Qué tan grave consideras esta violencia digital?",
+              "scale_id": "gravedad_1_5",
+              "required": true
+            }
+          ]
+        },
+        {
+          "question_id": "P14",
+          "order": 14,
+          "stem": "¿Qué tan normalizado está compartir contenido sobre una mujer sin su consentimiento?",
+          "cards": [
+            {
+              "dimension": "frecuencia",
+              "prompt": "¿Cada cuánto sucede algo así?",
+              "scale_id": "frecuencia_1_5",
+              "required": true
+            },
+            {
+              "dimension": "normalidad",
+              "prompt": "¿Se percibe como algo sin consecuencias?",
+              "scale_id": "normalidad_1_5",
+              "required": true
+            },
+            {
+              "dimension": "gravedad",
+              "prompt": "¿Qué tan grave es vulnerar la privacidad de una mujer?",
+              "scale_id": "gravedad_1_5",
+              "required": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type_id": "tv8_agresion_o_amenaza",
+      "order": 8,
+      "label": "Agresión o amenaza",
+      "notes": "Violencia psicológica grave y clima de intimidación",
+      "questions": [
+        {
+          "question_id": "P15",
+          "order": 15,
+          "stem": "¿Qué tan común es que haya gritos o amenazas hacia mujeres?",
+          "cards": [
+            {
+              "dimension": "frecuencia",
+              "prompt": "¿Cada cuánto se presentan estas conductas?",
+              "scale_id": "frecuencia_1_5",
+              "required": true
+            },
+            {
+              "dimension": "normalidad",
+              "prompt": "¿Se toleran como parte del ambiente?",
+              "scale_id": "normalidad_1_5",
+              "required": true
+            },
+            {
+              "dimension": "gravedad",
+              "prompt": "Para ti, ¿qué tan grave es este clima de agresión?",
+              "scale_id": "gravedad_1_5",
+              "required": true
+            }
+          ]
+        },
+        {
+          "question_id": "P16",
+          "order": 16,
+          "stem": "¿En qué medida ciertas actitudes generan miedo o sensación de riesgo para las mujeres?",
+          "cards": [
+            {
+              "dimension": "frecuencia",
+              "prompt": "¿Cada cuánto notas este ambiente de riesgo?",
+              "scale_id": "frecuencia_1_5",
+              "required": true
+            },
+            {
+              "dimension": "normalidad",
+              "prompt": "¿Se acepta como algo “normal” del entorno?",
+              "scale_id": "normalidad_1_5",
+              "required": true
+            },
+            {
+              "dimension": "gravedad",
+              "prompt": "¿Qué tan grave es que las mujeres sientan miedo en este espacio?",
+              "scale_id": "gravedad_1_5",
+              "required": true
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "scoring": {
+    "coding": "1-5",
+    "per_question": {
+      "method": "store_raw",
+      "fields": ["frecuencia", "normalidad", "gravedad"]
+    },
+    "per_type_indices": {
+      "method": "mean",
+      "notes": "Para cada tipo: promedio de sus 2 preguntas por dimensión (F, N, G)."
+    },
+    "total_responses_expected": 48
+  },
+  "validation": {
+    "required_all_cards": true,
+    "allow_skip": false
+  }
+}

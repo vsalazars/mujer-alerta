@@ -1,0 +1,208 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* =========================================================
+   MUJER ALERTA — Paleta “Movimiento Mujeres” (Morados)
+   + Tipografía:
+     - Cuerpo: Montserrat (vía --font-geist-sans desde layout.tsx)
+     - Títulos: Poppins (vía --font-geist-mono desde layout.tsx)
+   (Sin tailwind.config.ts)
+   ========================================================= */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  /* Tu layout.tsx define estas variables con next/font:
+     --font-geist-sans  -> Montserrat
+     --font-geist-mono  -> Poppins
+  */
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+
+  --color-destructive: var(--destructive);
+
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+}
+
+/* =========================
+   LIGHT (default)
+   ========================= */
+:root {
+  --radius: 0.75rem;
+
+  /* Backgrounds / surfaces */
+  --background: oklch(0.992 0.005 315);          /* casi blanco lavanda */
+  --foreground: oklch(0.17 0.06 308);            /* tinta morada profunda */
+
+  --card: oklch(0.995 0.004 315);
+  --card-foreground: var(--foreground);
+
+  --popover: oklch(0.995 0.004 315);
+  --popover-foreground: var(--foreground);
+
+  /* Brand */
+  --primary: oklch(0.43 0.20 310);               /* morado movimiento */
+  --primary-foreground: oklch(0.985 0.01 315);   /* blanco lavanda */
+
+  --secondary: oklch(0.965 0.02 315);            /* lavanda suave */
+  --secondary-foreground: oklch(0.22 0.09 308);
+
+  --muted: oklch(0.972 0.015 315);
+  --muted-foreground: oklch(0.48 0.06 305);
+
+  --accent: oklch(0.93 0.04 315);                /* acento lavanda */
+  --accent-foreground: oklch(0.25 0.11 308);
+
+  /* Inputs / borders / ring */
+  --border: oklch(0.90 0.03 315);                /* borde lavanda gris */
+  --input: oklch(0.90 0.03 315);
+  --ring: oklch(0.55 0.18 312);                  /* morado vivo */
+
+  /* Destructive */
+  --destructive: oklch(0.577 0.245 27.325);
+
+  /* Charts (morado → violeta → magenta → lavanda) */
+  --chart-1: oklch(0.43 0.20 310);               /* morado */
+  --chart-2: oklch(0.50 0.19 300);               /* violeta */
+  --chart-3: oklch(0.56 0.21 330);               /* magenta */
+  --chart-4: oklch(0.70 0.14 320);               /* lavanda fuerte */
+  --chart-5: oklch(0.86 0.06 315);               /* lavanda claro */
+
+  /* Sidebar */
+  --sidebar: oklch(0.992 0.005 315);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: oklch(0.96 0.03 315);
+  --sidebar-accent-foreground: oklch(0.22 0.09 308);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+}
+
+/* =========================
+   DARK
+   ========================= */
+.dark {
+  --background: oklch(0.14 0.04 305);            /* negro morado */
+  --foreground: oklch(0.97 0.01 315);            /* lavanda claro */
+
+  --card: oklch(0.18 0.05 305);
+  --card-foreground: var(--foreground);
+
+  --popover: oklch(0.18 0.05 305);
+  --popover-foreground: var(--foreground);
+
+  --primary: oklch(0.72 0.16 312);               /* morado brillante */
+  --primary-foreground: oklch(0.16 0.05 305);
+
+  --secondary: oklch(0.24 0.05 305);
+  --secondary-foreground: var(--foreground);
+
+  --muted: oklch(0.24 0.05 305);
+  --muted-foreground: oklch(0.72 0.05 315);
+
+  --accent: oklch(0.26 0.07 310);
+  --accent-foreground: var(--foreground);
+
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.72 0.16 312);
+
+  --destructive: oklch(0.704 0.191 22.216);
+
+  /* Charts (dark: más saturados para contraste) */
+  --chart-1: oklch(0.72 0.16 312);
+  --chart-2: oklch(0.68 0.18 300);
+  --chart-3: oklch(0.66 0.22 330);
+  --chart-4: oklch(0.78 0.12 320);
+  --chart-5: oklch(0.90 0.05 315);
+
+  --sidebar: oklch(0.18 0.05 305);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: oklch(0.24 0.05 305);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+}
+
+/* =========================
+   BASE
+   ========================= */
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    /* Cuerpo = Montserrat */
+    font-family: var(--font-geist-sans);
+    text-rendering: geometricPrecision;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-geist-sans);
+  }
+
+  /* Títulos = Poppins (sin Tailwind config) */
+  h1, h2, h3, h4, h5, h6,
+  .font-heading {
+    font-family: var(--font-geist-mono);
+    letter-spacing: -0.01em;
+  }
+
+  /* Mejor legibilidad en textos largos */
+  p {
+    text-wrap: pretty;
+  }
+}

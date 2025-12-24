@@ -1,0 +1,305 @@
+package handlers
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+type CentroResultadosHandler struct {
+	DB *pgxpool.Pool
+}
+
+type CountItem struct {
+	Clave string `json:"clave"`
+	Label string `json:"label"`
+	Total int64  `json:"total"`
+}
+
+type CentroStats struct {
+	TotalParticipantes int64       `json:"total_participantes"`
+	TotalEncuestas     int64       `json:"total_encuestas"`
+	TotalRespuestas    int64       `json:"total_respuestas"`
+	EncuestasPorGenero []CountItem `json:"encuestas_por_genero"`
+	RespuestasPorGenero []CountItem `json:"respuestas_por_genero"`
+	EncuestasPorEdad   []CountItem `json:"encuestas_por_edad"`
+	RespuestasPorEdad  []CountItem `json:"respuestas_por_edad"`
+}
+
+type CentroResumenResponse struct {
+	Centros []int64       `json:"centros"`
+	Global  ResumenGlobal `json:"global"`
+	Matriz  []MatrizItem  `json:"matriz"`
+	Stats   CentroStats   `json:"stats"`
+}
+
+func writeJSONCentro(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(v)
+}
+
+func (h CentroResultadosHandler) ensureCentroRole(w http.ResponseWriter, r *http.Request) bool {
+	if UserRolFromCtx(r.Context()) != "centro" {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return false
+	}
+	return true
+}
+
+// GET /api/centro/resumen
+func (h CentroResultadosHandler) GetResumenCentro(w http.ResponseWriter, r *http.Request) {
+	if !h.ensureCentroRole(w, r) {
+		return
+	}
+
+	centros := UserCentrosFromCtx(r.Context())
+	if len(centros) == 0 {
+		http.Error(w, "no_centros", http.StatusForbidden)
+		return
+	}
+
+	ctx := r.Context()
+
+	// ==========================
+	// STATS CORRECTAS (JOIN + DISTINCT)
+	// ==========================
+	var totalParticipantes int64
+	var totalRespuestas int64
+
+	// participantes = encuestas con al menos 1 respuesta
+	if err := h.DB.QueryRow(ctx, `
+		select count(distinct e.id)
+		from encuestas e
+		join respuestas r on r.encuesta_id = e.id
+		where e.centro_id = any($1::bigint[])
+	`, centros).Scan(&totalParticipantes); err != nil {
+		http.Error(w, "db_error", http.StatusInternalServerError)
+		return
+	}
+
+	// total respuestas
+	if err := h.DB.QueryRow(ctx, `
+		select count(*)
+		from respuestas r
+		join encuestas e on e.id = r.encuesta_id
+		where e.centro_id = any($1::bigint[])
+	`, centros).Scan(&totalRespuestas); err != nil {
+		http.Error(w, "db_error", http.StatusInternalServerError)
+		return
+	}
+
+	if totalRespuestas == 0 {
+		http.Error(w, "no_data", http.StatusNotFound)
+		return
+	}
+
+	stats := CentroStats{
+		TotalParticipantes: totalParticipantes,
+		TotalEncuestas:     totalParticipantes, // en tu modelo: 1 encuesta = 1 participante
+		TotalRespuestas:    totalRespuestas,
+		EncuestasPorGenero: []CountItem{},
+		RespuestasPorGenero: []CountItem{},
+		EncuestasPorEdad:   []CountItem{},
+		RespuestasPorEdad:  []CountItem{},
+	}
+
+	// ==========================
+	// GLOBAL POR DIMENSIÓN
+	// ==========================
+	var g ResumenGlobal
+	rows, err := h.DB.Query(ctx, `
+		select r.dimension::text, avg(r.valor)::float8
+		from respuestas r
+		join encuestas e on e.id = r.encuesta_id
+		where e.centro_id = any($1::bigint[])
+		group by r.dimension
+	`, centros)
+	if err != nil {
+		http.Error(w, "db_error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var dim string
+		var avg float64
+		if err := rows.Scan(&dim, &avg); err != nil {
+			http.Error(w, "db_error", http.StatusInternalServerError)
+			return
+		}
+		switch dim {
+		case "frecuencia":
+			g.Frecuencia = avg
+		case "normalidad":
+			g.Normalidad = avg
+		case "gravedad":
+			g.Gravedad = avg
+		}
+	}
+
+	if err := h.DB.QueryRow(ctx, `
+		select avg(r.valor)::float8
+		from respuestas r
+		join encuestas e on e.id = r.encuesta_id
+		where e.centro_id = any($1::bigint[])
+	`, centros).Scan(&g.Total); err != nil {
+		http.Error(w, "db_error", http.StatusInternalServerError)
+		return
+	}
+
+	// ==========================
+	// MATRIZ POR TIPO + DIMENSIÓN
+	// ==========================
+	mrows, err := h.DB.Query(ctx, `
+		with mapa as (
+			select * from (values
+				('P1',1),('P2',1),
+				('P3',2),('P4',2),
+				('P5',3),('P6',3),
+				('P7',4),('P8',4),
+				('P9',5),('P10',5),
+				('P11',6),('P12',6),
+				('P13',7),('P14',7),
+				('P15',8),('P16',8)
+			) as t(pregunta_id, tipo_num)
+		),
+		tipos as (
+			select * from (values
+				(1,'Descalificación / Humillación'),
+				(2,'Discriminación por ser mujer'),
+				(3,'Sexualización / Comentarios sexuales'),
+				(4,'Hostigamiento sexual'),
+				(5,'Abuso de poder'),
+				(6,'Obstaculización académica o laboral'),
+				(7,'Violencia digital / mediática'),
+				(8,'Agresión o amenaza')
+			) as t(tipo_num, tipo_nombre)
+		)
+		select
+			t.tipo_num,
+			t.tipo_nombre,
+			r.dimension::text,
+			round(avg(r.valor)::numeric,2)::float8
+		from respuestas r
+		join encuestas e on e.id = r.encuesta_id
+		join mapa m on m.pregunta_id = r.pregunta_id
+		join tipos t on t.tipo_num = m.tipo_num
+		where e.centro_id = any($1::bigint[])
+		group by t.tipo_num, t.tipo_nombre, r.dimension
+		order by t.tipo_num, r.dimension
+	`, centros)
+	if err != nil {
+		http.Error(w, "db_error", http.StatusInternalServerError)
+		return
+	}
+	defer mrows.Close()
+
+	matriz := []MatrizItem{}
+	for mrows.Next() {
+		var it MatrizItem
+		if err := mrows.Scan(&it.TipoNum, &it.TipoNombre, &it.Dimension, &it.Promedio); err != nil {
+			http.Error(w, "db_error", http.StatusInternalServerError)
+			return
+		}
+		matriz = append(matriz, it)
+	}
+
+	// ==========================
+	// POR GÉNERO (REAL)
+	// ==========================
+	gr, _ := h.DB.Query(ctx, `
+		select g.clave, g.etiqueta, count(distinct e.id)
+		from encuestas e
+		join respuestas r on r.encuesta_id = e.id
+		join generos g on g.id = e.genero_id
+		where e.centro_id = any($1::bigint[])
+		group by g.clave, g.etiqueta
+		order by count(*) desc
+	`, centros)
+	for gr.Next() {
+		var it CountItem
+		gr.Scan(&it.Clave, &it.Label, &it.Total)
+		stats.EncuestasPorGenero = append(stats.EncuestasPorGenero, it)
+	}
+	gr.Close()
+
+	gr2, _ := h.DB.Query(ctx, `
+		select g.clave, g.etiqueta, count(*)
+		from respuestas r
+		join encuestas e on e.id = r.encuesta_id
+		join generos g on g.id = e.genero_id
+		where e.centro_id = any($1::bigint[])
+		group by g.clave, g.etiqueta
+		order by count(*) desc
+	`, centros)
+	for gr2.Next() {
+		var it CountItem
+		gr2.Scan(&it.Clave, &it.Label, &it.Total)
+		stats.RespuestasPorGenero = append(stats.RespuestasPorGenero, it)
+	}
+	gr2.Close()
+
+	// ==========================
+	// POR EDAD (BUCKETS)
+	// ==========================
+	edadKey := `
+		case
+			when e.edad < 18 then '<18'
+			when e.edad between 18 and 24 then '18-24'
+			when e.edad between 25 and 34 then '25-34'
+			when e.edad between 35 and 44 then '35-44'
+			when e.edad between 45 and 54 then '45-54'
+			when e.edad between 55 and 64 then '55-64'
+			else '65+'
+		end
+	`
+
+	qEdadEnc := fmt.Sprintf(`
+		select %s as clave, %s as label, count(distinct e.id)
+		from encuestas e
+		join respuestas r on r.encuesta_id = e.id
+		where e.centro_id = any($1::bigint[])
+		group by 1,2
+		order by count(*) desc
+	`, edadKey, edadKey)
+
+	er, _ := h.DB.Query(ctx, qEdadEnc, centros)
+	for er.Next() {
+		var it CountItem
+		er.Scan(&it.Clave, &it.Label, &it.Total)
+		stats.EncuestasPorEdad = append(stats.EncuestasPorEdad, it)
+	}
+	er.Close()
+
+	qEdadResp := fmt.Sprintf(`
+		select %s as clave, %s as label, count(*)
+		from respuestas r
+		join encuestas e on e.id = r.encuesta_id
+		where e.centro_id = any($1::bigint[])
+		group by 1,2
+		order by count(*) desc
+	`, edadKey, edadKey)
+
+	er2, _ := h.DB.Query(ctx, qEdadResp, centros)
+	for er2.Next() {
+		var it CountItem
+		er2.Scan(&it.Clave, &it.Label, &it.Total)
+		stats.RespuestasPorEdad = append(stats.RespuestasPorEdad, it)
+	}
+	er2.Close()
+
+	// ==========================
+	// RESPONSE FINAL
+	// ==========================
+	resp := CentroResumenResponse{
+		Centros: centros,
+		Global:  g,
+		Matriz:  matriz,
+		Stats:   stats,
+	}
+
+	writeJSONCentro(w, http.StatusOK, resp)
+}
