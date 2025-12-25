@@ -19,6 +19,8 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ResponsiveWaffle } from "@nivo/waffle";
+
 
 /* ======= Nivo (SVG versions, like official docs) ======= */
 const ResponsiveHeatMap = dynamic(
@@ -224,7 +226,7 @@ export default function CentroPage() {
     const mkRow = (id: string, dim: MatrizItem["dimension"]) => ({
       id,
       data: tipos.map((t) => ({
-        x: `#${t.n} ${t.name}`,
+        x: `${t.name}`,
         y: Number((map.get(`${dim}:${t.n}`) ?? 0).toFixed(2)),
       })),
     });
@@ -365,7 +367,7 @@ export default function CentroPage() {
                       color: PURPLE,
                     }}
                   >
-                    Total: {pctFrom5(data.global.total)}%
+                    Total de percepción de violencia contra la mujer: {pctFrom5(data.global.total)}%
                   </Badge>
 
                   {showSemantic ? (
@@ -407,13 +409,13 @@ export default function CentroPage() {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-black tracking-wide">
-                  KPIs
+                  Principales indicadores
                 </CardTitle>
                 <Badge
                   variant="secondary"
                   className="rounded-full font-black uppercase tracking-widest text-[10px]"
                 >
-                  Vista rápida
+                  Resumen
                 </Badge>
               </div>
             </CardHeader>
@@ -534,7 +536,7 @@ export default function CentroPage() {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-black tracking-wide">
-                  Radar global
+                  Radar de vectores de violencia
                 </CardTitle>
                 <div className="flex items-center gap-2">
                   <RadarIcon className="h-4 w-4" style={{ color: PURPLE }} />
@@ -542,7 +544,7 @@ export default function CentroPage() {
                     variant="secondary"
                     className="rounded-full font-black text-[10px] uppercase tracking-widest"
                   >
-                    1–5
+                    Vectores
                   </Badge>
                 </div>
               </div>
@@ -614,7 +616,7 @@ export default function CentroPage() {
                     variant="secondary"
                     className="rounded-full font-black text-[10px] uppercase tracking-widest"
                   >
-                    Respuestas
+                    Género
                   </Badge>
                 </div>
               </div>
@@ -655,7 +657,7 @@ export default function CentroPage() {
                     variant="secondary"
                     className="rounded-full font-black text-[10px] uppercase tracking-widest"
                   >
-                    Respuestas
+                    Edad
                   </Badge>
                 </div>
               </div>
@@ -693,12 +695,7 @@ export default function CentroPage() {
               </CardTitle>
               <div className="flex items-center gap-2">
                 <Grid3X3 className="h-4 w-4" style={{ color: PURPLE }} />
-                <Badge
-                  variant="secondary"
-                  className="rounded-full font-black text-[10px] uppercase tracking-widest"
-                >
-                  0–5 fijo
-                </Badge>
+                
               </div>
             </div>
           </CardHeader>
@@ -800,12 +797,7 @@ export default function CentroPage() {
               </CardTitle>
               <div className="flex items-center gap-2">
                 <BarChart3 className="h-4 w-4" style={{ color: PURPLE }} />
-                <Badge
-                  variant="secondary"
-                  className="rounded-full font-black text-[10px] uppercase tracking-widest"
-                >
-                  Barras agrupadas · 1–5
-                </Badge>
+                
               </div>
             </div>
           </CardHeader>

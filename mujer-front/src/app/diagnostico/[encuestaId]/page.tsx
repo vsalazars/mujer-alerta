@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 import {
@@ -11,6 +11,7 @@ import {
 } from "../../../components/ui/card";
 import { Button } from "../../../components/ui/button";
 import { Separator } from "../../../components/ui/separator";
+import { Textarea } from "../../../components/ui/textarea";
 
 import { api } from "../../../lib/api";
 
@@ -114,6 +115,72 @@ type RespuestaItem = {
   valor: number;
 };
 
+// ===== LocalStorage helpers (NUEVO) =====
+const LS_VERSION = 1;
+
+function storageKey(encuestaId: string) {
+  return `mujer_alerta:diagnostico:${encuestaId}:v${LS_VERSION}`;
+}
+
+type SavedProgress = {
+  v: number;
+  updated_at: number;
+  qIndex: number;
+  comentario: string;
+  answers: Record<string, number>;
+};
+
+function safeReadProgress(key: string): SavedProgress | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!isObject(parsed)) return null;
+
+    const v = Number((parsed as any).v);
+    const updated_at = Number((parsed as any).updated_at);
+    const qIndex = Number((parsed as any).qIndex);
+    const comentario = typeof (parsed as any).comentario === "string" ? (parsed as any).comentario : "";
+    const answersRaw = (parsed as any).answers;
+
+    if (!Number.isFinite(v) || v !== LS_VERSION) return null;
+    if (!Number.isFinite(updated_at)) return null;
+    if (!Number.isFinite(qIndex)) return null;
+    if (!isObject(answersRaw)) return null;
+
+    const answers: Record<string, number> = {};
+    for (const [k, val] of Object.entries(answersRaw)) {
+      const n = Number(val);
+      if (typeof k === "string" && Number.isFinite(n)) {
+        answers[k] = n;
+      }
+    }
+
+    return { v, updated_at, qIndex, comentario, answers };
+  } catch {
+    return null;
+  }
+}
+
+function safeWriteProgress(key: string, payload: SavedProgress) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(payload));
+  } catch {
+    // storage full / blocked: no hacemos nada (no rompe UX)
+  }
+}
+
+function safeRemoveProgress(key: string) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+}
+
 export default function DiagnosticoEncuestaPage() {
   const params = useParams<{ encuestaId: string }>();
   const encuestaId = params?.encuestaId || "";
@@ -127,6 +194,13 @@ export default function DiagnosticoEncuestaPage() {
 
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [qIndex, setQIndex] = useState(0);
+
+  // ✅ Comentario opcional
+  const [comentario, setComentario] = useState<string>("");
+
+  // ===== NUEVO: flags para evitar que el autoguardado sobreescriba al cargar =====
+  const hydratedRef = useRef(false);
+  const saveTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -190,9 +264,12 @@ export default function DiagnosticoEncuestaPage() {
     return flat as Instrumento["types_of_violence"][number]["questions"];
   }, [inst]);
 
-  const current = questions[qIndex];
-
   const totalQuestions = questions.length || 16;
+
+  // ✅ Paso extra comentario
+  const isCommentStep = qIndex === totalQuestions;
+  const current = !isCommentStep ? questions[qIndex] : null;
+
   const totalExpected =
     (inst as any)?.scoring?.total_responses_expected ?? totalQuestions * 3;
 
@@ -228,7 +305,7 @@ export default function DiagnosticoEncuestaPage() {
   }
 
   function goNext() {
-    setQIndex((i) => Math.min(totalQuestions - 1, i + 1));
+    setQIndex((i) => Math.min(totalQuestions, i + 1));
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -244,6 +321,63 @@ export default function DiagnosticoEncuestaPage() {
     }
     return -1;
   }
+
+  // ===== NUEVO: hidratar progreso desde localStorage cuando ya tenemos questions =====
+  useEffect(() => {
+    if (!encuestaId) return;
+    if (!inst) return; // esperamos a que haya instrumento
+    if (!questions.length) return; // esperamos preguntas reales
+
+    const key = storageKey(encuestaId);
+    const saved = safeReadProgress(key);
+
+    if (saved && !hydratedRef.current) {
+      // clamp del índice: 0..totalQuestions (incluye comentario)
+      const maxIdx = totalQuestions;
+      const nextIdx = clamp(saved.qIndex, 0, maxIdx);
+
+      setAnswers(saved.answers || {});
+      setComentario(typeof saved.comentario === "string" ? saved.comentario : "");
+      setQIndex(nextIdx);
+
+      hydratedRef.current = true;
+      return;
+    }
+
+    // si no hay saved, marcamos hidratado para habilitar autoguardado
+    hydratedRef.current = true;
+  }, [encuestaId, inst, questions.length, totalQuestions]);
+
+  // ===== NUEVO: autoguardado (debounced) =====
+  useEffect(() => {
+    if (!encuestaId) return;
+    if (!hydratedRef.current) return;
+
+    const key = storageKey(encuestaId);
+
+    // debounce 250ms para no escribir a cada click/tecla
+    if (saveTimerRef.current) {
+      window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+
+    saveTimerRef.current = window.setTimeout(() => {
+      safeWriteProgress(key, {
+        v: LS_VERSION,
+        updated_at: Date.now(),
+        qIndex,
+        comentario,
+        answers,
+      });
+    }, 250);
+
+    return () => {
+      if (saveTimerRef.current) {
+        window.clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+    };
+  }, [encuestaId, qIndex, comentario, answers]);
 
   async function onSubmitAll() {
     if (!inst) return;
@@ -273,13 +407,19 @@ export default function DiagnosticoEncuestaPage() {
 
     setSaving(true);
     try {
+      const cleanComment = comentario.trim();
+
       await api<{ ok: boolean }>("/api/respuestas", {
         method: "POST",
         body: JSON.stringify({
           encuesta_id: encuestaId,
           respuestas,
+          comentario: cleanComment ? cleanComment : undefined,
         }),
       });
+
+      // ✅ NUEVO: al finalizar, borrar progreso guardado
+      safeRemoveProgress(storageKey(encuestaId));
 
       router.push(`/resumen/${encuestaId}`);
     } catch (err: any) {
@@ -334,7 +474,7 @@ export default function DiagnosticoEncuestaPage() {
     );
   }
 
-  if (!inst || !current) {
+  if (!inst || (!current && !isCommentStep)) {
     return (
       <main className="min-h-dvh bg-white">
         <div className="mx-auto w-full max-w-md px-5 py-8">
@@ -353,21 +493,26 @@ export default function DiagnosticoEncuestaPage() {
     );
   }
 
-  // ✅ SNAP por pregunta (dot siempre avanza con qIndex)
-  const steps = Math.max(1, totalQuestions);
+  // ✅ SNAP por paso (incluye comentario como paso final)
+  const steps = Math.max(1, totalQuestions + 1);
   const denom = Math.max(1, steps - 1);
   const snapPct = clamp((qIndex / denom) * 100, 0, 100);
-  const snapPctLabel = Math.round(((qIndex + 1) / steps) * 100);
-  const stepLabel = `Paso ${qIndex + 1} de ${steps}`;
 
-  // rail útil (dot no se corta)
+  // ✅ Etiqueta: en comentario debe ser 100%
+  const snapPctLabel = isCommentStep
+    ? 100
+    : Math.round(((qIndex + 1) / steps) * 100);
+
+  const stepLabel = isCommentStep
+    ? `Comentario (opcional)`
+    : `Paso ${qIndex + 1} de ${totalQuestions}`;
+
   const railWidthExpr = `(100% - ${DOT_SIZE}px)`;
   const dotLeft = `calc(${DOT_R}px + (${snapPct} / 100) * ${railWidthExpr})`;
   const fillWidth = `calc((${snapPct} / 100) * ${railWidthExpr})`;
 
   return (
     <main className="h-dvh bg-white overflow-hidden">
-      {/* ↓↓↓ Ajuste: menos padding vertical + safe-area inferior para que NO se corte */}
       <div className="mx-auto h-dvh w-full max-w-md px-5 py-5 pb-[env(safe-area-inset-bottom)] flex flex-col">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
@@ -378,7 +523,6 @@ export default function DiagnosticoEncuestaPage() {
               {inst.name}
             </h2>
 
-            {/* ✅ Barra PRO: degradado + glow + dot snap */}
             <div className="mt-2">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-medium text-neutral-600">
@@ -401,13 +545,11 @@ export default function DiagnosticoEncuestaPage() {
                 aria-valuemax={100}
                 aria-valuenow={Math.round(snapPct)}
               >
-                {/* Track */}
                 <div
                   className="absolute inset-0 rounded-full"
                   style={{ backgroundColor: "rgba(122,0,60,0.12)" }}
                 />
 
-                {/* Fill con degradado + glow */}
                 <div
                   className="absolute left-0 top-0 h-full rounded-full transition-[width] duration-300 ease-out"
                   style={{
@@ -417,7 +559,6 @@ export default function DiagnosticoEncuestaPage() {
                   }}
                 />
 
-                {/* Dot */}
                 <div
                   className="absolute top-1/2 -translate-y-1/2 transition-[left] duration-250 ease-out"
                   style={{ left: dotLeft }}
@@ -447,160 +588,192 @@ export default function DiagnosticoEncuestaPage() {
           </p>
         ) : null}
 
-        {/* ✅ Card a altura fija ocupando el resto de la pantalla */}
-        {/* ↓↓↓ Ajuste: mt-6 -> mt-4 para ganar espacio vertical */}
         <Card className="mt-4 mb-2 flex-1 min-h-0 flex flex-col">
-
           <CardHeader>
             <CardTitle
               className="text-base font-heading font-semibold leading-snug"
               style={{ color: "var(--primary)" }}
             >
-              {current.question_id}. {current.stem}
+              {isCommentStep
+                ? "Comentario final (opcional)"
+                : `${current!.question_id}. ${current!.stem}`}
             </CardTitle>
           </CardHeader>
 
-          {/* ✅ Mantener formato: no tocamos tus colores ni estilos internos,
-              solo hacemos que el CardContent distribuya altura sin scroll */}
           <CardContent className="flex-1 min-h-0 flex flex-col overflow-hidden">
-            {/* Top: contenido con tu mismo espaciado */}
-            {/* ↓↓↓ Ajuste: space-y-6 -> space-y-4 para que quepan botones */}
-            <div className="space-y-4">
-              {Array.isArray(current.cards) &&
-                current.cards.map((c) => {
-                  const scale = pickScale(inst as any, c.scale_id);
-                  const picked = answers[`${current.question_id}:${c.dimension}`];
+            {isCommentStep ? (
+              <div className="flex-1 min-h-0 flex flex-col">
+                <p className="text-sm text-neutral-700">
+                  Si quieres, deja un comentario breve sobre el entorno del centro. No es
+                  obligatorio.
+                </p>
 
-                  if (!scale) {
-                    return (
-                      <div
-                        key={`${current.question_id}:${c.dimension}`}
-                        className="rounded-xl border p-3"
-                      >
-                        <p className="text-sm text-neutral-700">
-                          No se encontró la escala <code>{c.scale_id}</code>.
-                        </p>
-                      </div>
-                    );
-                  }
+                <div className="mt-3 flex-1 min-h-0">
+                  <Textarea
+                    value={comentario}
+                    onChange={(e) => setComentario(e.target.value)}
+                    placeholder="Escribe aquí (opcional)…"
+                    className="min-h-[160px] resize-none rounded-2xl"
+                    maxLength={2000}
+                  />
+                  <div className="mt-2 flex items-center justify-between text-[11px] text-neutral-500">
+                    <span>Máximo 2000 caracteres.</span>
+                    <span className="tabular-nums">
+                      {Math.min(2000, comentario.length)}/2000
+                    </span>
+                  </div>
+                </div>
 
-                  return (
-                    <div
-                      key={`${current.question_id}:${c.dimension}`}
-                      className="space-y-3"
+                <Separator className="my-4" />
+
+                <div className="mt-auto">
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      className="h-12 flex-1 rounded-full"
+                      onClick={goPrev}
                     >
-                      <p className="text-sm font-medium text-neutral-800">
-                        {c.prompt}
-                      </p>
+                      Atrás
+                    </Button>
 
-                      <div className="grid grid-cols-5 gap-2">
-                        {scale.options.map((opt) => {
-                          const active = picked === opt.value;
-                          return (
-                            <button
-                              key={opt.value}
-                              type="button"
-                              onClick={() =>
-                                setAnswer(
-                                  current.question_id,
-                                  c.dimension,
-                                  opt.value
-                                )
-                              }
-                              aria-pressed={active}
-                              className={[
-                                "h-11 w-11 rounded-full flex items-center justify-center",
-                                "border transition-colors duration-150",
-                                "focus-visible:outline-none focus-visible:ring-2",
-                                active ? "font-bold" : "font-medium",
-                              ].join(" ")}
+                    <Button
+                      className="h-12 flex-1 rounded-full text-base font-semibold"
+                      style={{ backgroundColor: BRAND }}
+                      onClick={onSubmitAll}
+                      disabled={!allDone || saving}
+                    >
+                      {saving ? "Guardando…" : "Finalizar"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-4">
+                  {Array.isArray(current!.cards) &&
+                    current!.cards.map((c) => {
+                      const scale = pickScale(inst as any, c.scale_id);
+                      const picked = answers[`${current!.question_id}:${c.dimension}`];
+
+                      if (!scale) {
+                        return (
+                          <div
+                            key={`${current!.question_id}:${c.dimension}`}
+                            className="rounded-xl border p-3"
+                          >
+                            <p className="text-sm text-neutral-700">
+                              No se encontró la escala <code>{c.scale_id}</code>.
+                            </p>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div
+                          key={`${current!.question_id}:${c.dimension}`}
+                          className="space-y-3"
+                        >
+                          <p className="text-sm font-medium text-neutral-800">
+                            {c.prompt}
+                          </p>
+
+                          <div className="grid grid-cols-5 gap-2">
+                            {scale.options.map((opt) => {
+                              const active = picked === opt.value;
+                              return (
+                                <button
+                                  key={opt.value}
+                                  type="button"
+                                  onClick={() =>
+                                    setAnswer(
+                                      current!.question_id,
+                                      c.dimension,
+                                      opt.value
+                                    )
+                                  }
+                                  aria-pressed={active}
+                                  className={[
+                                    "h-11 w-11 rounded-full flex items-center justify-center",
+                                    "border transition-colors duration-150",
+                                    "focus-visible:outline-none focus-visible:ring-2",
+                                    active ? "font-bold" : "font-medium",
+                                  ].join(" ")}
+                                  style={{
+                                    backgroundColor: active
+                                      ? "var(--primary)"
+                                      : "transparent",
+                                    color: active
+                                      ? "var(--primary-foreground)"
+                                      : "var(--foreground)",
+                                    borderColor: active
+                                      ? "var(--primary)"
+                                      : "var(--border)",
+                                    boxShadow: active
+                                      ? "0 0 0 4px color-mix(in oklch, var(--ring) 35%, transparent)"
+                                      : "none",
+                                  }}
+                                >
+                                  {opt.value}
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          <div className="flex justify-between text-[11px] leading-none">
+                            <span
+                              className="px-2 py-1 rounded-full font-bold"
                               style={{
-                                backgroundColor: active
-                                  ? "var(--primary)"
-                                  : "transparent",
-                                color: active
-                                  ? "var(--primary-foreground)"
-                                  : "var(--foreground)",
-                                borderColor: active
-                                  ? "var(--primary)"
-                                  : "var(--border)",
-                                boxShadow: active
-                                  ? "0 0 0 4px color-mix(in oklch, var(--ring) 35%, transparent)"
-                                  : "none",
+                                color: "var(--chart-2)",
+                                background:
+                                  "color-mix(in oklch, var(--accent) 70%, transparent)",
+                                border: "1px solid var(--border)",
                               }}
                             >
-                              {opt.value}
-                            </button>
-                          );
-                        })}
-                      </div>
+                              {scale.options[0]?.label}
+                            </span>
 
-                      <div className="flex justify-between text-[11px] leading-none">
-                        <span
-                          className="px-2 py-1 rounded-full font-bold"
-                          style={{
-                            color: "var(--chart-2)",
-                            background:
-                              "color-mix(in oklch, var(--accent) 70%, transparent)",
-                            border: "1px solid var(--border)",
-                          }}
-                        >
-                          {scale.options[0]?.label}
-                        </span>
+                            <span
+                              className="px-2 py-1 rounded-full font-bold"
+                              style={{
+                                color: "var(--chart-2)",
+                                background:
+                                  "color-mix(in oklch, var(--accent) 70%, transparent)",
+                                border: "1px solid var(--border)",
+                              }}
+                            >
+                              {scale.options[scale.options.length - 1]?.label}
+                            </span>
+                          </div>
 
-                        <span
-                          className="px-2 py-1 rounded-full font-bold"
-                          style={{
-                            color: "var(--chart-2)",
-                            background:
-                              "color-mix(in oklch, var(--accent) 70%, transparent)",
-                            border: "1px solid var(--border)",
-                          }}
-                        >
-                          {scale.options[scale.options.length - 1]?.label}
-                        </span>
-                      </div>
+                          <Separator />
+                        </div>
+                      );
+                    })}
+                </div>
 
-                      <Separator />
-                    </div>
-                  );
-                })}
-            </div>
+                <div className="mt-auto pt-4">
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      className="h-12 flex-1 rounded-full"
+                      onClick={goPrev}
+                      disabled={qIndex === 0}
+                    >
+                      Atrás
+                    </Button>
 
-            {/* Bottom: botones siempre abajo, sin scroll */}
-            {/* ↓↓↓ Ajuste: pt-6 -> pt-4 para ganar espacio */}
-            <div className="mt-auto pt-4">
-              <div className="flex gap-3">
-                <Button
-                  variant="outline"
-                  className="h-12 flex-1 rounded-full"
-                  onClick={goPrev}
-                  disabled={qIndex === 0}
-                >
-                  Atrás
-                </Button>
-
-                {qIndex < totalQuestions - 1 ? (
-                  <Button
-                    className="h-12 flex-1 rounded-full text-base font-semibold"
-                    style={{ backgroundColor: BRAND }}
-                    onClick={goNext}
-                    disabled={!currentDone}
-                  >
-                    Siguiente
-                  </Button>
-                ) : (
-                  <Button
-                    className="h-12 flex-1 rounded-full text-base font-semibold"
-                    style={{ backgroundColor: BRAND }}
-                    onClick={onSubmitAll}
-                    disabled={!allDone || saving}
-                  >
-                    {saving ? "Guardando…" : "Finalizar"}
-                  </Button>
-                )}
-              </div>
-            </div>
+                    <Button
+                      className="h-12 flex-1 rounded-full text-base font-semibold"
+                      style={{ backgroundColor: BRAND }}
+                      onClick={goNext}
+                      disabled={!currentDone}
+                    >
+                      {qIndex < totalQuestions - 1 ? "Siguiente" : "Continuar"}
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

@@ -21,13 +21,16 @@ type RespuestaItem struct {
 }
 
 type SaveRespuestasRequest struct {
-	EncuestaID string         `json:"encuesta_id"`
+	EncuestaID string          `json:"encuesta_id"`
 	Respuestas []RespuestaItem `json:"respuestas"`
+
+	// NUEVO: comentario final opcional (1 por encuesta)
+	Comentario *string `json:"comentario,omitempty"`
 }
 
 type SaveRespuestasResponse struct {
-	Ok     bool `json:"ok"`
-	Inserted int `json:"inserted"`
+	Ok       bool `json:"ok"`
+	Inserted int  `json:"inserted"`
 }
 
 var rePregunta = regexp.MustCompile(`^P([1-9]|1[0-6])$`)
@@ -48,6 +51,23 @@ func (h RespuestasHandler) Save(w http.ResponseWriter, r *http.Request) {
 	if len(req.Respuestas) != 48 {
 		http.Error(w, "need_48_answers", http.StatusBadRequest)
 		return
+	}
+
+	// NUEVO: normalizar comentario (opcional)
+	var comentario *string = nil
+	if req.Comentario != nil {
+		c := strings.TrimSpace(*req.Comentario)
+		if c == "" {
+			comentario = nil
+		} else {
+			// límite defensivo para evitar payloads enormes
+			// (si también pusiste CHECK en BD, mejor)
+			if len([]rune(c)) > 2000 {
+				http.Error(w, "bad_comentario", http.StatusBadRequest)
+				return
+			}
+			comentario = &c
+		}
 	}
 
 	ctx := r.Context()
@@ -72,8 +92,8 @@ func (h RespuestasHandler) Save(w http.ResponseWriter, r *http.Request) {
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	batch := &pgx.Batch{}
-
 	inserted := 0
+
 	for _, it := range req.Respuestas {
 		pid := strings.TrimSpace(it.PreguntaID)
 		dim := strings.TrimSpace(strings.ToLower(it.Dimension))
@@ -108,8 +128,23 @@ func (h RespuestasHandler) Save(w http.ResponseWriter, r *http.Request) {
 		inserted++
 	}
 
+	// Ejecutar batch de respuestas
 	br := tx.SendBatch(ctx, batch)
 	if err := br.Close(); err != nil {
+		http.Error(w, "db_error", http.StatusInternalServerError)
+		return
+	}
+
+	// NUEVO: guardar comentario opcional (1 por encuesta) + marcar finished_at
+	// - Si comentario == nil, lo dejamos como NULL (no forzamos a borrar nada existente).
+	// - finished_at siempre se marca al guardar respuestas (si prefieres otra lógica, lo ajustamos).
+	if _, err := tx.Exec(ctx, `
+		update encuestas
+		set
+			comentario = coalesce($2, comentario),
+			finished_at = now()
+		where id = $1
+	`, req.EncuestaID, comentario); err != nil {
 		http.Error(w, "db_error", http.StatusInternalServerError)
 		return
 	}
