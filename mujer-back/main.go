@@ -253,6 +253,20 @@ func main() {
 	})
 
 	// ======================
+	// Centro: Años disponibles (solo años con datos)
+	// ======================
+	mux.HandleFunc("/api/centro/years", func(w http.ResponseWriter, r *http.Request) {
+		handlers.RequireJWT(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodGet {
+				crh.GetCentroYears(w, r)
+				return
+			}
+			http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+		})).ServeHTTP(w, r)
+	})
+
+
+	// ======================
 	// CORS
 	// ======================
 	handler := handlers.CORS(mux, handlers.CORSOptions{

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -27,6 +28,15 @@ type GeneroDimItem struct {
 	Gravedad   float64 `json:"gravedad"`
 }
 
+/* ✅ NUEVO: comentario tal cual en encuestas.comentario */
+type ComentarioItem struct {
+	EncuestaID string `json:"encuesta_id"`
+	Fecha      string `json:"fecha"`  // string ISO simple
+	Genero     string `json:"genero"` // etiqueta de generos
+	Edad       int    `json:"edad"`
+	Texto      string `json:"texto"`
+}
+
 type CentroStats struct {
 	TotalParticipantes  int64       `json:"total_participantes"`
 	TotalEncuestas      int64       `json:"total_encuestas"`
@@ -38,6 +48,9 @@ type CentroStats struct {
 
 	/* ✅ NUEVO */
 	ResumenPorGenero []GeneroDimItem `json:"resumen_por_genero"`
+
+	/* ✅ NUEVO: TODOS los comentarios */
+	Comentarios []ComentarioItem `json:"comentarios"`
 }
 
 type CentroResumenResponse struct {
@@ -45,6 +58,11 @@ type CentroResumenResponse struct {
 	Global  ResumenGlobal `json:"global"`
 	Matriz  []MatrizItem  `json:"matriz"`
 	Stats   CentroStats   `json:"stats"`
+}
+
+/* ✅ NUEVO: years disponibles para selector */
+type CentroYearsResponse struct {
+	Years []int `json:"years"`
 }
 
 func writeJSONCentro(w http.ResponseWriter, status int, v any) {
@@ -62,6 +80,8 @@ func (h CentroResultadosHandler) ensureCentroRole(w http.ResponseWriter, r *http
 }
 
 // GET /api/centro/resumen
+// ✅ Nuevo: ?year=2025 (filtra por EXTRACT(YEAR FROM e.finished_at))
+// ✅ Solo encuestas finalizadas (e.finished_at IS NOT NULL) cuando se usa el endpoint
 func (h CentroResultadosHandler) GetResumenCentro(w http.ResponseWriter, r *http.Request) {
 	if !h.ensureCentroRole(w, r) {
 		return
@@ -76,29 +96,46 @@ func (h CentroResultadosHandler) GetResumenCentro(w http.ResponseWriter, r *http
 	ctx := r.Context()
 
 	// ==========================
+	// ✅ NUEVO: year opcional (?year=2025)
+	// ==========================
+	var year *int
+	if ys := r.URL.Query().Get("year"); ys != "" {
+		yi, err := strconv.Atoi(ys)
+		if err != nil {
+			http.Error(w, "bad_year", http.StatusBadRequest)
+			return
+		}
+		year = &yi
+	}
+
+	// ==========================
 	// STATS CORRECTAS (JOIN + DISTINCT)
 	// ==========================
 	var totalParticipantes int64
 	var totalRespuestas int64
 
-	// participantes = encuestas con al menos 1 respuesta
+	// participantes = encuestas (finalizadas) con al menos 1 respuesta
 	if err := h.DB.QueryRow(ctx, `
 		select count(distinct e.id)
 		from encuestas e
 		join respuestas r on r.encuesta_id = e.id
 		where e.centro_id = any($1::bigint[])
-	`, centros).Scan(&totalParticipantes); err != nil {
+		  and e.finished_at is not null
+		  and ($2::int is null or extract(year from e.finished_at) = $2)
+	`, centros, year).Scan(&totalParticipantes); err != nil {
 		http.Error(w, "db_error", http.StatusInternalServerError)
 		return
 	}
 
-	// total respuestas
+	// total respuestas (solo finalizadas)
 	if err := h.DB.QueryRow(ctx, `
 		select count(*)
 		from respuestas r
 		join encuestas e on e.id = r.encuesta_id
 		where e.centro_id = any($1::bigint[])
-	`, centros).Scan(&totalRespuestas); err != nil {
+		  and e.finished_at is not null
+		  and ($2::int is null or extract(year from e.finished_at) = $2)
+	`, centros, year).Scan(&totalRespuestas); err != nil {
 		http.Error(w, "db_error", http.StatusInternalServerError)
 		return
 	}
@@ -119,6 +156,9 @@ func (h CentroResultadosHandler) GetResumenCentro(w http.ResponseWriter, r *http
 
 		/* ✅ NUEVO */
 		ResumenPorGenero: []GeneroDimItem{},
+
+		/* ✅ NUEVO */
+		Comentarios: []ComentarioItem{},
 	}
 
 	// ==========================
@@ -130,8 +170,10 @@ func (h CentroResultadosHandler) GetResumenCentro(w http.ResponseWriter, r *http
 		from respuestas r
 		join encuestas e on e.id = r.encuesta_id
 		where e.centro_id = any($1::bigint[])
+		  and e.finished_at is not null
+		  and ($2::int is null or extract(year from e.finished_at) = $2)
 		group by r.dimension
-	`, centros)
+	`, centros, year)
 	if err != nil {
 		http.Error(w, "db_error", http.StatusInternalServerError)
 		return
@@ -160,7 +202,9 @@ func (h CentroResultadosHandler) GetResumenCentro(w http.ResponseWriter, r *http
 		from respuestas r
 		join encuestas e on e.id = r.encuesta_id
 		where e.centro_id = any($1::bigint[])
-	`, centros).Scan(&g.Total); err != nil {
+		  and e.finished_at is not null
+		  and ($2::int is null or extract(year from e.finished_at) = $2)
+	`, centros, year).Scan(&g.Total); err != nil {
 		http.Error(w, "db_error", http.StatusInternalServerError)
 		return
 	}
@@ -203,9 +247,11 @@ func (h CentroResultadosHandler) GetResumenCentro(w http.ResponseWriter, r *http
 		join mapa m on m.pregunta_id = r.pregunta_id
 		join tipos t on t.tipo_num = m.tipo_num
 		where e.centro_id = any($1::bigint[])
+		  and e.finished_at is not null
+		  and ($2::int is null or extract(year from e.finished_at) = $2)
 		group by t.tipo_num, t.tipo_nombre, r.dimension
 		order by t.tipo_num, r.dimension
-	`, centros)
+	`, centros, year)
 	if err != nil {
 		http.Error(w, "db_error", http.StatusInternalServerError)
 		return
@@ -231,9 +277,11 @@ func (h CentroResultadosHandler) GetResumenCentro(w http.ResponseWriter, r *http
 		join respuestas r on r.encuesta_id = e.id
 		join generos g on g.id = e.genero_id
 		where e.centro_id = any($1::bigint[])
+		  and e.finished_at is not null
+		  and ($2::int is null or extract(year from e.finished_at) = $2)
 		group by g.clave, g.etiqueta
 		order by count(*) desc
-	`, centros)
+	`, centros, year)
 	for gr.Next() {
 		var it CountItem
 		gr.Scan(&it.Clave, &it.Label, &it.Total)
@@ -247,9 +295,11 @@ func (h CentroResultadosHandler) GetResumenCentro(w http.ResponseWriter, r *http
 		join encuestas e on e.id = r.encuesta_id
 		join generos g on g.id = e.genero_id
 		where e.centro_id = any($1::bigint[])
+		  and e.finished_at is not null
+		  and ($2::int is null or extract(year from e.finished_at) = $2)
 		group by g.clave, g.etiqueta
 		order by count(*) desc
-	`, centros)
+	`, centros, year)
 	for gr2.Next() {
 		var it CountItem
 		gr2.Scan(&it.Clave, &it.Label, &it.Total)
@@ -259,7 +309,6 @@ func (h CentroResultadosHandler) GetResumenCentro(w http.ResponseWriter, r *http
 
 	// ==========================
 	// ✅ NUEVO: PROMEDIOS POR GÉNERO (Frecuencia/Normalidad/Gravedad)
-	// para la gráfica apilada del front: stats.resumen_por_genero[]
 	// ==========================
 	gdRows, err := h.DB.Query(ctx, `
 		select
@@ -272,9 +321,11 @@ func (h CentroResultadosHandler) GetResumenCentro(w http.ResponseWriter, r *http
 		join encuestas e on e.id = r.encuesta_id
 		join generos g on g.id = e.genero_id
 		where e.centro_id = any($1::bigint[])
+		  and e.finished_at is not null
+		  and ($2::int is null or extract(year from e.finished_at) = $2)
 		group by g.clave, g.etiqueta
 		order by g.etiqueta asc
-	`, centros)
+	`, centros, year)
 	if err != nil {
 		http.Error(w, "db_error", http.StatusInternalServerError)
 		return
@@ -291,30 +342,22 @@ func (h CentroResultadosHandler) GetResumenCentro(w http.ResponseWriter, r *http
 	gdRows.Close()
 
 	// ==========================
-	// POR EDAD (BUCKETS)
+	// POR EDAD
 	// ==========================
-	edadKey := `
-		case
-			when e.edad < 18 then '<18'
-			when e.edad between 18 and 24 then '18-24'
-			when e.edad between 25 and 34 then '25-34'
-			when e.edad between 35 and 44 then '35-44'
-			when e.edad between 45 and 54 then '45-54'
-			when e.edad between 55 and 64 then '55-64'
-			else '65+'
-		end
-	`
+	edadKey := `e.edad::text`
 
 	qEdadEnc := fmt.Sprintf(`
 		select %s as clave, %s as label, count(distinct e.id)
 		from encuestas e
 		join respuestas r on r.encuesta_id = e.id
 		where e.centro_id = any($1::bigint[])
+		  and e.finished_at is not null
+		  and ($2::int is null or extract(year from e.finished_at) = $2)
 		group by 1,2
 		order by count(*) desc
 	`, edadKey, edadKey)
 
-	er, _ := h.DB.Query(ctx, qEdadEnc, centros)
+	er, _ := h.DB.Query(ctx, qEdadEnc, centros, year)
 	for er.Next() {
 		var it CountItem
 		er.Scan(&it.Clave, &it.Label, &it.Total)
@@ -327,17 +370,57 @@ func (h CentroResultadosHandler) GetResumenCentro(w http.ResponseWriter, r *http
 		from respuestas r
 		join encuestas e on e.id = r.encuesta_id
 		where e.centro_id = any($1::bigint[])
+		  and e.finished_at is not null
+		  and ($2::int is null or extract(year from e.finished_at) = $2)
 		group by 1,2
 		order by count(*) desc
 	`, edadKey, edadKey)
 
-	er2, _ := h.DB.Query(ctx, qEdadResp, centros)
+	er2, _ := h.DB.Query(ctx, qEdadResp, centros, year)
 	for er2.Next() {
 		var it CountItem
 		er2.Scan(&it.Clave, &it.Label, &it.Total)
 		stats.RespuestasPorEdad = append(stats.RespuestasPorEdad, it)
 	}
 	er2.Close()
+
+	// ==========================
+	// ✅ NUEVO: TODOS LOS COMENTARIOS (sin LIMIT)
+	// ==========================
+	cRows, err := h.DB.Query(ctx, `
+		select
+			e.id::text,
+			to_char(e.finished_at, 'YYYY-MM-DD"T"HH24:MI:SS') as fecha,
+			coalesce(g.etiqueta, '') as genero,
+			coalesce(e.edad, 0) as edad,
+			e.comentario
+		from encuestas e
+		left join generos g on g.id = e.genero_id
+		where e.centro_id = any($1::bigint[])
+		  and e.finished_at is not null
+		  and ($2::int is null or extract(year from e.finished_at) = $2)
+		  and e.comentario is not null
+		  and btrim(e.comentario) <> ''
+		order by e.finished_at desc
+	`, centros, year)
+	if err != nil {
+		http.Error(w, "db_error", http.StatusInternalServerError)
+		return
+	}
+	defer cRows.Close()
+
+	for cRows.Next() {
+		var it ComentarioItem
+		if err := cRows.Scan(&it.EncuestaID, &it.Fecha, &it.Genero, &it.Edad, &it.Texto); err != nil {
+			http.Error(w, "db_error", http.StatusInternalServerError)
+			return
+		}
+		stats.Comentarios = append(stats.Comentarios, it)
+	}
+	if err := cRows.Err(); err != nil {
+		http.Error(w, "db_error", http.StatusInternalServerError)
+		return
+	}
 
 	// ==========================
 	// RESPONSE FINAL
@@ -350,4 +433,54 @@ func (h CentroResultadosHandler) GetResumenCentro(w http.ResponseWriter, r *http
 	}
 
 	writeJSONCentro(w, http.StatusOK, resp)
+}
+
+// =======================================================
+// ✅ NUEVO ENDPOINT: years disponibles (solo años con datos)
+// GET /api/centro/years
+// - usa los mismos centros del ctx
+// - solo encuestas finalizadas (finished_at is not null)
+// - devuelve { years: [2025, 2024, ...] }
+// =======================================================
+func (h CentroResultadosHandler) GetCentroYears(w http.ResponseWriter, r *http.Request) {
+	if !h.ensureCentroRole(w, r) {
+		return
+	}
+
+	centros := UserCentrosFromCtx(r.Context())
+	if len(centros) == 0 {
+		http.Error(w, "no_centros", http.StatusForbidden)
+		return
+	}
+
+	ctx := r.Context()
+
+	rows, err := h.DB.Query(ctx, `
+		select distinct extract(year from e.finished_at)::int as year
+		from encuestas e
+		where e.centro_id = any($1::bigint[])
+		  and e.finished_at is not null
+		order by year desc
+	`, centros)
+	if err != nil {
+		http.Error(w, "db_error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	years := make([]int, 0, 8)
+	for rows.Next() {
+		var y int
+		if err := rows.Scan(&y); err != nil {
+			http.Error(w, "db_error", http.StatusInternalServerError)
+			return
+		}
+		years = append(years, y)
+	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, "db_error", http.StatusInternalServerError)
+		return
+	}
+
+	writeJSONCentro(w, http.StatusOK, CentroYearsResponse{Years: years})
 }

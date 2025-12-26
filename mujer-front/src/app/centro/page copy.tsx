@@ -12,6 +12,7 @@ import {
   Radar as RadarIcon,
   Grid3X3,
   ArrowUpRight,
+  Calendar,
 } from "lucide-react";
 
 import { api } from "@/lib/api";
@@ -20,7 +21,15 @@ import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
-/* ======= Nivo (SVG versions, like official docs) ======= */
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+/* ======= Nivo (SVG versions) ======= */
 const ResponsiveHeatMap = dynamic(
   () => import("@nivo/heatmap").then((m) => m.ResponsiveHeatMap),
   { ssr: false }
@@ -53,9 +62,8 @@ type MatrizItem = {
 
 type CountItem = { clave: string; label: string; total: number };
 
-/** ✅ NUEVO (opcional): resumen por género (promedios 1–5) */
 type GeneroDimItem = {
-  clave?: string;
+  clave: string;
   label: string;
   frecuencia: number;
   normalidad: number;
@@ -64,13 +72,16 @@ type GeneroDimItem = {
 
 type CentroStats = {
   total_participantes: number;
-  total_encuestas?: number;
+  total_encuestas: number;
   total_respuestas: number;
-  respuestas_por_genero?: CountItem[];
-  respuestas_por_edad?: CountItem[];
 
-  /** ✅ NUEVO (opcional): para barras apiladas */
-  resumen_por_genero?: GeneroDimItem[];
+  encuestas_por_genero: CountItem[];
+  respuestas_por_genero: CountItem[];
+
+  encuestas_por_edad: CountItem[];
+  respuestas_por_edad: CountItem[];
+
+  resumen_por_genero: GeneroDimItem[];
 };
 
 type CentroResumenResponse = {
@@ -98,24 +109,18 @@ function fmtInt(x: number) {
 function safeArr<T>(v?: T[] | null) {
   return Array.isArray(v) ? v : [];
 }
-
-// 0–100 a partir de 0–5
 function pctFrom5(x: number) {
   const v = clamp5(x);
   return Math.round((v / 5) * 100);
 }
 
-// ✅ Escala semántica 5 niveles (neutral) pegada a 1–5.
-// Para promedios decimales, redondea al entero más cercano (1..5).
 type Semantic5 = "Muy bajo" | "Bajo" | "Medio" | "Alto" | "Muy alto";
-
 function toNearestLikert(x: number): 1 | 2 | 3 | 4 | 5 {
   const v = clamp5(x);
   const r = Math.round(v);
   const rr = Math.max(1, Math.min(5, r));
   return rr as 1 | 2 | 3 | 4 | 5;
 }
-
 function semanticLevel5(x: number): Semantic5 {
   const k = toNearestLikert(x);
   switch (k) {
@@ -131,15 +136,8 @@ function semanticLevel5(x: number): Semantic5 {
       return "Muy alto";
   }
 }
-
-// Badge discretos (sin dramatizar)
 function semanticBadgeClass5(level: Semantic5, onDark = false) {
-  if (onDark) {
-    // ✅ Para fondo oscuro (card global): todo legible en blanco + primario
-    return "bg-primary text-primary-foreground border border-primary";
-  }
-
-  // ✅ Para fondo claro: escala suave (sin negro)
+  if (onDark) return "bg-primary text-primary-foreground border border-primary";
   switch (level) {
     case "Muy bajo":
       return "bg-slate-50 text-slate-700 border border-slate-200";
@@ -153,7 +151,6 @@ function semanticBadgeClass5(level: Semantic5, onDark = false) {
       return "bg-[rgba(127,1,127,0.26)] text-[rgba(127,1,127,1)] border border-[rgba(127,1,127,0.28)]";
   }
 }
-
 function wrapLabel(s: string, maxLen = 18, maxLines = 2) {
   const txt = (s || "").trim();
   if (!txt) return "";
@@ -177,20 +174,44 @@ function wrapLabel(s: string, maxLen = 18, maxLines = 2) {
   return lines.join("\n");
 }
 
+/* =======================
+   ✅ Años (desde back si existe)
+   - Si tu back ya expone /api/centro/years → lo usamos
+   - Si no existe aún → fallback seguro sin romper nada
+   ======================= */
+type YearOption = { value: string; label: string };
+
+function fallbackYears(): YearOption[] {
+  const y = new Date().getFullYear();
+  const out: YearOption[] = [{ value: "all", label: "Todos" }];
+  for (let i = 0; i < 8; i++) out.push({ value: String(y - i), label: String(y - i) });
+  return out;
+}
+
 export default function CentroPage() {
   const [data, setData] = useState<CentroResumenResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
-  // ✅ Toggle para escala semántica (opcional)
   const [showSemantic, setShowSemantic] = useState(true);
 
-  async function load() {
+  // ✅ NUEVO: options reales
+  const [yearOptions, setYearOptions] = useState<YearOption[]>(fallbackYears());
+  const [year, setYear] = useState<string>("all");
+
+  async function load(selectedYear?: string) {
+    const y = selectedYear ?? year;
+
     setLoading(true);
     setErr("");
     try {
-      const res = await api<CentroResumenResponse>("/api/centro/resumen");
+      const qs = y && y !== "all" ? `?year=${encodeURIComponent(y)}` : "";
+      const res = await api<CentroResumenResponse>(`/api/centro/resumen${qs}`);
       setData(res);
+
+      try {
+        localStorage.setItem("centro_dashboard_year", y || "all");
+      } catch {}
     } catch (e: any) {
       setErr(e?.message || "No se pudo cargar el resumen");
       setData(null);
@@ -199,9 +220,62 @@ export default function CentroPage() {
     }
   }
 
+  // ✅ NUEVO: carga years desde back (si existe) + carga dashboard con año persistido
   useEffect(() => {
-    load();
+    (async () => {
+      // 1) Año guardado (si existe)
+      let saved: string | null = null;
+      try {
+        saved = localStorage.getItem("centro_dashboard_year");
+      } catch {}
+
+      // 2) Intenta traer años reales del back
+      //    Recomendado: GET /api/centro/years → [2023,2024,2025]
+      //    (si no existe, caemos a fallbackYears sin romper)
+      try {
+        const years = await api<number[] | { years: number[] }>(`/api/centro/years`);
+        const arr = Array.isArray(years) ? years : Array.isArray((years as any)?.years) ? (years as any).years : [];
+        const clean = arr
+          .map((n) => Number(n))
+          .filter((n) => Number.isFinite(n) && n >= 2000 && n <= 2100)
+          .sort((a, b) => b - a);
+
+        if (clean.length) {
+          const opts: YearOption[] = [{ value: "all", label: "Todos" }].concat(
+            clean.map((y) => ({ value: String(y), label: String(y) }))
+          );
+          setYearOptions(opts);
+
+          // si saved existe pero no está en opts, lo ignoramos
+          const ok =
+            saved &&
+            (saved === "all" || opts.some((o) => o.value === saved));
+
+          const initialYear = ok ? (saved as string) : "all";
+          setYear(initialYear);
+          await load(initialYear);
+          return;
+        }
+      } catch {
+        // swallow → fallback
+      }
+
+      // 3) Fallback years + carga
+      const ok = saved && (saved === "all" || /^\d{4}$/.test(saved));
+      const initialYear = ok ? (saved as string) : "all";
+      setYearOptions(fallbackYears());
+      setYear(initialYear);
+      await load(initialYear);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ✅ si usuario cambia año, recarga todo
+  useEffect(() => {
+    if (!data && loading) return;
+    load(year);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [year]);
 
   /* =======================
      HeatMap data prep
@@ -224,7 +298,7 @@ export default function CentroPage() {
     const mkRow = (id: string, dim: MatrizItem["dimension"]) => ({
       id,
       data: tipos.map((t) => ({
-        x: `#${t.n} ${t.name}`,
+        x: `${t.name}`,
         y: Number((map.get(`${dim}:${t.n}`) ?? 0).toFixed(2)),
       })),
     });
@@ -256,25 +330,22 @@ export default function CentroPage() {
   }, [data]);
 
   const generoBars = useMemo(() => {
-    if (!data) return [];
-    return safeArr(data.stats.respuestas_por_genero)
-      .slice()
-      .sort((a, b) => (b.total || 0) - (a.total || 0))
-      .map((x) => ({ label: x.label, total: x.total || 0 }));
+  if (!data) return [];
+  return safeArr(data.stats.encuestas_por_genero)
+    .slice()
+    .sort((a, b) => (b.total || 0) - (a.total || 0))
+    .map((x) => ({ label: x.label, total: x.total || 0 }));
   }, [data]);
 
   const edadBars = useMemo(() => {
     if (!data) return [];
-    return safeArr(data.stats.respuestas_por_edad)
+    return safeArr(data.stats.encuestas_por_edad)
       .slice()
       .sort((a, b) => a.label.localeCompare(b.label, "es", { numeric: true }))
       .map((x) => ({ label: x.label, total: x.total || 0 }));
   }, [data]);
 
-  /* =======================
-     ✅ NUEVO: Barras apiladas por género (Frecuencia/Normalización/Gravedad)
-     - Usa data.stats.resumen_por_genero (opcional)
-     ======================= */
+
   const generoStack = useMemo(() => {
     if (!data) return [];
     return safeArr(data.stats.resumen_por_genero)
@@ -323,6 +394,101 @@ export default function CentroPage() {
     { label: "Total", value: data.global.total },
   ];
 
+  const BarValueChipLayer = ({ bars }: any) => {
+  return (
+    <>
+      {bars.map((bar: any) => {
+        const value = Math.round(bar.data.value);
+        if (!value) return null;
+
+        return (
+          <g
+            key={bar.key}
+            transform={`translate(${bar.x + bar.width + 8}, ${bar.y + bar.height / 2})`}
+          >
+            <foreignObject
+              width={56}
+              height={28}
+              x={0}
+              y={-14}
+              style={{ overflow: "visible" }}
+            >
+              <div
+                style={{
+                  background: "rgba(127,1,127,0.12)",
+                  color: "#7F017F",
+                  border: "1px solid rgba(127,1,127,0.25)",
+                  borderRadius: 999,
+                  padding: "2px 10px",
+                  fontSize: 12,
+                  fontWeight: 900,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  whiteSpace: "nowrap",
+                  boxShadow: "0 6px 18px rgba(127,1,127,0.25)",
+                }}
+              >
+                {value}
+              </div>
+            </foreignObject>
+          </g>
+        );
+      })}
+    </>
+  );
+};
+
+const GroupedBarValuePillLayer = ({ bars }: any) => {
+  return (
+    <>
+      {bars.map((bar: any) => {
+        const raw = Number(bar.data.value);
+        if (!Number.isFinite(raw)) return null;
+
+        const txt = fmt2(raw); // 2 decimales (1–5)
+
+        return (
+          <g
+            key={bar.key}
+            transform={`translate(${bar.x + bar.width + 8}, ${bar.y + bar.height / 2})`}
+          >
+            <foreignObject
+              width={62}
+              height={24}
+              x={0}
+              y={-12}
+              style={{ overflow: "visible" }}
+            >
+              <div
+                style={{
+                  background: "rgba(127,1,127,0.12)",      
+                  color: "#7F017F",
+                  border: "1px solid rgba(127,1,127,0.25)",
+                  borderRadius: 999,
+                  padding: "1px 8px",
+                  fontSize: 9,                           
+                  fontWeight: 900,
+                  letterSpacing: "0.01em",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  whiteSpace: "nowrap",
+                  boxShadow: "0 6px 18px rgba(127,1,127,0.22)",
+                }}
+              >
+                {txt}
+              </div>
+            </foreignObject>
+          </g>
+        );
+      })}
+    </>
+  );
+};
+
+
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] px-6 py-10 lg:px-12 text-slate-900">
       {/* HERO */}
@@ -347,25 +513,23 @@ export default function CentroPage() {
                   >
                     Analítica agregada
                   </Badge>
-                  <Sparkles
-                    className="h-4 w-4 opacity-70"
-                    style={{ color: PURPLE }}
-                  />
+                  <Sparkles className="h-4 w-4 opacity-70" style={{ color: PURPLE }} />
                 </div>
 
                 <h1 className="text-4xl md:text-5xl font-light tracking-tight">
                   Dashboard <span className="font-black">Mujer Alerta</span>
                 </h1>
 
-                <div className="mt-4 flex flex-wrap items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-sm font-semibold text-slate-600">
+                    Total de percepción de violencia contra la mujer
+                  </span>
+
                   <Badge
-                    className="rounded-full font-black"
-                    style={{
-                      background: "rgba(127,1,127,0.10)",
-                      color: PURPLE,
-                    }}
+                    className="rounded-full px-3 py-1 font-black text-sm"
+                    style={{ background: "rgba(127,1,127,0.12)", color: PURPLE }}
                   >
-                    Total: {pctFrom5(data.global.total)}%
+                    {pctFrom5(data.global.total)}%
                   </Badge>
 
                   {showSemantic ? (
@@ -378,22 +542,58 @@ export default function CentroPage() {
                       {semanticLevel5(data.global.total)}
                     </Badge>
                   ) : null}
+
+                  <Badge
+                    variant="secondary"
+                    className="rounded-full px-3 py-1 font-black tracking-wide"
+                    style={{ background: "rgba(2,6,23,0.04)", color: "#0f172a" }}
+                  >
+                    {year === "all" ? "Histórico: Todos" : `Año: ${year}`}
+                  </Badge>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowSemantic((v) => !v)}
-                  className="rounded-2xl bg-white border-slate-200 hover:border-purple-300"
-                  title="Mostrar/ocultar escala semántica (Muy bajo…Muy alto)"
-                >
-                  <Sparkles
-                    className="mr-2 h-4 w-4"
-                    style={{ color: PURPLE }}
-                  />
-                  Semántica: {showSemantic ? "ON" : "OFF"}
-                </Button>
+              <div className="flex flex-col items-end gap-3">
+                {/* ✅ Selector año (real desde back si existe) */}
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 text-xs font-black text-slate-600">
+                    <Calendar className="h-4 w-4" style={{ color: PURPLE }} />
+                    Año
+                  </div>
+                  <Select value={year} onValueChange={(v) => setYear(v)}>
+                    <SelectTrigger className="h-10 w-[180px] rounded-2xl bg-white border-slate-200 hover:border-purple-300">
+                      <SelectValue placeholder="Selecciona año" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-2xl">
+                      {yearOptions.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowSemantic((v) => !v)}
+                    className="rounded-2xl bg-white border-slate-200 hover:border-purple-300"
+                  >
+                    <Sparkles className="mr-2 h-4 w-4" style={{ color: PURPLE }} />
+                    Semántica: {showSemantic ? "ON" : "OFF"}
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    onClick={() => load(year)}
+                    className="rounded-2xl bg-white border-slate-200 hover:border-purple-300"
+                    title="Recargar datos"
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" style={{ color: PURPLE }} />
+                    Actualizar
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
@@ -407,13 +607,13 @@ export default function CentroPage() {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-black tracking-wide">
-                  KPIs
+                  Principales indicadores
                 </CardTitle>
                 <Badge
                   variant="secondary"
                   className="rounded-full font-black uppercase tracking-widest text-[10px]"
                 >
-                  Vista rápida
+                  Resumen
                 </Badge>
               </div>
             </CardHeader>
@@ -428,10 +628,7 @@ export default function CentroPage() {
                     </p>
                     <Users className="h-4 w-4" style={{ color: PURPLE }} />
                   </div>
-                  <p
-                    className="mt-2 text-3xl font-black"
-                    style={{ color: PURPLE }}
-                  >
+                  <p className="mt-2 text-3xl font-black" style={{ color: PURPLE }}>
                     {fmtInt(s.total_participantes)}
                   </p>
                   <div className="mt-2 flex items-center gap-2 text-emerald-600 text-xs font-black">
@@ -447,10 +644,7 @@ export default function CentroPage() {
                     </p>
                     <Sigma className="h-4 w-4" style={{ color: PURPLE }} />
                   </div>
-                  <p
-                    className="mt-2 text-3xl font-black"
-                    style={{ color: PURPLE }}
-                  >
+                  <p className="mt-2 text-3xl font-black" style={{ color: PURPLE }}>
                     {fmtInt(s.total_respuestas)}
                   </p>
                 </div>
@@ -486,7 +680,6 @@ export default function CentroPage() {
                 </div>
               </div>
 
-              {/* KPIs por dimensión */}
               <div className="mt-5 grid gap-4 sm:grid-cols-4">
                 {kpis.map((k) => {
                   const pct = pctFrom5(k.value);
@@ -502,25 +695,19 @@ export default function CentroPage() {
                         </p>
                         {showSemantic ? (
                           <Badge
-                            className={`rounded-full text-[10px] font-black ${semanticBadgeClass5(
-                              sem
-                            )}`}
+                            className={`rounded-full text-[10px] font-black ${semanticBadgeClass5(sem)}`}
                           >
                             {sem}
                           </Badge>
                         ) : null}
                       </div>
 
-                      <p
-                        className="mt-2 text-3xl font-black"
-                        style={{ color: PURPLE }}
-                      >
+                      <p className="mt-2 text-3xl font-black" style={{ color: PURPLE }}>
                         {pct}%
                       </p>
 
                       <p className="mt-1 text-[11px] text-slate-500 font-semibold">
-                        Promedio:{" "}
-                        <span className="font-black">{fmt2(k.value)}</span> / 5
+                        Promedio: <span className="font-black">{fmt2(k.value)}</span> / 5
                       </p>
                     </div>
                   );
@@ -529,12 +716,11 @@ export default function CentroPage() {
             </CardContent>
           </Card>
 
-          {/* Radar y resto: SIN CAMBIOS funcionales */}
           <Card className="lg:col-span-5 rounded-[2rem] border-slate-200 shadow-sm">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-black tracking-wide">
-                  Radar global
+                  Radar de vectores de violencia
                 </CardTitle>
                 <div className="flex items-center gap-2">
                   <RadarIcon className="h-4 w-4" style={{ color: PURPLE }} />
@@ -542,7 +728,7 @@ export default function CentroPage() {
                     variant="secondary"
                     className="rounded-full font-black text-[10px] uppercase tracking-widest"
                   >
-                    1–5
+                    Vectores
                   </Badge>
                 </div>
               </div>
@@ -568,21 +754,10 @@ export default function CentroPage() {
                     borderWidth={3}
                     blendMode="multiply"
                     enableDotLabel={false}
-                    dotLabel={(v: any) => fmt2(Number(v))}
-                    dotLabelYOffset={-12}
                     legends={[]}
                     theme={{
-                      text: {
-                        fontSize: 12,
-                        fontWeight: 900,
-                        fill: "#111827",
-                      },
-                      grid: {
-                        line: {
-                          stroke: "rgba(2,6,23,0.10)",
-                          strokeWidth: 1,
-                        },
-                      },
+                      text: { fontSize: 12, fontWeight: 900, fill: "#111827" },
+                      grid: { line: { stroke: "rgba(2,6,23,0.10)", strokeWidth: 1 } },
                       tooltip: {
                         container: {
                           background: "rgba(17,24,39,0.92)",
@@ -600,13 +775,13 @@ export default function CentroPage() {
           </Card>
         </section>
 
-        {/* Distribuciones + Heatmap sin cambios */}
+        {/* Distribuciones */}
         <section className="grid gap-6 lg:grid-cols-12">
           <Card className="lg:col-span-6 rounded-[2rem] border-slate-200 shadow-sm">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-black tracking-wide">
-                  Distribución por género
+                  Participantes por género
                 </CardTitle>
                 <div className="flex items-center gap-2">
                   <BarChart3 className="h-4 w-4" style={{ color: PURPLE }} />
@@ -614,7 +789,7 @@ export default function CentroPage() {
                     variant="secondary"
                     className="rounded-full font-black text-[10px] uppercase tracking-widest"
                   >
-                    Respuestas
+                    Género
                   </Badge>
                 </div>
               </div>
@@ -627,18 +802,48 @@ export default function CentroPage() {
                   keys={["total"]}
                   indexBy="label"
                   layout="horizontal"
-                  margin={{ top: 10, right: 28, bottom: 36, left: 190 }}
+                  margin={{ top: 10, right: 96, bottom: 36, left: 190 }} // + espacio chip
                   padding={0.32}
                   colors={[PURPLE]}
                   borderRadius={10}
                   enableGridY={false}
                   axisTop={null}
                   axisRight={null}
-                  axisBottom={{ tickSize: 0, tickPadding: 8 }}
+                  axisBottom={{
+                    tickSize: 0,
+                    tickPadding: 8,
+                    format: (v) => String(Math.round(Number(v))),
+                  }}
                   axisLeft={{ tickSize: 0, tickPadding: 10 }}
-                  labelSkipWidth={9999}
-                  labelSkipHeight={9999}
+                  enableLabel={false} // ⛔ desactivamos labels nativos
+                  layers={[
+                    "grid",
+                    "axes",
+                    "bars",
+                    "markers",
+                    "legends",
+                    BarValueChipLayer, // ✅ chip
+                  ]}
+                  tooltip={({ indexValue, value }: any) => (
+                    <div
+                      style={{
+                        background: "rgba(17,24,39,0.92)",
+                        color: "white",
+                        padding: "10px 12px",
+                        borderRadius: 12,
+                        boxShadow: "0 14px 40px rgba(0,0,0,0.22)",
+                        fontWeight: 900,
+                      }}
+                    >
+                      <div style={{ opacity: 0.85, fontSize: 12 }}>{String(indexValue)}</div>
+                      <div style={{ fontSize: 13, marginTop: 2 }}>
+                        Participantes: <strong>{Math.round(Number(value))}</strong>
+                      </div>
+                    </div>
+                  )}
                 />
+
+
               </div>
             </CardContent>
           </Card>
@@ -647,7 +852,7 @@ export default function CentroPage() {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-black tracking-wide">
-                  Distribución por edad
+                  Participantes por edad
                 </CardTitle>
                 <div className="flex items-center gap-2">
                   <BarChart3 className="h-4 w-4" style={{ color: PURPLE }} />
@@ -655,7 +860,7 @@ export default function CentroPage() {
                     variant="secondary"
                     className="rounded-full font-black text-[10px] uppercase tracking-widest"
                   >
-                    Respuestas
+                    Edad
                   </Badge>
                 </div>
               </div>
@@ -663,28 +868,40 @@ export default function CentroPage() {
             <CardContent>
               <Separator className="mb-5" />
               <div className="h-[380px]">
-                <ResponsiveBar
+               <ResponsiveBar
                   data={edadBars as any}
                   keys={["total"]}
                   indexBy="label"
                   layout="horizontal"
-                  margin={{ top: 10, right: 28, bottom: 36, left: 190 }}
+                  margin={{ top: 10, right: 96, bottom: 36, left: 190 }}
                   padding={0.32}
                   colors={[PURPLE]}
                   borderRadius={10}
                   enableGridY={false}
                   axisTop={null}
                   axisRight={null}
-                  axisBottom={{ tickSize: 0, tickPadding: 8 }}
+                  axisBottom={{
+                    tickSize: 0,
+                    tickPadding: 8,
+                    format: (v) => String(Math.round(Number(v))),
+                  }}
                   axisLeft={{ tickSize: 0, tickPadding: 10 }}
-                  labelSkipWidth={9999}
-                  labelSkipHeight={9999}
+                  enableLabel={false}
+                  layers={[
+                    "grid",
+                    "axes",
+                    "bars",
+                    "markers",
+                    "legends",
+                    BarValueChipLayer,
+                  ]}
                 />
               </div>
             </CardContent>
           </Card>
         </section>
 
+        {/* Heatmap */}
         <Card className="rounded-[2rem] border-slate-200 shadow-sm">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
@@ -693,12 +910,6 @@ export default function CentroPage() {
               </CardTitle>
               <div className="flex items-center gap-2">
                 <Grid3X3 className="h-4 w-4" style={{ color: PURPLE }} />
-                <Badge
-                  variant="secondary"
-                  className="rounded-full font-black text-[10px] uppercase tracking-widest"
-                >
-                  0–5 fijo
-                </Badge>
               </div>
             </div>
           </CardHeader>
@@ -707,11 +918,7 @@ export default function CentroPage() {
             <Separator className="mb-5" />
 
             <div className="mt-2 w-full overflow-x-auto">
-              <div
-                style={{
-                  minWidth: Math.max(980, (heatmap?.xCount || 0) * 112),
-                }}
-              >
+              <div style={{ minWidth: Math.max(980, (heatmap?.xCount || 0) * 112) }}>
                 <div className="h-[520px]">
                   {heatmap ? (
                     <ResponsiveHeatMap
@@ -741,10 +948,7 @@ export default function CentroPage() {
                       cellBorderWidth={1}
                       cellBorderColor="rgba(2,6,23,0.06)"
                       enableLabels={true}
-                      labelTextColor={{
-                        from: "color",
-                        modifiers: [["darker", 2.1]],
-                      }}
+                      labelTextColor={{ from: "color", modifiers: [["darker", 2.1]] }}
                       legends={[
                         {
                           anchor: "bottom",
@@ -764,15 +968,8 @@ export default function CentroPage() {
                         },
                       ]}
                       theme={{
-                        text: {
-                          fontFamily: "Montserrat",
-                          fontSize: 14,
-                          fontWeight: 900,
-                          fill: "#111827",
-                        },
-                        axis: {
-                          ticks: { text: { fill: "#111827", fontWeight: 900 } },
-                        },
+                        text: { fontFamily: "Montserrat", fontSize: 14, fontWeight: 900, fill: "#111827" },
+                        axis: { ticks: { text: { fill: "#111827", fontWeight: 900 } } },
                         tooltip: {
                           container: {
                             background: "rgba(17,24,39,0.92)",
@@ -791,7 +988,7 @@ export default function CentroPage() {
           </CardContent>
         </Card>
 
-        {/* ✅ MEJOR: Barras agrupadas por género (3 vectores) */}
+        {/* Barras por género (vectores) */}
         <Card className="rounded-[2rem] border-slate-200 shadow-sm">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
@@ -800,12 +997,6 @@ export default function CentroPage() {
               </CardTitle>
               <div className="flex items-center gap-2">
                 <BarChart3 className="h-4 w-4" style={{ color: PURPLE }} />
-                <Badge
-                  variant="secondary"
-                  className="rounded-full font-black text-[10px] uppercase tracking-widest"
-                >
-                  Barras agrupadas · 1–5
-                </Badge>
               </div>
             </div>
           </CardHeader>
@@ -822,165 +1013,81 @@ export default function CentroPage() {
               </div>
             ) : (
               <div className="h-[520px]">
-               <ResponsiveBar
-                data={generoStack as any}
-                keys={["Frecuencia", "Normalización", "Gravedad"]}
-                indexBy="label"
-                groupMode="grouped"
-                layout="horizontal"
-
-                /* =========================
-                  ESCALA X ESTRICTA 0–5
-                  ========================= */
-                minValue={0}
-                maxValue={5}
-                valueScale={{
-                  type: "linear",
-                  min: 0,
-                  max: 5,
-                }}
-
-                indexScale={{ type: "band", round: true }}
-                margin={{ top: 44, right: 36, bottom: 52, left: 210 }}
-                padding={0.32}
-                innerPadding={10}
-                borderRadius={10}
-
-                /* =========================
-                  COLORES (3 VECTORES)
-                  ========================= */
-                colors={({ id }) => {
-                  const k = String(id);
-                  if (k === "Frecuencia") return "rgba(127,1,127,0.95)";
-                  if (k === "Normalización") return "rgba(127,1,127,0.55)";
-                  return "rgba(127,1,127,0.30)"; // Gravedad
-                }}
-
-                /* =========================
-                  GRID
-                  ========================= */
-                enableGridX={true}
-                enableGridY={false}
-
-                axisTop={null}
-                axisRight={null}
-
-                /* =========================
-                  EJE X NUMÉRICO PURO (0–5)
-                  ========================= */
-                axisBottom={{
-                  tickSize: 0,
-                  tickPadding: 10,
-                  tickRotation: 0,
-                  tickValues: [0, 1, 2, 3, 4, 5],
-                  format: (v) => String(v),
-                  legend: "Promedio (1–5)",
-                  legendPosition: "middle",
-                  legendOffset: 38,
-                }}
-
-                /* =========================
-                  EJE Y (GÉNEROS)
-                  ========================= */
-                axisLeft={{
-                  tickSize: 0,
-                  tickPadding: 12,
-                  format: (v) => wrapLabel(String(v), 22, 2),
-                }}
-
-                /* =========================
-                  LABELS DE VALOR
-                  ========================= */
-                enableLabel={true}
-                label={(d: any) => fmt2(Number(d.value))}
-                labelSkipWidth={16}
-                labelSkipHeight={14}
-                labelTextColor="#111827"
-                labelPosition="end"
-                labelOffset={10}
-
-                valueFormat={(v: any) => fmt2(Number(v))}
-
-                /* =========================
-                  TOOLTIP
-                  ========================= */
-                tooltip={({ id, value, indexValue }: any) => (
-                  <div
-                    style={{
-                      width: 220,                 // 🔒 ancho fijo
-                      background: "rgba(17,24,39,0.92)",
-                      color: "white",
-                      padding: "10px 12px",
-                      borderRadius: 12,
-                      boxShadow: "0 14px 40px rgba(0,0,0,0.22)",
-                      fontWeight: 900,
-                    }}
-                  >
-                    <div style={{ opacity: 0.85, fontSize: 12 }}>
-                      {String(indexValue)}
-                    </div>
-                    <div style={{ fontSize: 13, marginTop: 2 }}>
-                      {String(id)}:{" "}
-                      <span style={{ fontWeight: 900 }}>
-                        {fmt2(Number(value))}
-                      </span>{" "}
-                      / 5
-                    </div>
-                  </div>
-                )}
-
-                /* =========================
-                  LEYENDA
-                  ========================= */
-                legends={[
-                  {
-                    dataFrom: "keys",
-                    anchor: "top-left",
-                    direction: "row",
-                    justify: false,
-                    translateX: 0,
-                    translateY: -34,
-                    itemsSpacing: 12,
-                    itemWidth: 155,
-                    itemHeight: 18,
-                    itemDirection: "left-to-right",
-                    symbolSize: 12,
-                    symbolShape: "circle",
-                  },
-                ]}
-
-                /* =========================
-                  THEME
-                  ========================= */
-                theme={{
-                  text: {
-                    fontFamily: "Montserrat",
-                    fontSize: 12,
-                    fontWeight: 900,
-                    fill: "#111827",
-                  },
-                  axis: {
-                    ticks: {
-                      text: {
-                        fill: "#111827",
-                        fontWeight: 900,
-                      },
+                <ResponsiveBar
+                  data={generoStack as any}
+                  keys={["Frecuencia", "Normalización", "Gravedad"]}
+                  indexBy="label"
+                  groupMode="grouped"
+                  layout="horizontal"
+                  minValue={0}
+                  maxValue={5}
+                  valueScale={{ type: "linear", min: 0, max: 5 }}
+                  indexScale={{ type: "band", round: true }}
+                  margin={{ top: 44, right: 110, bottom: 52, left: 210 }}  // ✅ espacio pill
+                  padding={0.32}
+                  innerPadding={10}
+                  borderRadius={10}
+                  colors={({ id }) => {
+                    const k = String(id);
+                    if (k === "Frecuencia") return "rgba(127,1,127,0.95)";
+                    if (k === "Normalización") return "rgba(127,1,127,0.55)";
+                    return "rgba(127,1,127,0.30)";
+                  }}
+                  enableGridX={true}
+                  enableGridY={false}
+                  axisTop={null}
+                  axisRight={null}
+                  axisBottom={{
+                    tickSize: 0,
+                    tickPadding: 10,
+                    tickValues: [0, 1, 2, 3, 4, 5],
+                    format: (v) => String(v),
+                    legend: "Promedio (1–5)",
+                    legendPosition: "middle",
+                    legendOffset: 38,
+                  }}
+                  axisLeft={{
+                    tickSize: 0,
+                    tickPadding: 12,
+                    format: (v) => wrapLabel(String(v), 22, 2),
+                  }}
+                  enableLabel={false}
+                  layers={[
+                    "grid",
+                    "axes",
+                    "bars",
+                    "markers",
+                    "legends",
+                    GroupedBarValuePillLayer,
+                  ]}
+                  valueFormat={(v: any) => fmt2(Number(v))}
+                  legends={[
+                    {
+                      dataFrom: "keys",
+                      anchor: "top-left",
+                      direction: "row",
+                      justify: false,
+                      translateX: 0,
+                      translateY: -34,
+                      itemsSpacing: 12,
+                      itemWidth: 155,
+                      itemHeight: 18,
+                      itemDirection: "left-to-right",
+                      symbolSize: 12,
+                      symbolShape: "circle",
                     },
-                  },
-                  grid: {
-                    line: {
-                      stroke: "rgba(2,6,23,0.08)",
-                      strokeWidth: 1,
-                    },
-                  },
-                }}
-              />
+                  ]}
+                  theme={{
+                    text: { fontFamily: "Montserrat", fontSize: 12, fontWeight: 900, fill: "#111827" },
+                    axis: { ticks: { text: { fill: "#111827", fontWeight: 900 } } },
+                    grid: { line: { stroke: "rgba(2,6,23,0.08)", strokeWidth: 1 } },
+                  }}
+                />
 
               </div>
             )}
           </CardContent>
         </Card>
-
       </main>
     </div>
   );
