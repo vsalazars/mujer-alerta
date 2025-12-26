@@ -29,6 +29,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+
+
 /* ======= Nivo (SVG versions) ======= */
 const ResponsiveHeatMap = dynamic(
   () => import("@nivo/heatmap").then((m) => m.ResponsiveHeatMap),
@@ -82,6 +91,8 @@ type CentroStats = {
   respuestas_por_edad: CountItem[];
 
   resumen_por_genero: GeneroDimItem[];
+  comentarios?: ComentarioItem[];
+
 };
 
 type CentroResumenResponse = {
@@ -92,6 +103,15 @@ type CentroResumenResponse = {
 };
 
 const PURPLE = "#7F017F";
+
+
+type ComentarioItem = {
+  encuesta_id: string;
+  fecha: string;   // string
+  genero: string;
+  edad: number;
+  texto: string;
+};
 
 /* =======================
    Helpers
@@ -358,6 +378,41 @@ export default function CentroPage() {
       }))
       .sort((a, b) => a.label.localeCompare(b.label, "es", { numeric: true }));
   }, [data]);
+
+   // ✅ helper (no hook)
+  function truncate(s: string, n = 180) {
+    const t = (s || "").trim();
+    if (t.length <= n) return t;
+    return t.slice(0, n).trimEnd() + "…";
+  }
+
+  function formatFechaES(iso?: string) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso; // fallback seguro
+
+  return new Intl.DateTimeFormat("es-MX", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(d);
+}
+
+
+
+
+  // ✅ hook SIEMPRE antes de returns condicionales
+  const comentarios = useMemo(() => {
+    if (!data) return [];
+    return safeArr(data.stats.comentarios)
+      .filter((c) => (c?.texto || "").trim().length > 0)
+      .slice();
+  }, [data]);
+
+  const comentariosCount = comentarios.length;
+
 
   if (loading) {
     return (
@@ -1088,6 +1143,158 @@ const GroupedBarValuePillLayer = ({ bars }: any) => {
             )}
           </CardContent>
         </Card>
+
+        {/* Comentarios */}
+        <Card className="rounded-[2rem] border-slate-200 shadow-sm">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-black tracking-wide">
+                Comentarios del entorno
+              </CardTitle>
+
+              <div className="flex items-center gap-2">
+                <Badge
+                  variant="secondary"
+                  className="rounded-full font-black text-[10px] uppercase tracking-widest"
+                  style={{ background: "rgba(127,1,127,0.10)", color: PURPLE }}
+                >
+                  {comentariosCount.toLocaleString("es-MX")} comentarios
+                </Badge>
+
+                <Badge
+                  variant="secondary"
+                  className="rounded-full font-black text-[10px] uppercase tracking-widest"
+                  style={{ background: "rgba(2,6,23,0.04)", color: "#0f172a" }}
+                >
+                  {year === "all" ? "Histórico" : `Año ${year}`}
+                </Badge>
+              </div>
+            </div>
+          </CardHeader>
+
+          <CardContent>
+            <Separator className="mb-5" />
+
+            {comentariosCount === 0 ? (
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                <span className="font-black" style={{ color: PURPLE }}>
+                  Sin comentarios
+                </span>{" "}
+                para el periodo seleccionado.
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {comentarios.map((c, idx) => (
+                  <div
+                    key={`${c.encuesta_id}-${idx}`}
+                    className="group relative overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.06)]"
+                  >
+                    {/* glow suave */}
+                    <div
+                      className="pointer-events-none absolute -top-24 -right-24 h-[220px] w-[220px] rounded-full blur-3xl opacity-0 transition-opacity duration-300 group-hover:opacity-30"
+                      style={{ background: PURPLE }}
+                    />
+
+                    <div className="relative">
+                      {/* meta */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        {c.genero ? (
+                          <Badge
+                            variant="secondary"
+                            className="rounded-full font-black text-[10px] uppercase tracking-widest"
+                            style={{ background: "rgba(127,1,127,0.10)", color: PURPLE }}
+                          >
+                            {c.genero}
+                          </Badge>
+                        ) : null}
+
+                        {Number.isFinite(c.edad) && c.edad > 0 ? (
+                          <Badge
+                            variant="secondary"
+                            className="rounded-full font-black text-[10px] uppercase tracking-widest"
+                            style={{ background: "rgba(2,6,23,0.04)", color: "#0f172a" }}
+                          >
+                            {c.edad} años
+                          </Badge>
+                        ) : null}
+
+                        {c.fecha ? (
+                          <span className="ml-auto text-[11px] font-black text-slate-400">
+                            {formatFechaES(c.fecha)}
+                          </span>
+                        ) : null}
+
+                      </div>
+
+                      {/* texto */}
+                      <p className="mt-3 text-sm leading-6 text-slate-700 font-semibold">
+                          {truncate(c.texto, 180)}
+                        </p>
+
+                        {c.texto.length > 180 && (
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <button
+                                className="mt-3 text-xs font-black uppercase tracking-widest"
+                                style={{ color: PURPLE }}
+                              >
+                                Ver comentario completo
+                              </button>
+                            </DialogTrigger>
+
+                            <DialogContent className="max-w-xl rounded-[1.75rem]">
+                              <DialogHeader>
+                                <DialogTitle className="text-sm font-black tracking-wide">
+                                  Comentario completo
+                                </DialogTitle>
+                              </DialogHeader>
+
+                              {/* Meta */}
+                              <div className="flex flex-wrap items-center gap-2 mb-3">
+                                {c.genero && (
+                                  <Badge
+                                    variant="secondary"
+                                    className="rounded-full font-black text-[10px] uppercase tracking-widest"
+                                    style={{ background: "rgba(127,1,127,0.10)", color: PURPLE }}
+                                  >
+                                    {c.genero}
+                                  </Badge>
+                                )}
+
+                                {Number.isFinite(c.edad) && c.edad > 0 && (
+                                  <Badge
+                                    variant="secondary"
+                                    className="rounded-full font-black text-[10px] uppercase tracking-widest"
+                                  >
+                                    {c.edad} años
+                                  </Badge>
+                                )}
+
+                                {c.fecha && (
+                                  <span className="ml-auto text-[11px] font-black text-slate-400">
+                                    {formatFechaES(c.fecha)}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Texto completo */}
+                              <p className="text-sm leading-6 text-slate-700 font-semibold whitespace-pre-wrap">
+                                {c.texto}
+                              </p>
+                            </DialogContent>
+                          </Dialog>
+                        )}
+
+                     
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+
       </main>
     </div>
   );

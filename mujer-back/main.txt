@@ -267,21 +267,6 @@ func main() {
 
 
 	// ======================
-	// Centro: Serie anual (comparar años)
-	// GET /api/centro/resumen-anual?years=2022,2023,2024
-	// ======================
-	mux.HandleFunc("/api/centro/resumen-anual", func(w http.ResponseWriter, r *http.Request) {
-		handlers.RequireJWT(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Method == http.MethodGet {
-				crh.GetResumenCentroAnual(w, r)
-				return
-			}
-			http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
-		})).ServeHTTP(w, r)
-	})
-
-
-	// ======================
 	// CORS
 	// ======================
 	handler := handlers.CORS(mux, handlers.CORSOptions{
@@ -304,5 +289,3 @@ func main() {
 		os.Exit(1)
 	}
 }
-
-
