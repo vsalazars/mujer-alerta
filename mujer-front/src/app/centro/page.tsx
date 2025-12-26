@@ -29,6 +29,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+
+
 /* ======= Nivo (SVG versions) ======= */
 const ResponsiveHeatMap = dynamic(
   () => import("@nivo/heatmap").then((m) => m.ResponsiveHeatMap),
@@ -1219,8 +1228,62 @@ const GroupedBarValuePillLayer = ({ bars }: any) => {
 
                       {/* texto */}
                       <p className="mt-3 text-sm leading-6 text-slate-700 font-semibold">
-                        {truncate(c.texto, 180)}
-                      </p>
+                          {truncate(c.texto, 180)}
+                        </p>
+
+                        {c.texto.length > 180 && (
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <button
+                                className="mt-3 text-xs font-black uppercase tracking-widest"
+                                style={{ color: PURPLE }}
+                              >
+                                Ver comentario completo
+                              </button>
+                            </DialogTrigger>
+
+                            <DialogContent className="max-w-xl rounded-[1.75rem]">
+                              <DialogHeader>
+                                <DialogTitle className="text-sm font-black tracking-wide">
+                                  Comentario completo
+                                </DialogTitle>
+                              </DialogHeader>
+
+                              {/* Meta */}
+                              <div className="flex flex-wrap items-center gap-2 mb-3">
+                                {c.genero && (
+                                  <Badge
+                                    variant="secondary"
+                                    className="rounded-full font-black text-[10px] uppercase tracking-widest"
+                                    style={{ background: "rgba(127,1,127,0.10)", color: PURPLE }}
+                                  >
+                                    {c.genero}
+                                  </Badge>
+                                )}
+
+                                {Number.isFinite(c.edad) && c.edad > 0 && (
+                                  <Badge
+                                    variant="secondary"
+                                    className="rounded-full font-black text-[10px] uppercase tracking-widest"
+                                  >
+                                    {c.edad} años
+                                  </Badge>
+                                )}
+
+                                {c.fecha && (
+                                  <span className="ml-auto text-[11px] font-black text-slate-400">
+                                    {formatFechaES(c.fecha)}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Texto completo */}
+                              <p className="text-sm leading-6 text-slate-700 font-semibold whitespace-pre-wrap">
+                                {c.texto}
+                              </p>
+                            </DialogContent>
+                          </Dialog>
+                        )}
 
                      
                     </div>
