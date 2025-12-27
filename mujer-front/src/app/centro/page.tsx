@@ -831,13 +831,11 @@ export default function CentroPage() {
 
                     {showSemantic ? (
                       <Badge
-                        className={`rounded-full font-black ${semanticBadgeClass5(
-                          semanticLevel5(data.global.total),
-                          true
-                        )}`}
-                      >
-                        {semanticLevel5(data.global.total)}
-                      </Badge>
+                          className="rounded-full bg-white/10 text-white border border-white/15 font-black uppercase tracking-widest text-[11px]"
+                        >
+                          {semanticLevel5(data.global.total)}
+                        </Badge>
+
                     ) : null}
                   </div>
                 </div>
