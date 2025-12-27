@@ -229,6 +229,67 @@ function wrapLabel(s: string, maxLen = 18, maxLines = 2) {
   return lines.join("\n");
 }
 
+
+
+type LevelTag = "Muy bajo" | "Bajo" | "Medio" | "Alto" | "Muy alto";
+type VarTag = "Baja" | "Moderada" | "Alta";
+type PrecTag = "Alta" | "Moderada" | "Baja";
+type ConsTag = "Baja" | "Aceptable" | "Alta" | "Muy alta";
+
+function levelFromMean(x: number): LevelTag {
+  const v = clamp5(x);
+  if (v < 1.5) return "Muy bajo";
+  if (v < 2.5) return "Bajo";
+  if (v < 3.5) return "Medio";
+  if (v < 4.5) return "Alto";
+  return "Muy alto";
+}
+
+function variabilityTag(stdDevItems: number): VarTag {
+  const s = Number.isFinite(stdDevItems) ? stdDevItems : 0;
+  if (s < 0.6) return "Baja";
+  if (s <= 0.9) return "Moderada";
+  return "Alta";
+}
+
+function precisionTagByCI(ciInf: number, ciSup: number): PrecTag {
+  const a = Number.isFinite(ciInf) ? ciInf : 0;
+  const b = Number.isFinite(ciSup) ? ciSup : 0;
+  const width = Math.abs(b - a);
+  if (width <= 0.4) return "Alta";
+  if (width <= 0.7) return "Moderada";
+  return "Baja";
+}
+
+function consistencyTag(alpha: number): ConsTag {
+  const a = Number.isFinite(alpha) ? alpha : 0;
+  if (a >= 0.9) return "Muy alta";
+  if (a >= 0.8) return "Alta";
+  if (a >= 0.7) return "Aceptable";
+  return "Baja";
+}
+
+function dimPretty(dim: string) {
+  if (dim === "frecuencia") return "Frecuencia";
+  if (dim === "normalidad") return "Normalización";
+  if (dim === "gravedad") return "Gravedad";
+  return dim;
+}
+
+function dimShortRisk(dim: string, mean: number) {
+  const lvl = levelFromMean(mean);
+  // si quieres más fino: "medio-alto" cerca del umbral
+  const v = clamp5(mean);
+  const nearHigh = lvl === "Medio" && v >= 3.25;
+  if (nearHigh) return "Medio-alto";
+  return lvl;
+}
+
+function pickDim(rows: AdvRow[], dim: string) {
+  return rows.find((r) => String(r.dimension) === dim);
+}
+
+
 /* =======================
    ✅ Años (desde back si existe)
    ======================= */
@@ -1429,6 +1490,391 @@ export default function CentroPage() {
             )}
           </CardContent>
         </Card>
+        
+       {/* =======================
+          ✅ Interpretación ejecutiva (sin tecnicismos) — PREMIUM
+        ======================= */}
+        <Card className="rounded-[2rem] border-slate-200 shadow-sm">
+          <CardHeader className="pb-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <CardTitle className="text-sm font-black tracking-wide">
+                  Resultados ejecutivos dinámicos 
+                </CardTitle>
+              
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 justify-end">
+                <Badge
+                  variant="secondary"
+                  className="rounded-full font-black text-[10px] uppercase tracking-widest"
+                  style={{ background: "rgba(127,1,127,0.10)", color: PURPLE }}
+                >
+                  Resumen ejecutivo
+                </Badge>
+
+                <Badge
+                  variant="secondary"
+                  className="rounded-full font-black text-[10px] uppercase tracking-widest"
+                  style={{ background: "rgba(2,6,23,0.04)", color: "#0f172a" }}
+                >
+                  {year === "all" ? "Selecciona año" : `Año ${year}`}
+                </Badge>
+              </div>
+            </div>
+          </CardHeader>
+
+          <CardContent>
+            <Separator className="mb-5" />
+
+            {year === "all" ? (
+              <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                <span className="font-black" style={{ color: PURPLE }}>
+                  Selecciona un año
+                </span>{" "}
+                para generar el resumen ejecutivo.
+              </div>
+            ) : advLoading ? (
+              <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 text-sm text-slate-600 flex items-center gap-3">
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                Preparando resumen…
+              </div>
+            ) : advErr ? (
+              <div className="rounded-[1.5rem] border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                <span className="font-black">No se pudo cargar:</span> {advErr}
+              </div>
+            ) : advRows.length === 0 ? (
+              <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                <span className="font-black" style={{ color: PURPLE }}>
+                  Sin datos
+                </span>{" "}
+                para resumen ejecutivo.
+              </div>
+            ) : (
+              (() => {
+                const f = pickDim(advRows, "frecuencia");
+                const n = pickDim(advRows, "normalidad");
+                const g = pickDim(advRows, "gravedad");
+
+                const rows = [f, n, g].filter(Boolean) as AdvRow[];
+                const meta = advRows[0];
+
+                // ======================
+                // Traducciones "humanas"
+                // ======================
+                function consensoHumano(stdDevItems: number) {
+                  const v = variabilityTag(stdDevItems);
+                  if (v === "Baja") return "Alto consenso";
+                  if (v === "Moderada") return "Consenso moderado";
+                  return "Opiniones divididas";
+                }
+
+                function solidezHumana(ciInfEnc: number, ciSupEnc: number) {
+                  const p = precisionTagByCI(ciInfEnc, ciSupEnc);
+                  if (p === "Alta") return "Alta";
+                  if (p === "Moderada") return "Moderada";
+                  return "En observación";
+                }
+
+                function confiabilidadHumana(alpha: number) {
+                  const c = consistencyTag(alpha);
+                  if (c === "Muy alta") return "Muy alta";
+                  if (c === "Alta") return "Alta";
+                  if (c === "Aceptable") return "Adecuada";
+                  return "Baja";
+                }
+
+                function riskBandByMean(mean: number): "Bajo" | "Medio" | "Alto" {
+                  const v = clamp5(mean);
+                  if (v < 2.5) return "Bajo";
+                  if (v < 3.5) return "Medio";
+                  return "Alto";
+                }
+
+                function chipStyle(band: "Bajo" | "Medio" | "Alto") {
+                  if (band === "Alto") {
+                    return {
+                      bg: "rgba(127,1,127,0.14)",
+                      fg: PURPLE,
+                      bd: "rgba(127,1,127,0.28)",
+                      dot: "rgba(127,1,127,0.95)",
+                      glow: "0 0 0 6px rgba(127,1,127,0.10)",
+                    };
+                  }
+                  if (band === "Medio") {
+                    return {
+                      bg: "rgba(127,1,127,0.08)",
+                      fg: PURPLE,
+                      bd: "rgba(127,1,127,0.18)",
+                      dot: "rgba(127,1,127,0.65)",
+                      glow: "0 0 0 6px rgba(127,1,127,0.06)",
+                    };
+                  }
+                  return {
+                    bg: "rgba(2,6,23,0.04)",
+                    fg: "#0f172a",
+                    bd: "rgba(2,6,23,0.10)",
+                    dot: "rgba(2,6,23,0.40)",
+                    glow: "0 0 0 6px rgba(2,6,23,0.03)",
+                  };
+                }
+
+                // ======================
+                // Síntesis ejecutiva (reglas)
+                // ======================
+                const highG = g && clamp5(g.promedio) >= 3.5;
+                const highN = n && clamp5(n.promedio) >= 3.5;
+                const nearHighF = f && clamp5(f.promedio) >= 3.25;
+
+                const headline =
+                  highG && highN
+                    ? "Gravedad y normalización altas: patrón severo y percibido como habitual."
+                    : highG
+                    ? "Gravedad alta: requiere atención prioritaria."
+                    : highN
+                    ? "Normalización alta: requiere intervención cultural."
+                    : nearHighF
+                    ? "Frecuencia medio-alta: reforzar monitoreo y prevención."
+                    : "Resultados en rango bajo–medio: mantener vigilancia y canales de reporte.";
+
+                // Acciones sugeridas (humanas)
+                const actions: string[] = [];
+                if (highG) actions.push("Activar/fortalecer rutas de canalización y respuesta (protocolos y seguimiento).");
+                if (highN) actions.push("Intervención cultural: sensibilización, comunicación y tolerancia cero.");
+                if (nearHighF || (f && clamp5(f.promedio) >= 3.0))
+                  actions.push("Refuerzo preventivo: presencia, difusión de canales y monitoreo periódico.");
+
+                const anyDivided = rows.some((r) => consensoHumano(r.std_dev) === "Opiniones divididas");
+                if (anyDivided) actions.push("Revisar diferencias entre grupos o áreas: no todas las personas reportan lo mismo.");
+
+                const anyObs = rows.some((r) => solidezHumana(r.ic95_inferior_encuestas, r.ic95_superior_encuestas) === "En observación");
+                if (anyObs) actions.push("Aumentar encuestas para fortalecer la solidez por participantes.");
+
+                if (actions.length === 0) actions.push("Mantener monitoreo anual y reforzar cultura de reporte.");
+
+                // ======================
+                // Badges globales (sin tecnicismos)
+                // ======================
+                const alphas = rows
+                  .map((r) => Number(r.alpha_cronbach ?? 0))
+                  .filter((x) => Number.isFinite(x) && x > 0);
+                const alphaAvg = alphas.length ? alphas.reduce((a, b) => a + b, 0) / alphas.length : 0;
+                const confiabGlobal = alphaAvg ? confiabilidadHumana(alphaAvg) : "Alta";
+
+                return (
+                  <>
+                    {/* =======================
+                      Banda ejecutiva (premium)
+                    ======================= */}
+                    <div className="mb-5 overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white">
+                      <div
+                        className="h-2 w-full"
+                        style={{
+                          background:
+                            "linear-gradient(90deg, rgba(127,1,127,0.95), rgba(127,1,127,0.30), rgba(2,6,23,0.04))",
+                        }}
+                      />
+
+                      <div className="p-5">
+                        <div className="grid gap-3 md:grid-cols-[1fr,320px]">
+                          {/* Síntesis */}
+                          <div className="rounded-[1.5rem] border border-slate-200 bg-[radial-gradient(900px_circle_at_0%_0%,rgba(127,1,127,0.10),transparent_55%)] p-5">
+                            <p className="text-[11px] font-black uppercase tracking-widest" style={{ color: PURPLE }}>
+                              Síntesis
+                            </p>
+                            <p className="mt-2 text-sm leading-6 text-slate-900 font-semibold">
+                              {headline}
+                            </p>
+
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                              {meta ? (
+                                <Badge
+                                  variant="secondary"
+                                  className="rounded-full px-3 py-1 font-black text-[11px]"
+                                  style={{ background: "rgba(2,6,23,0.04)", color: "#0f172a" }}
+                                  title="Tamaño del levantamiento del año"
+                                >
+                                  Muestra: {meta.n_encuestas} participantes
+                                </Badge>
+                              ) : null}
+
+                              <Badge
+                                variant="secondary"
+                                className="rounded-full px-3 py-1 font-black text-[11px]"
+                                style={{ background: "rgba(2,6,23,0.04)", color: "#0f172a" }}
+                                title="Calidad general de la medición"
+                              >
+                                Confiabilidad: {confiabGlobal}
+                              </Badge>
+
+                              {meta ? (
+                                <Badge
+                                  variant="secondary"
+                                  className="rounded-full px-3 py-1 font-black text-[11px]"
+                                  style={{ background: "rgba(2,6,23,0.04)", color: "#0f172a" }}
+                                  title="Volumen de información capturada"
+                                >
+                                  Datos: {meta.total_respuestas} respuestas
+                                </Badge>
+                              ) : null}
+                            </div>
+                          </div>
+
+                          {/* Acciones */}
+                          <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5">
+                            <p className="text-[11px] font-black uppercase tracking-widest text-slate-700">
+                              Acciones sugeridas
+                            </p>
+
+                            <div className="mt-3 space-y-2">
+                              {actions.slice(0, 4).map((a, i) => (
+                                <div key={i} className="flex items-start gap-2">
+                                  <span
+                                    className="mt-1 inline-flex h-2 w-2 rounded-full"
+                                    style={{ background: PURPLE, boxShadow: "0 0 0 6px rgba(127,1,127,0.08)" }}
+                                  />
+                                  <p className="text-xs font-semibold text-slate-700 leading-5">
+                                    {a}
+                                  </p>
+                                </div>
+                              ))}
+                              {actions.length > 4 ? (
+                                <p className="pt-1 text-[11px] font-black text-slate-500">
+                                  +{actions.length - 4} acciones adicionales sugeridas
+                                </p>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* =======================
+                      Tarjetas por dimensión (humanas)
+                    ======================= */}
+                    <div className="grid gap-4 md:grid-cols-3">
+                      {rows.map((r) => {
+                        const dim = String(r.dimension);
+                        const pretty = dimPretty(dim);
+
+                        const riskBand = riskBandByMean(r.promedio);
+                        const s = chipStyle(riskBand);
+
+                        const consenso = consensoHumano(r.std_dev);
+                        const solidez = solidezHumana(r.ic95_inferior_encuestas, r.ic95_superior_encuestas);
+                        const conf = confiabilidadHumana(r.alpha_cronbach);
+
+                        // Frase “qué implica”
+                        const implies =
+                          riskBand === "Alto"
+                            ? "Priorizar atención y seguimiento."
+                            : riskBand === "Medio"
+                            ? "Reforzar prevención y monitoreo."
+                            : "Mantener vigilancia y cultura de reporte.";
+
+                        const implies2 =
+                          consenso === "Opiniones divididas"
+                            ? "Puede haber focos específicos (diferencias por grupo/área)."
+                            : consenso === "Consenso moderado"
+                            ? "Patrón relativamente estable."
+                            : "Percepción homogénea.";
+
+                        const implies3 =
+                          solidez === "En observación"
+                            ? "Con más participantes, el mensaje se vuelve más sólido."
+                            : solidez === "Moderada"
+                            ? "Mensaje suficientemente estable para lectura institucional."
+                            : "Mensaje muy estable con la muestra actual.";
+
+                        return (
+                          <div
+                            key={dim}
+                            className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)]"
+                          >
+                            {/* Header */}
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-center gap-2">
+                                <span className="inline-flex h-2.5 w-2.5 rounded-full" style={{ background: PURPLE }} />
+                                <div>
+                                  <p className="font-black text-slate-900">{pretty}</p>
+                                  <p className="text-[11px] font-semibold text-slate-500">
+                                    {pctFrom5(r.promedio)}% · {fmt2(r.promedio)} / 5
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div
+                                className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest"
+                                style={{
+                                  background: s.bg,
+                                  color: s.fg,
+                                  border: `1px solid ${s.bd}`,
+                                  boxShadow: s.glow,
+                                }}
+                                title="Semáforo ejecutivo"
+                              >
+                                <span className="inline-flex h-2 w-2 rounded-full" style={{ background: s.dot }} />
+                                {riskBand}
+                              </div>
+                            </div>
+
+                            {/* 3 bloques humanos */}
+                            <div className="mt-4 grid gap-3">
+                              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                                  Consenso del grupo
+                                </p>
+                                <p className="mt-1 text-sm font-black text-slate-900">{consenso}</p>
+                              </div>
+
+                              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                                  Solidez con la muestra actual
+                                </p>
+                                <p className="mt-1 text-sm font-black text-slate-900">{solidez}</p>
+                              </div>
+
+                              <div className="rounded-2xl border border-slate-200 bg-[rgba(127,1,127,0.06)] p-4">
+                                <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: PURPLE }}>
+                                  Confiabilidad de la medición
+                                </p>
+                                <p className="mt-1 text-sm font-black text-slate-900">{conf}</p>
+                              </div>
+                            </div>
+
+                            {/* Interpretación ejecutiva */}
+                            <div className="mt-4 rounded-2xl border border-slate-200 bg-[rgba(127,1,127,0.06)] p-4">
+                              <p className="text-[11px] font-black uppercase tracking-widest" style={{ color: PURPLE }}>
+                                Qué significa
+                              </p>
+                              <div className="mt-2 space-y-2 text-xs font-semibold text-slate-700 leading-5">
+                                <p>• {implies}</p>
+                                <p>• {implies2}</p>
+                                <p>• {implies3}</p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Cierre (sin fórmula) */}
+                    <div className="mt-5 rounded-[1.5rem] border border-slate-200 bg-white p-4 text-[11px] font-semibold text-slate-600 leading-5">
+                      <span className="font-black" style={{ color: PURPLE }}>
+                        Nota ejecutiva:
+                      </span>{" "}
+                      Esta lectura resume <span className="font-black">nivel</span>, <span className="font-black">consenso</span> y{" "}
+                      <span className="font-black">solidez</span>. Los detalles técnicos permanecen en “Estadística avanzada”.
+                    </div>
+                  </>
+                );
+              })()
+            )}
+          </CardContent>
+        </Card>
+
+
+
 
         {/* Comentarios */}
         <Card className="rounded-[2rem] border-slate-200 shadow-sm">
