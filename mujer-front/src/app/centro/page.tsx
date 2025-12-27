@@ -1485,11 +1485,12 @@ export default function CentroPage() {
                   </div>
 
                   <div className="border-t border-slate-200 bg-white px-4 py-3 text-[12px] text-slate-600">
-                    <span className="font-black" style={{ color: PURPLE }}>
-                      Nota:
-                    </span>{" "}
-                    IC 95% calculado con aproximación normal (1.96·σ/√n). Percentiles por{" "}
-                    <span className="font-black">percentile_cont</span>. Alpha por dimensión.
+                      <span className="font-black" style={{ color: PURPLE }}>
+                        Nota:
+                      </span>{" "}
+                      IC 95% calculado con aproximación normal (1.96·σ/√n).
+                      Cuartiles (Q1, mediana y Q3). Alpha por dimensión.
+
                   </div>
                 </div>
               </>
