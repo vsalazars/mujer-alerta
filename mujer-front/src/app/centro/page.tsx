@@ -1038,7 +1038,7 @@ export default function CentroPage() {
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-black tracking-wide">
-                Heatmap por tipo de violencia contra la mujer
+                Mapa de Calor por tipo de violencia contra la mujer
               </CardTitle>
               <div className="flex items-center gap-2">
                 <Grid3X3 className="h-4 w-4" style={{ color: PURPLE }} />
