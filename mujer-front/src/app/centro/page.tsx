@@ -1311,7 +1311,7 @@ export default function CentroPage() {
 
                   <div className="rounded-2xl border border-slate-200 bg-white p-4">
                     <div className="flex items-center gap-2">
-                      <Sigma className="h-4 w-4" style={{ color: PURPLE }} />
+                      <Sparkles className="h-4 w-4" style={{ color: PURPLE }} />
                       <p className="text-xs font-black tracking-wide text-slate-700">
                         Dispersión (σ)
                       </p>
@@ -1344,14 +1344,20 @@ export default function CentroPage() {
                           <th className="px-4 py-3 font-black">n encuestas</th>
                           <th className="px-4 py-3 font-black">n respuestas</th>
                           <th className="px-4 py-3 font-black">Prom</th>
-                          <th className="px-4 py-3 font-black">σ</th>
+                          <th className="px-4 py-3 font-black">
+                            <span className="normal-case">σ</span>{" "}
+                            <span className="uppercase">(ítems)</span>
+                          </th>
                           <th className="px-4 py-3 font-black">Mediana</th>
                           <th className="px-4 py-3 font-black">Q1</th>
                           <th className="px-4 py-3 font-black">Q3</th>
                           <th className="px-4 py-3 font-black">IC 95% (ítems / encuestas)</th>
                           <th className="px-4 py-3 font-black">α</th>
                           <th className="px-4 py-3 font-black">k</th>
-                          <th className="px-4 py-3 font-black">σ encuestas</th>
+                          <th className="px-4 py-3 font-black">
+                            <span className="normal-case">σ</span>{" "}
+                            <span className="uppercase">(encuestas)</span>
+                          </th>
 
 
                         </tr>
