@@ -120,6 +120,9 @@ type AdvRow = {
   n_respuestas: number;
   n_encuestas: number;
 
+  total_respuestas: number;
+  k_items: number;         
+
   promedio: number;
   std_dev: number;
 
@@ -131,7 +134,13 @@ type AdvRow = {
   ic95_superior: number;
 
   alpha_cronbach: number;
+
+  std_dev_encuestas: number;
+  ic95_inferior_encuestas: number;
+  ic95_superior_encuestas: number;
+
 };
+
 
 type CentroEstadisticaAvanzadaResponse = {
   centros: number[];
@@ -1332,6 +1341,17 @@ export default function CentroPage() {
                 >
                   {year === "all" ? "Requiere año" : `Año ${year}`}
                 </Badge>
+                {advRows.length > 0 ? (
+                <Badge
+                  variant="secondary"
+                  className="rounded-full font-black text-[10px] uppercase tracking-widest"
+                  style={{ background: "rgba(2,6,23,0.04)", color: "#0f172a" }}
+                >
+                  {advRows[0]?.n_respuestas ?? 0} por dimensión ·{" "}
+                  {advRows[0]?.total_respuestas ?? 0} total · k={advRows[0]?.k_items ?? 0}
+                </Badge>
+              ) : null}
+
               </div>
             </div>
           </CardHeader>
@@ -1415,8 +1435,12 @@ export default function CentroPage() {
                           <th className="px-4 py-3 font-black">Mediana</th>
                           <th className="px-4 py-3 font-black">P25</th>
                           <th className="px-4 py-3 font-black">P75</th>
-                          <th className="px-4 py-3 font-black">IC 95%</th>
+                          <th className="px-4 py-3 font-black">IC 95% (ítems / encuestas)</th>
                           <th className="px-4 py-3 font-black">α</th>
+                          <th className="px-4 py-3 font-black">k</th>
+                          <th className="px-4 py-3 font-black">σ encuestas</th>
+
+
                         </tr>
                       </thead>
 
@@ -1483,18 +1507,39 @@ export default function CentroPage() {
                               </td>
 
                               <td className="px-4 py-3">
-                                <div
-                                  className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-black"
-                                  style={{
-                                    background: "rgba(127,1,127,0.10)",
-                                    color: PURPLE,
-                                    border: "1px solid rgba(127,1,127,0.20)",
-                                  }}
-                                >
-                                  {Number(row.ic95_inferior ?? 0).toFixed(2)} –{" "}
-                                  {Number(row.ic95_superior ?? 0).toFixed(2)}
+                                <div className="flex flex-col gap-2">
+                                  {/* IC por ítems */}
+                                  <div
+                                    className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-black"
+                                    style={{
+                                      background: "rgba(127,1,127,0.10)",
+                                      color: PURPLE,
+                                      border: "1px solid rgba(127,1,127,0.20)",
+                                    }}
+                                    title="IC 95% calculado por ítems (n = n_respuestas)"
+                                  >
+                                    {Number(row.ic95_inferior ?? 0).toFixed(2)} –{" "}
+                                    {Number(row.ic95_superior ?? 0).toFixed(2)}
+                                    <span className="opacity-70">· ítems</span>
+                                  </div>
+
+                                  {/* IC conservador por encuestas */}
+                                  <div
+                                    className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-black"
+                                    style={{
+                                      background: "rgba(2,6,23,0.04)",
+                                      color: "#0f172a",
+                                      border: "1px solid rgba(2,6,23,0.10)",
+                                    }}
+                                    title="IC 95% conservador calculado entre encuestas (n = n_encuestas)"
+                                  >
+                                    {Number(row.ic95_inferior_encuestas ?? 0).toFixed(2)} –{" "}
+                                    {Number(row.ic95_superior_encuestas ?? 0).toFixed(2)}
+                                    <span className="opacity-70">· encuestas</span>
+                                  </div>
                                 </div>
                               </td>
+
 
                               <td className="px-4 py-3">
                                 <span
@@ -1503,6 +1548,16 @@ export default function CentroPage() {
                                   {alpha.toFixed(2)}
                                 </span>
                               </td>
+                              <td className="px-4 py-3 text-sm font-black text-slate-900">
+                                {row.k_items ?? 0}
+                              </td>
+
+
+                              <td className="px-4 py-3 text-sm font-black text-slate-900">
+                                {Number(row.std_dev_encuestas ?? 0).toFixed(2)}
+                              </td>
+
+
                             </tr>
                           );
                         })}

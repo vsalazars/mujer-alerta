@@ -661,31 +661,38 @@ func (h CentroResultadosHandler) GetResumenCentroAnual(w http.ResponseWriter, r 
 // =======================================================
 // 📊 ESTADÍSTICA AVANZADA POR CENTRO Y AÑO
 // Incluye:
-// 1️⃣ Desviación estándar
-// 2️⃣ Mediana + percentiles (P25, P75)
-// 3️⃣ Tamaño muestral explícito (por dimensión + total anual)
-// 4️⃣ Intervalos de confianza 95%
-// 5️⃣ Alpha de Cronbach (consistencia interna)
+// 1️⃣ Desviación estándar (ítems) + desviación estándar entre encuestas
+// 2️⃣ Mediana + percentiles (P25, P75) (por ítems)
+// 3️⃣ Tamaño muestral explícito (por dimensión + total anual + k)
+// 4️⃣ Intervalos de confianza 95% (ítems + encuestas)
+// 5️⃣ Alpha de Cronbach (consistencia interna) por dimensión
 // =======================================================
 
 type EstadisticaDimension struct {
 	Dimension string `json:"dimension"`
 
-	// ✅ tamaño muestral
-	NRespuestas      int64 `json:"n_respuestas"`       // por dimensión (ej. 112 = 7*16)
-	NEncuestas       int64 `json:"n_encuestas"`        // encuestas finalizadas (ej. 7)
-	TotalRespuestas  int64 `json:"total_respuestas"`   // total anual (ej. 336 = 7*48)
-	KItems           int64 `json:"k_items"`            // #preguntas distintas por dimensión (ej. 16)
+	// ✅ tamaños muestrales
+	NRespuestas     int64 `json:"n_respuestas"`      // por dimensión (ej. 112 = 7*16)
+	NEncuestas      int64 `json:"n_encuestas"`       // encuestas finalizadas (ej. 7)
+	TotalRespuestas int64 `json:"total_respuestas"`  // total anual (ej. 336 = 7*48)
+	KItems          int64 `json:"k_items"`           // #ítems por dimensión (ej. 16)
 
+	// ✅ estadística por ítems
 	Promedio float64 `json:"promedio"`
-	StdDev   float64 `json:"std_dev"`
+	StdDev   float64 `json:"std_dev"` // σ (ítems)
 
 	Mediana float64 `json:"mediana"`
 	P25     float64 `json:"p25"`
 	P75     float64 `json:"p75"`
 
+	// ✅ IC95 por ítems (n = n_respuestas)
 	IC95Inferior float64 `json:"ic95_inferior"`
 	IC95Superior float64 `json:"ic95_superior"`
+
+	// ✅ estadística entre encuestas (más conservador)
+	StdDevEncuestas      float64 `json:"std_dev_encuestas"`
+	IC95InferiorEncuestas float64 `json:"ic95_inferior_encuestas"`
+	IC95SuperiorEncuestas float64 `json:"ic95_superior_encuestas"`
 
 	AlphaCronbach float64 `json:"alpha_cronbach"`
 }
@@ -722,10 +729,6 @@ func (h CentroResultadosHandler) GetCentroEstadisticaAvanzada(w http.ResponseWri
 	ctx := r.Context()
 
 	rows, err := h.DB.Query(ctx, `
-		-- ==========================
-		-- Base: una fila por respuesta (ya viene con dimension)
-		-- dimension -> (frecuencia|normalidad|gravedad)
-		-- ==========================
 		with base as (
 			select
 				r.dimension::text as dimension,
@@ -739,16 +742,16 @@ func (h CentroResultadosHandler) GetCentroEstadisticaAvanzada(w http.ResponseWri
 			  and extract(year from e.finished_at)::int = $2
 		),
 
-		-- ✅ total real de respuestas del año (sumando todas las dimensiones)
+		-- ✅ total real de respuestas del año (todas las dimensiones)
 		total_respuestas as (
 			select count(*)::bigint as total_respuestas
 			from base
 		),
 
 		-- ==========================
-		-- Stats descriptiva por dimensión (n por dimensión)
+		-- Stats por ÍTEMS (como antes)
 		-- ==========================
-		stats as (
+		stats_items as (
 			select
 				dimension,
 				count(*)::bigint as n_respuestas,
@@ -763,10 +766,30 @@ func (h CentroResultadosHandler) GetCentroEstadisticaAvanzada(w http.ResponseWri
 		),
 
 		-- ==========================
-		-- Cronbach alpha por dimensión
-		-- k = #preguntas distintas por dimensión
+		-- Stats ENTRE ENCUESTAS
+		-- 1 fila por (dimension, encuesta_id) con el promedio de la dimensión
 		-- ==========================
-		-- Normalizamos a 1 valor por (encuesta_id, pregunta_id)
+		encuesta_dim as (
+			select
+				dimension,
+				encuesta_id,
+				avg(valor)::float8 as promedio_encuesta
+			from base
+			group by dimension, encuesta_id
+		),
+		stats_encuestas as (
+			select
+				dimension,
+				count(*)::bigint as n_encuestas, -- aquí count(*) == count(distinct encuesta_id)
+				avg(promedio_encuesta)::float8 as promedio_encuestas,
+				stddev_samp(promedio_encuesta)::float8 as stddev_encuestas
+			from encuesta_dim
+			group by dimension
+		),
+
+		-- ==========================
+		-- Cronbach alpha por dimensión
+		-- ==========================
 		item_values as (
 			select
 				dimension,
@@ -821,34 +844,45 @@ func (h CentroResultadosHandler) GetCentroEstadisticaAvanzada(w http.ResponseWri
 		)
 
 		select
-			s.dimension,
-			s.n_respuestas,
-			s.n_encuestas,
+			si.dimension,
+			si.n_respuestas,
+			si.n_encuestas,
 			tr.total_respuestas,
 			coalesce(a.k, 0)::bigint as k_items,
 
-			s.promedio,
-			coalesce(s.stddev, 0)::float8 as stddev,
-			s.mediana,
-			s.p25,
-			s.p75,
+			si.promedio,
+			coalesce(si.stddev, 0)::float8 as stddev,
+			si.mediana,
+			si.p25,
+			si.p75,
 
-			-- IC 95%: si n<2 o stddev=0, devolvemos promedio como rango
+			-- IC95 por ítems (n = n_respuestas)
 			case
-				when s.n_respuestas < 2 or coalesce(s.stddev,0) = 0 then s.promedio
-				else (s.promedio - 1.96 * (coalesce(s.stddev,0) / sqrt(s.n_respuestas::float8)))
-			end as ic_inf,
+				when si.n_respuestas < 2 or coalesce(si.stddev,0) = 0 then si.promedio
+				else (si.promedio - 1.96 * (coalesce(si.stddev,0) / sqrt(si.n_respuestas::float8)))
+			end as ic_inf_items,
+			case
+				when si.n_respuestas < 2 or coalesce(si.stddev,0) = 0 then si.promedio
+				else (si.promedio + 1.96 * (coalesce(si.stddev,0) / sqrt(si.n_respuestas::float8)))
+			end as ic_sup_items,
 
+			-- σ e IC95 conservador entre encuestas (n = n_encuestas)
+			coalesce(se.stddev_encuestas, 0)::float8 as stddev_encuestas,
 			case
-				when s.n_respuestas < 2 or coalesce(s.stddev,0) = 0 then s.promedio
-				else (s.promedio + 1.96 * (coalesce(s.stddev,0) / sqrt(s.n_respuestas::float8)))
-			end as ic_sup,
+				when coalesce(se.n_encuestas,0) < 2 or coalesce(se.stddev_encuestas,0) = 0 then si.promedio
+				else (si.promedio - 1.96 * (coalesce(se.stddev_encuestas,0) / sqrt(se.n_encuestas::float8)))
+			end as ic_inf_enc,
+			case
+				when coalesce(se.n_encuestas,0) < 2 or coalesce(se.stddev_encuestas,0) = 0 then si.promedio
+				else (si.promedio + 1.96 * (coalesce(se.stddev_encuestas,0) / sqrt(se.n_encuestas::float8)))
+			end as ic_sup_enc,
 
 			coalesce(a.alpha, 0)::float8 as alpha
-		from stats s
+		from stats_items si
 		cross join total_respuestas tr
-		left join alpha a on a.dimension = s.dimension
-		order by s.dimension
+		left join stats_encuestas se on se.dimension = si.dimension
+		left join alpha a on a.dimension = si.dimension
+		order by si.dimension
 	`, centros, year)
 
 	if err != nil {
@@ -867,13 +901,20 @@ func (h CentroResultadosHandler) GetCentroEstadisticaAvanzada(w http.ResponseWri
 			&d.NEncuestas,
 			&d.TotalRespuestas,
 			&d.KItems,
+
 			&d.Promedio,
 			&d.StdDev,
 			&d.Mediana,
 			&d.P25,
 			&d.P75,
+
 			&d.IC95Inferior,
 			&d.IC95Superior,
+
+			&d.StdDevEncuestas,
+			&d.IC95InferiorEncuestas,
+			&d.IC95SuperiorEncuestas,
+
 			&d.AlphaCronbach,
 		); err != nil {
 			http.Error(w, "db_error", http.StatusInternalServerError)
