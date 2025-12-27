@@ -1235,7 +1235,7 @@ export default function CentroPage() {
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-black tracking-wide">
-                Estadística avanzada (precisión y consistencia)
+                Estadística aplicada (precisión y consistencia)
               </CardTitle>
 
               <div className="flex items-center gap-2">
@@ -1282,7 +1282,7 @@ export default function CentroPage() {
             ) : advLoading ? (
               <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600 flex items-center gap-3">
                 <RefreshCw className="h-4 w-4 animate-spin" />
-                Calculando estadística avanzada…
+                Calculando estadística aplicada…
               </div>
             ) : advErr ? (
               <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -1293,7 +1293,7 @@ export default function CentroPage() {
                 <span className="font-black" style={{ color: PURPLE }}>
                   Sin datos
                 </span>{" "}
-                para estadística avanzada en el año seleccionado.
+                para estadística aplicada en el año seleccionado.
               </div>
             ) : (
               <>
@@ -1864,7 +1864,7 @@ export default function CentroPage() {
                         Nota ejecutiva:
                       </span>{" "}
                       Esta lectura resume <span className="font-black">nivel</span>, <span className="font-black">consenso</span> y{" "}
-                      <span className="font-black">solidez</span>. Los detalles técnicos permanecen en “Estadística avanzada”.
+                      <span className="font-black">solidez</span>. Los detalles técnicos permanecen en “Estadística aplicada”.
                     </div>
                   </>
                 );
