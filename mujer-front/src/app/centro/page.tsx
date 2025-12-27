@@ -1244,7 +1244,7 @@ export default function CentroPage() {
                   className="rounded-full font-black text-[10px] uppercase tracking-widest"
                   style={{ background: "rgba(127,1,127,0.10)", color: PURPLE }}
                 >
-                  IC 95% · σ · P25/P50/P75 · α
+                  IC 95% · σ · Q1/Q2/Q3 · α
                 </Badge>
 
                 <Badge
@@ -1346,8 +1346,8 @@ export default function CentroPage() {
                           <th className="px-4 py-3 font-black">Prom</th>
                           <th className="px-4 py-3 font-black">σ</th>
                           <th className="px-4 py-3 font-black">Mediana</th>
-                          <th className="px-4 py-3 font-black">P25</th>
-                          <th className="px-4 py-3 font-black">P75</th>
+                          <th className="px-4 py-3 font-black">Q1</th>
+                          <th className="px-4 py-3 font-black">Q3</th>
                           <th className="px-4 py-3 font-black">IC 95% (ítems / encuestas)</th>
                           <th className="px-4 py-3 font-black">α</th>
                           <th className="px-4 py-3 font-black">k</th>
