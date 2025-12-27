@@ -10,6 +10,7 @@ import { Separator } from "../components/ui/separator";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Badge } from "../components/ui/badge";
+
 import {
   Dialog,
   DialogContent,
@@ -25,6 +26,8 @@ import {
   ShieldCheck,
   BarChart3,
   ChevronRight,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 import { api } from "../lib/api";
@@ -59,6 +62,9 @@ export default function HomePage() {
 
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string>("");
+
+  const [showPassword, setShowPassword] = useState(false);
+
 
   const canSubmit = useMemo(() => {
     return email.trim().length > 3 && password.trim().length >= 6 && !loading;
@@ -154,15 +160,43 @@ export default function HomePage() {
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
                 <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-11 w-11 rounded-full border border-slate-200 bg-white/80 shadow-sm backdrop-blur active:scale-[0.98]"
-                  aria-label="Acceso"
-                  title="Acceso"
-                >
-                  <Lock className="h-5 w-5" style={{ color: BRAND }} />
-                </Button>
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Acceso"
+                    title="Acceso"
+                    className={[
+                      "group relative h-11 w-11 rounded-full",
+                      "transition-all duration-300 ease-out",
+                      "active:scale-[0.97]",
+                      "hover:-translate-y-[1.5px]",
+                      "shadow-[0_6px_18px_rgba(127,1,127,0.28)]",
+                      "hover:shadow-[0_12px_26px_rgba(127,1,127,0.38)]",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#7F017F]",
+                    ].join(" ")}
+                    style={{
+                      background: "linear-gradient(135deg, #7F017F 0%, #BE185D 100%)",
+                    }}
+                  >
+                    {/* ✅ halo externo que "pulsa" de vez en cuando (NO afecta icono) */}
+                    <span
+                      className="pointer-events-none absolute -inset-2 rounded-full blur-md"
+                      style={{
+                        background:
+                          "linear-gradient(135deg, rgba(127,1,127,0.55), rgba(190,24,93,0.45))",
+                        animation: "subtlePulse 5s ease-in-out infinite",
+                      }}
+                    />
+
+                    {/* anillo interior sutil */}
+                    <span className="pointer-events-none absolute inset-[1.5px] rounded-full ring-1 ring-white/20" />
+
+                    {/* ✅ icono SIEMPRE blanco */}
+                    <Lock className="relative h-5 w-5 text-white" strokeWidth={2.2} />
+                  </Button>
+
               </DialogTrigger>
+
+
 
               <DialogContent className="sm:max-w-md">
                 <DialogHeader>
@@ -191,15 +225,38 @@ export default function HomePage() {
 
                   <div className="grid gap-2">
                     <Label htmlFor="password">Contraseña</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      autoComplete="current-password"
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      disabled={loading}
-                    />
+
+                    <div className="relative">
+                      <Input
+                        id="password"
+                        type={showPassword ? "text" : "password"}
+                        autoComplete="current-password"
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        disabled={loading}
+                        className="pr-11"
+                      />
+
+                      <button
+                        type="button"
+                        aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                        className={[
+                          "absolute right-3 top-1/2 -translate-y-1/2",
+                          "text-slate-400 hover:text-slate-600",
+                          "transition-colors",
+                          "focus:outline-none",
+                        ].join(" ")}
+                        onClick={() => setShowPassword((v) => !v)}
+                        tabIndex={-1}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
                   </div>
 
                   {err ? <p className="text-sm text-red-600">{err}</p> : null}

@@ -20,6 +20,8 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { TrendsModal } from "@/components/centro/TrendsModal";
+
 
 import {
   Select,
@@ -214,6 +216,10 @@ export default function CentroPage() {
   const [err, setErr] = useState("");
 
   const [showSemantic, setShowSemantic] = useState(true);
+
+  // ✅ Modal Tendencias
+  const [trendsOpen, setTrendsOpen] = useState(false);
+
 
   // ✅ NUEVO: options reales
   const [yearOptions, setYearOptions] = useState<YearOption[]>(fallbackYears());
@@ -609,12 +615,13 @@ const GroupedBarValuePillLayer = ({ bars }: any) => {
               </div>
 
               <div className="flex flex-col items-end gap-3">
-                {/* ✅ Selector año (real desde back si existe) */}
+                {/* ✅ Selector año + botón Tendencias */}
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-2 text-xs font-black text-slate-600">
                     <Calendar className="h-4 w-4" style={{ color: PURPLE }} />
                     Año
                   </div>
+
                   <Select value={year} onValueChange={(v) => setYear(v)}>
                     <SelectTrigger className="h-10 w-[180px] rounded-2xl bg-white border-slate-200 hover:border-purple-300">
                       <SelectValue placeholder="Selecciona año" />
@@ -627,27 +634,24 @@ const GroupedBarValuePillLayer = ({ bars }: any) => {
                       ))}
                     </SelectContent>
                   </Select>
+
+                  {/* ✅ NUEVO: Tendencias (abrirá modal en otro componente) */}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-10 rounded-2xl bg-white border-slate-200 hover:border-purple-300"
+                    onClick={() => setTrendsOpen(true)}
+                    title="Comparar promedios anuales"
+                  >
+                    <Activity className="mr-2 h-4 w-4" style={{ color: PURPLE }} />
+                    Tendencias
+                  </Button>
+
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowSemantic((v) => !v)}
-                    className="rounded-2xl bg-white border-slate-200 hover:border-purple-300"
-                  >
-                    <Sparkles className="mr-2 h-4 w-4" style={{ color: PURPLE }} />
-                    Semántica: {showSemantic ? "ON" : "OFF"}
-                  </Button>
 
-                  <Button
-                    variant="outline"
-                    onClick={() => load(year)}
-                    className="rounded-2xl bg-white border-slate-200 hover:border-purple-300"
-                    title="Recargar datos"
-                  >
-                    <RefreshCw className="mr-2 h-4 w-4" style={{ color: PURPLE }} />
-                    Actualizar
-                  </Button>
+                <div className="flex items-center gap-3">
+                  
                 </div>
               </div>
             </div>
@@ -1117,21 +1121,20 @@ const GroupedBarValuePillLayer = ({ bars }: any) => {
                   ]}
                   valueFormat={(v: any) => fmt2(Number(v))}
                   legends={[
-                    {
-                      dataFrom: "keys",
-                      anchor: "top-left",
-                      direction: "row",
-                      justify: false,
-                      translateX: 0,
-                      translateY: -34,
-                      itemsSpacing: 12,
-                      itemWidth: 155,
-                      itemHeight: 18,
-                      itemDirection: "left-to-right",
-                      symbolSize: 12,
-                      symbolShape: "circle",
-                    },
-                  ]}
+                  {
+                    dataFrom: "keys",
+                    anchor: "top",
+                    direction: "row",
+                    justify: false,
+                    translateY: -28,
+                    itemsSpacing: 18,
+                    itemWidth: 90,
+                    itemHeight: 18,
+                    symbolSize: 10,
+                    symbolShape: "circle",
+                  },
+                ]}
+
                   theme={{
                     text: { fontFamily: "Montserrat", fontSize: 12, fontWeight: 900, fill: "#111827" },
                     axis: { ticks: { text: { fill: "#111827", fontWeight: 900 } } },
@@ -1296,6 +1299,13 @@ const GroupedBarValuePillLayer = ({ bars }: any) => {
 
 
       </main>
+      
+       {/* ✅ Modal Tendencias (NO afecta layout hasta que open=true) */}
+      <TrendsModal
+        open={trendsOpen}
+        onOpenChange={setTrendsOpen}
+      />
+
     </div>
   );
 }

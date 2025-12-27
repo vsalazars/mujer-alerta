@@ -206,3 +206,10 @@
     text-wrap: pretty;
   }
 }
+
+@keyframes subtlePulse {
+  0%, 78%, 100% { opacity: 0; transform: scale(1); }
+  82% { opacity: .55; transform: scale(1.10); }
+  86% { opacity: 0; transform: scale(1.18); }
+}
+

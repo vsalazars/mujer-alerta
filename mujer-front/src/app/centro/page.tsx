@@ -22,7 +22,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrendsModal } from "@/components/centro/TrendsModal";
 
-
 import {
   Select,
   SelectContent,
@@ -38,7 +37,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-
 
 /* ======= Nivo (SVG versions) ======= */
 const ResponsiveHeatMap = dynamic(
@@ -81,6 +79,14 @@ type GeneroDimItem = {
   gravedad: number;
 };
 
+type ComentarioItem = {
+  encuesta_id: string;
+  fecha: string;
+  genero: string;
+  edad: number;
+  texto: string;
+};
+
 type CentroStats = {
   total_participantes: number;
   total_encuestas: number;
@@ -94,7 +100,6 @@ type CentroStats = {
 
   resumen_por_genero: GeneroDimItem[];
   comentarios?: ComentarioItem[];
-
 };
 
 type CentroResumenResponse = {
@@ -106,13 +111,32 @@ type CentroResumenResponse = {
 
 const PURPLE = "#7F017F";
 
+/* =======================
+   ✅ NUEVO: Estadística avanzada
+   ======================= */
+type AdvRow = {
+  dimension: "frecuencia" | "normalidad" | "gravedad" | string;
 
-type ComentarioItem = {
-  encuesta_id: string;
-  fecha: string;   // string
-  genero: string;
-  edad: number;
-  texto: string;
+  n_respuestas: number;
+  n_encuestas: number;
+
+  promedio: number;
+  std_dev: number;
+
+  mediana: number;
+  p25: number;
+  p75: number;
+
+  ic95_inferior: number;
+  ic95_superior: number;
+
+  alpha_cronbach: number;
+};
+
+type CentroEstadisticaAvanzadaResponse = {
+  centros: number[];
+  year: number;
+  datos: AdvRow[];
 };
 
 /* =======================
@@ -198,8 +222,6 @@ function wrapLabel(s: string, maxLen = 18, maxLines = 2) {
 
 /* =======================
    ✅ Años (desde back si existe)
-   - Si tu back ya expone /api/centro/years → lo usamos
-   - Si no existe aún → fallback seguro sin romper nada
    ======================= */
 type YearOption = { value: string; label: string };
 
@@ -220,10 +242,14 @@ export default function CentroPage() {
   // ✅ Modal Tendencias
   const [trendsOpen, setTrendsOpen] = useState(false);
 
-
-  // ✅ NUEVO: options reales
+  // ✅ options reales
   const [yearOptions, setYearOptions] = useState<YearOption[]>(fallbackYears());
   const [year, setYear] = useState<string>("all");
+
+  /* ✅ NUEVO: hooks de estadística avanzada (DENTRO del componente) */
+  const [advRows, setAdvRows] = useState<AdvRow[]>([]);
+  const [advLoading, setAdvLoading] = useState(false);
+  const [advErr, setAdvErr] = useState("");
 
   async function load(selectedYear?: string) {
     const y = selectedYear ?? year;
@@ -246,6 +272,32 @@ export default function CentroPage() {
     }
   }
 
+  async function loadAdvanced(selectedYear?: string) {
+    const y = selectedYear ?? year;
+
+    // solo aplica cuando hay año específico
+    if (!y || y === "all") {
+      setAdvRows([]);
+      setAdvErr("");
+      setAdvLoading(false);
+      return;
+    }
+
+    setAdvLoading(true);
+    setAdvErr("");
+    try {
+      const res = await api<CentroEstadisticaAvanzadaResponse>(
+        `/api/centro/estadistica-avanzada?year=${encodeURIComponent(y)}`
+      );
+      setAdvRows(Array.isArray(res?.datos) ? res.datos : []);
+    } catch (e: any) {
+      setAdvErr(e?.message || "Error al cargar estadística avanzada");
+      setAdvRows([]);
+    } finally {
+      setAdvLoading(false);
+    }
+  }
+
   // ✅ NUEVO: carga years desde back (si existe) + carga dashboard con año persistido
   useEffect(() => {
     (async () => {
@@ -256,11 +308,13 @@ export default function CentroPage() {
       } catch {}
 
       // 2) Intenta traer años reales del back
-      //    Recomendado: GET /api/centro/years → [2023,2024,2025]
-      //    (si no existe, caemos a fallbackYears sin romper)
       try {
         const years = await api<number[] | { years: number[] }>(`/api/centro/years`);
-        const arr = Array.isArray(years) ? years : Array.isArray((years as any)?.years) ? (years as any).years : [];
+        const arr = Array.isArray(years)
+          ? years
+          : Array.isArray((years as any)?.years)
+          ? (years as any).years
+          : [];
         const clean = arr
           .map((n) => Number(n))
           .filter((n) => Number.isFinite(n) && n >= 2000 && n <= 2100)
@@ -268,18 +322,16 @@ export default function CentroPage() {
 
         if (clean.length) {
           const opts: YearOption[] = [{ value: "all", label: "Todos" }].concat(
-            clean.map((y) => ({ value: String(y), label: String(y) }))
+            clean.map((yy) => ({ value: String(yy), label: String(yy) }))
           );
           setYearOptions(opts);
 
-          // si saved existe pero no está en opts, lo ignoramos
-          const ok =
-            saved &&
-            (saved === "all" || opts.some((o) => o.value === saved));
-
+          const ok = saved && (saved === "all" || opts.some((o) => o.value === saved));
           const initialYear = ok ? (saved as string) : "all";
+
           setYear(initialYear);
           await load(initialYear);
+          await loadAdvanced(initialYear);
           return;
         }
       } catch {
@@ -292,6 +344,7 @@ export default function CentroPage() {
       setYearOptions(fallbackYears());
       setYear(initialYear);
       await load(initialYear);
+      await loadAdvanced(initialYear);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -300,6 +353,7 @@ export default function CentroPage() {
   useEffect(() => {
     if (!data && loading) return;
     load(year);
+    loadAdvanced(year);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year]);
 
@@ -356,11 +410,11 @@ export default function CentroPage() {
   }, [data]);
 
   const generoBars = useMemo(() => {
-  if (!data) return [];
-  return safeArr(data.stats.encuestas_por_genero)
-    .slice()
-    .sort((a, b) => (b.total || 0) - (a.total || 0))
-    .map((x) => ({ label: x.label, total: x.total || 0 }));
+    if (!data) return [];
+    return safeArr(data.stats.encuestas_por_genero)
+      .slice()
+      .sort((a, b) => (b.total || 0) - (a.total || 0))
+      .map((x) => ({ label: x.label, total: x.total || 0 }));
   }, [data]);
 
   const edadBars = useMemo(() => {
@@ -370,7 +424,6 @@ export default function CentroPage() {
       .sort((a, b) => a.label.localeCompare(b.label, "es", { numeric: true }))
       .map((x) => ({ label: x.label, total: x.total || 0 }));
   }, [data]);
-
 
   const generoStack = useMemo(() => {
     if (!data) return [];
@@ -385,7 +438,7 @@ export default function CentroPage() {
       .sort((a, b) => a.label.localeCompare(b.label, "es", { numeric: true }));
   }, [data]);
 
-   // ✅ helper (no hook)
+  // ✅ helper (no hook)
   function truncate(s: string, n = 180) {
     const t = (s || "").trim();
     if (t.length <= n) return t;
@@ -393,21 +446,18 @@ export default function CentroPage() {
   }
 
   function formatFechaES(iso?: string) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return iso; // fallback seguro
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
 
-  return new Intl.DateTimeFormat("es-MX", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(d);
-}
-
-
-
+    return new Intl.DateTimeFormat("es-MX", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(d);
+  }
 
   // ✅ hook SIEMPRE antes de returns condicionales
   const comentarios = useMemo(() => {
@@ -418,7 +468,6 @@ export default function CentroPage() {
   }, [data]);
 
   const comentariosCount = comentarios.length;
-
 
   if (loading) {
     return (
@@ -438,9 +487,7 @@ export default function CentroPage() {
           <CardHeader>
             <CardTitle className="text-slate-900">Sin datos</CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-red-600">
-            {err || "Error"}
-          </CardContent>
+          <CardContent className="text-sm text-red-600">{err || "Error"}</CardContent>
         </Card>
       </div>
     );
@@ -456,99 +503,97 @@ export default function CentroPage() {
   ];
 
   const BarValueChipLayer = ({ bars }: any) => {
-  return (
-    <>
-      {bars.map((bar: any) => {
-        const value = Math.round(bar.data.value);
-        if (!value) return null;
+    return (
+      <>
+        {bars.map((bar: any) => {
+          const value = Math.round(bar.data.value);
+          if (!value) return null;
 
-        return (
-          <g
-            key={bar.key}
-            transform={`translate(${bar.x + bar.width + 8}, ${bar.y + bar.height / 2})`}
-          >
-            <foreignObject
-              width={56}
-              height={28}
-              x={0}
-              y={-14}
-              style={{ overflow: "visible" }}
+          return (
+            <g
+              key={bar.key}
+              transform={`translate(${bar.x + bar.width + 8}, ${bar.y + bar.height / 2})`}
             >
-              <div
-                style={{
-                  background: "rgba(127,1,127,0.12)",
-                  color: "#7F017F",
-                  border: "1px solid rgba(127,1,127,0.25)",
-                  borderRadius: 999,
-                  padding: "2px 10px",
-                  fontSize: 12,
-                  fontWeight: 900,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  whiteSpace: "nowrap",
-                  boxShadow: "0 6px 18px rgba(127,1,127,0.25)",
-                }}
+              <foreignObject
+                width={56}
+                height={28}
+                x={0}
+                y={-14}
+                style={{ overflow: "visible" }}
               >
-                {value}
-              </div>
-            </foreignObject>
-          </g>
-        );
-      })}
-    </>
-  );
-};
+                <div
+                  style={{
+                    background: "rgba(127,1,127,0.12)",
+                    color: "#7F017F",
+                    border: "1px solid rgba(127,1,127,0.25)",
+                    borderRadius: 999,
+                    padding: "2px 10px",
+                    fontSize: 12,
+                    fontWeight: 900,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    whiteSpace: "nowrap",
+                    boxShadow: "0 6px 18px rgba(127,1,127,0.25)",
+                  }}
+                >
+                  {value}
+                </div>
+              </foreignObject>
+            </g>
+          );
+        })}
+      </>
+    );
+  };
 
-const GroupedBarValuePillLayer = ({ bars }: any) => {
-  return (
-    <>
-      {bars.map((bar: any) => {
-        const raw = Number(bar.data.value);
-        if (!Number.isFinite(raw)) return null;
+  const GroupedBarValuePillLayer = ({ bars }: any) => {
+    return (
+      <>
+        {bars.map((bar: any) => {
+          const raw = Number(bar.data.value);
+          if (!Number.isFinite(raw)) return null;
 
-        const txt = fmt2(raw); // 2 decimales (1–5)
+          const txt = fmt2(raw);
 
-        return (
-          <g
-            key={bar.key}
-            transform={`translate(${bar.x + bar.width + 8}, ${bar.y + bar.height / 2})`}
-          >
-            <foreignObject
-              width={62}
-              height={24}
-              x={0}
-              y={-12}
-              style={{ overflow: "visible" }}
+          return (
+            <g
+              key={bar.key}
+              transform={`translate(${bar.x + bar.width + 8}, ${bar.y + bar.height / 2})`}
             >
-              <div
-                style={{
-                  background: "rgba(127,1,127,0.12)",      
-                  color: "#7F017F",
-                  border: "1px solid rgba(127,1,127,0.25)",
-                  borderRadius: 999,
-                  padding: "1px 8px",
-                  fontSize: 9,                           
-                  fontWeight: 900,
-                  letterSpacing: "0.01em",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  whiteSpace: "nowrap",
-                  boxShadow: "0 6px 18px rgba(127,1,127,0.22)",
-                }}
+              <foreignObject
+                width={62}
+                height={24}
+                x={0}
+                y={-12}
+                style={{ overflow: "visible" }}
               >
-                {txt}
-              </div>
-            </foreignObject>
-          </g>
-        );
-      })}
-    </>
-  );
-};
-
-
+                <div
+                  style={{
+                    background: "rgba(127,1,127,0.12)",
+                    color: "#7F017F",
+                    border: "1px solid rgba(127,1,127,0.25)",
+                    borderRadius: 999,
+                    padding: "1px 8px",
+                    fontSize: 9,
+                    fontWeight: 900,
+                    letterSpacing: "0.01em",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    whiteSpace: "nowrap",
+                    boxShadow: "0 6px 18px rgba(127,1,127,0.22)",
+                  }}
+                >
+                  {txt}
+                </div>
+              </foreignObject>
+            </g>
+          );
+        })}
+      </>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] px-6 py-10 lg:px-12 text-slate-900">
@@ -635,7 +680,6 @@ const GroupedBarValuePillLayer = ({ bars }: any) => {
                     </SelectContent>
                   </Select>
 
-                  {/* ✅ NUEVO: Tendencias (abrirá modal en otro componente) */}
                   <Button
                     type="button"
                     variant="outline"
@@ -646,13 +690,9 @@ const GroupedBarValuePillLayer = ({ bars }: any) => {
                     <Activity className="mr-2 h-4 w-4" style={{ color: PURPLE }} />
                     Tendencias
                   </Button>
-
                 </div>
 
-
-                <div className="flex items-center gap-3">
-                  
-                </div>
+                <div className="flex items-center gap-3"></div>
               </div>
             </div>
           </div>
@@ -682,9 +722,7 @@ const GroupedBarValuePillLayer = ({ bars }: any) => {
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs text-slate-500 font-semibold">
-                      Participantes
-                    </p>
+                    <p className="text-xs text-slate-500 font-semibold">Participantes</p>
                     <Users className="h-4 w-4" style={{ color: PURPLE }} />
                   </div>
                   <p className="mt-2 text-3xl font-black" style={{ color: PURPLE }}>
@@ -698,9 +736,7 @@ const GroupedBarValuePillLayer = ({ bars }: any) => {
 
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs text-slate-500 font-semibold">
-                      Respuestas
-                    </p>
+                    <p className="text-xs text-slate-500 font-semibold">Respuestas</p>
                     <Sigma className="h-4 w-4" style={{ color: PURPLE }} />
                   </div>
                   <p className="mt-2 text-3xl font-black" style={{ color: PURPLE }}>
@@ -710,9 +746,7 @@ const GroupedBarValuePillLayer = ({ bars }: any) => {
 
                 <div className="rounded-2xl border border-primary bg-primary p-4 shadow-[0_18px_50px_rgba(2,6,23,0.25)]">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs text-slate-300 font-semibold">
-                      Global
-                    </p>
+                    <p className="text-xs text-slate-300 font-semibold">Global</p>
                     <Activity className="h-4 w-4 text-purple-300" />
                   </div>
 
@@ -749,12 +783,12 @@ const GroupedBarValuePillLayer = ({ bars }: any) => {
                       className="rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,rgba(127,1,127,0.08),rgba(255,255,255,0.0))] p-4"
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs text-slate-500 font-semibold">
-                          {k.label}
-                        </p>
+                        <p className="text-xs text-slate-500 font-semibold">{k.label}</p>
                         {showSemantic ? (
                           <Badge
-                            className={`rounded-full text-[10px] font-black ${semanticBadgeClass5(sem)}`}
+                            className={`rounded-full text-[10px] font-black ${semanticBadgeClass5(
+                              sem
+                            )}`}
                           >
                             {sem}
                           </Badge>
@@ -816,7 +850,9 @@ const GroupedBarValuePillLayer = ({ bars }: any) => {
                     legends={[]}
                     theme={{
                       text: { fontSize: 12, fontWeight: 900, fill: "#111827" },
-                      grid: { line: { stroke: "rgba(2,6,23,0.10)", strokeWidth: 1 } },
+                      grid: {
+                        line: { stroke: "rgba(2,6,23,0.10)", strokeWidth: 1 },
+                      },
                       tooltip: {
                         container: {
                           background: "rgba(17,24,39,0.92)",
@@ -861,7 +897,7 @@ const GroupedBarValuePillLayer = ({ bars }: any) => {
                   keys={["total"]}
                   indexBy="label"
                   layout="horizontal"
-                  margin={{ top: 10, right: 96, bottom: 36, left: 190 }} // + espacio chip
+                  margin={{ top: 10, right: 96, bottom: 36, left: 190 }}
                   padding={0.32}
                   colors={[PURPLE]}
                   borderRadius={10}
@@ -874,35 +910,9 @@ const GroupedBarValuePillLayer = ({ bars }: any) => {
                     format: (v) => String(Math.round(Number(v))),
                   }}
                   axisLeft={{ tickSize: 0, tickPadding: 10 }}
-                  enableLabel={false} // ⛔ desactivamos labels nativos
-                  layers={[
-                    "grid",
-                    "axes",
-                    "bars",
-                    "markers",
-                    "legends",
-                    BarValueChipLayer, // ✅ chip
-                  ]}
-                  tooltip={({ indexValue, value }: any) => (
-                    <div
-                      style={{
-                        background: "rgba(17,24,39,0.92)",
-                        color: "white",
-                        padding: "10px 12px",
-                        borderRadius: 12,
-                        boxShadow: "0 14px 40px rgba(0,0,0,0.22)",
-                        fontWeight: 900,
-                      }}
-                    >
-                      <div style={{ opacity: 0.85, fontSize: 12 }}>{String(indexValue)}</div>
-                      <div style={{ fontSize: 13, marginTop: 2 }}>
-                        Participantes: <strong>{Math.round(Number(value))}</strong>
-                      </div>
-                    </div>
-                  )}
+                  enableLabel={false}
+                  layers={["grid", "axes", "bars", "markers", "legends", BarValueChipLayer]}
                 />
-
-
               </div>
             </CardContent>
           </Card>
@@ -927,7 +937,7 @@ const GroupedBarValuePillLayer = ({ bars }: any) => {
             <CardContent>
               <Separator className="mb-5" />
               <div className="h-[380px]">
-               <ResponsiveBar
+                <ResponsiveBar
                   data={edadBars as any}
                   keys={["total"]}
                   indexBy="label"
@@ -946,14 +956,7 @@ const GroupedBarValuePillLayer = ({ bars }: any) => {
                   }}
                   axisLeft={{ tickSize: 0, tickPadding: 10 }}
                   enableLabel={false}
-                  layers={[
-                    "grid",
-                    "axes",
-                    "bars",
-                    "markers",
-                    "legends",
-                    BarValueChipLayer,
-                  ]}
+                  layers={["grid", "axes", "bars", "markers", "legends", BarValueChipLayer]}
                 />
               </div>
             </CardContent>
@@ -1027,7 +1030,12 @@ const GroupedBarValuePillLayer = ({ bars }: any) => {
                         },
                       ]}
                       theme={{
-                        text: { fontFamily: "Montserrat", fontSize: 14, fontWeight: 900, fill: "#111827" },
+                        text: {
+                          fontFamily: "Montserrat",
+                          fontSize: 14,
+                          fontWeight: 900,
+                          fill: "#111827",
+                        },
                         axis: { ticks: { text: { fill: "#111827", fontWeight: 900 } } },
                         tooltip: {
                           container: {
@@ -1082,7 +1090,7 @@ const GroupedBarValuePillLayer = ({ bars }: any) => {
                   maxValue={5}
                   valueScale={{ type: "linear", min: 0, max: 5 }}
                   indexScale={{ type: "band", round: true }}
-                  margin={{ top: 44, right: 110, bottom: 52, left: 210 }}  // ✅ espacio pill
+                  margin={{ top: 44, right: 110, bottom: 52, left: 210 }}
                   padding={0.32}
                   innerPadding={10}
                   borderRadius={10}
@@ -1121,27 +1129,30 @@ const GroupedBarValuePillLayer = ({ bars }: any) => {
                   ]}
                   valueFormat={(v: any) => fmt2(Number(v))}
                   legends={[
-                  {
-                    dataFrom: "keys",
-                    anchor: "top",
-                    direction: "row",
-                    justify: false,
-                    translateY: -28,
-                    itemsSpacing: 18,
-                    itemWidth: 90,
-                    itemHeight: 18,
-                    symbolSize: 10,
-                    symbolShape: "circle",
-                  },
-                ]}
-
+                    {
+                      dataFrom: "keys",
+                      anchor: "top",
+                      direction: "row",
+                      justify: false,
+                      translateY: -28,
+                      itemsSpacing: 18,
+                      itemWidth: 90,
+                      itemHeight: 18,
+                      symbolSize: 10,
+                      symbolShape: "circle",
+                    },
+                  ]}
                   theme={{
-                    text: { fontFamily: "Montserrat", fontSize: 12, fontWeight: 900, fill: "#111827" },
+                    text: {
+                      fontFamily: "Montserrat",
+                      fontSize: 12,
+                      fontWeight: 900,
+                      fill: "#111827",
+                    },
                     axis: { ticks: { text: { fill: "#111827", fontWeight: 900 } } },
                     grid: { line: { stroke: "rgba(2,6,23,0.08)", strokeWidth: 1 } },
                   }}
                 />
-
               </div>
             )}
           </CardContent>
@@ -1192,20 +1203,21 @@ const GroupedBarValuePillLayer = ({ bars }: any) => {
                     key={`${c.encuesta_id}-${idx}`}
                     className="group relative overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.06)]"
                   >
-                    {/* glow suave */}
                     <div
                       className="pointer-events-none absolute -top-24 -right-24 h-[220px] w-[220px] rounded-full blur-3xl opacity-0 transition-opacity duration-300 group-hover:opacity-30"
                       style={{ background: PURPLE }}
                     />
 
                     <div className="relative">
-                      {/* meta */}
                       <div className="flex flex-wrap items-center gap-2">
                         {c.genero ? (
                           <Badge
                             variant="secondary"
                             className="rounded-full font-black text-[10px] uppercase tracking-widest"
-                            style={{ background: "rgba(127,1,127,0.10)", color: PURPLE }}
+                            style={{
+                              background: "rgba(127,1,127,0.10)",
+                              color: PURPLE,
+                            }}
                           >
                             {c.genero}
                           </Badge>
@@ -1226,69 +1238,66 @@ const GroupedBarValuePillLayer = ({ bars }: any) => {
                             {formatFechaES(c.fecha)}
                           </span>
                         ) : null}
-
                       </div>
 
-                      {/* texto */}
                       <p className="mt-3 text-sm leading-6 text-slate-700 font-semibold">
-                          {truncate(c.texto, 180)}
-                        </p>
+                        {truncate(c.texto, 180)}
+                      </p>
 
-                        {c.texto.length > 180 && (
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <button
-                                className="mt-3 text-xs font-black uppercase tracking-widest"
-                                style={{ color: PURPLE }}
-                              >
-                                Ver comentario completo
-                              </button>
-                            </DialogTrigger>
+                      {c.texto.length > 180 && (
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <button
+                              className="mt-3 text-xs font-black uppercase tracking-widest"
+                              style={{ color: PURPLE }}
+                            >
+                              Ver comentario completo
+                            </button>
+                          </DialogTrigger>
 
-                            <DialogContent className="max-w-xl rounded-[1.75rem]">
-                              <DialogHeader>
-                                <DialogTitle className="text-sm font-black tracking-wide">
-                                  Comentario completo
-                                </DialogTitle>
-                              </DialogHeader>
+                          <DialogContent className="max-w-xl rounded-[1.75rem]">
+                            <DialogHeader>
+                              <DialogTitle className="text-sm font-black tracking-wide">
+                                Comentario completo
+                              </DialogTitle>
+                            </DialogHeader>
 
-                              {/* Meta */}
-                              <div className="flex flex-wrap items-center gap-2 mb-3">
-                                {c.genero && (
-                                  <Badge
-                                    variant="secondary"
-                                    className="rounded-full font-black text-[10px] uppercase tracking-widest"
-                                    style={{ background: "rgba(127,1,127,0.10)", color: PURPLE }}
-                                  >
-                                    {c.genero}
-                                  </Badge>
-                                )}
+                            <div className="flex flex-wrap items-center gap-2 mb-3">
+                              {c.genero && (
+                                <Badge
+                                  variant="secondary"
+                                  className="rounded-full font-black text-[10px] uppercase tracking-widest"
+                                  style={{
+                                    background: "rgba(127,1,127,0.10)",
+                                    color: PURPLE,
+                                  }}
+                                >
+                                  {c.genero}
+                                </Badge>
+                              )}
 
-                                {Number.isFinite(c.edad) && c.edad > 0 && (
-                                  <Badge
-                                    variant="secondary"
-                                    className="rounded-full font-black text-[10px] uppercase tracking-widest"
-                                  >
-                                    {c.edad} años
-                                  </Badge>
-                                )}
+                              {Number.isFinite(c.edad) && c.edad > 0 && (
+                                <Badge
+                                  variant="secondary"
+                                  className="rounded-full font-black text-[10px] uppercase tracking-widest"
+                                >
+                                  {c.edad} años
+                                </Badge>
+                              )}
 
-                                {c.fecha && (
-                                  <span className="ml-auto text-[11px] font-black text-slate-400">
-                                    {formatFechaES(c.fecha)}
-                                  </span>
-                                )}
-                              </div>
+                              {c.fecha && (
+                                <span className="ml-auto text-[11px] font-black text-slate-400">
+                                  {formatFechaES(c.fecha)}
+                                </span>
+                              )}
+                            </div>
 
-                              {/* Texto completo */}
-                              <p className="text-sm leading-6 text-slate-700 font-semibold whitespace-pre-wrap">
-                                {c.texto}
-                              </p>
-                            </DialogContent>
-                          </Dialog>
-                        )}
-
-                     
+                            <p className="text-sm leading-6 text-slate-700 font-semibold whitespace-pre-wrap">
+                              {c.texto}
+                            </p>
+                          </DialogContent>
+                        </Dialog>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -1297,15 +1306,226 @@ const GroupedBarValuePillLayer = ({ bars }: any) => {
           </CardContent>
         </Card>
 
+        {/* =======================
+            ✅ Estadística avanzada (por año)
+          ======================= */}
+        <Card className="rounded-[2rem] border-slate-200 shadow-sm">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-black tracking-wide">
+                Estadística avanzada (precisión y consistencia)
+              </CardTitle>
 
+              <div className="flex items-center gap-2">
+                <Badge
+                  variant="secondary"
+                  className="rounded-full font-black text-[10px] uppercase tracking-widest"
+                  style={{ background: "rgba(127,1,127,0.10)", color: PURPLE }}
+                >
+                  IC 95% · σ · P25/P50/P75 · α
+                </Badge>
+
+                <Badge
+                  variant="secondary"
+                  className="rounded-full font-black text-[10px] uppercase tracking-widest"
+                  style={{ background: "rgba(2,6,23,0.04)", color: "#0f172a" }}
+                >
+                  {year === "all" ? "Requiere año" : `Año ${year}`}
+                </Badge>
+              </div>
+            </div>
+          </CardHeader>
+
+          <CardContent>
+            <Separator className="mb-5" />
+
+            {year === "all" ? (
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                <span className="font-black" style={{ color: PURPLE }}>
+                  Selecciona un año
+                </span>{" "}
+                para calcular intervalos de confianza, percentiles y alpha de Cronbach.
+              </div>
+            ) : advLoading ? (
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600 flex items-center gap-3">
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                Calculando estadística avanzada…
+              </div>
+            ) : advErr ? (
+              <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                <span className="font-black">No se pudo cargar:</span> {advErr}
+              </div>
+            ) : advRows.length === 0 ? (
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                <span className="font-black" style={{ color: PURPLE }}>
+                  Sin datos
+                </span>{" "}
+                para estadística avanzada en el año seleccionado.
+              </div>
+            ) : (
+              <>
+                <div className="mb-5 grid gap-3 md:grid-cols-3">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <div className="flex items-center gap-2">
+                      <Activity className="h-4 w-4" style={{ color: PURPLE }} />
+                      <p className="text-xs font-black tracking-wide text-slate-700">IC 95%</p>
+                    </div>
+                    <p className="mt-2 text-[12px] leading-5 text-slate-600 font-semibold">
+                      Rango esperado del promedio. Entre más estrecho,{" "}
+                      <span className="font-black">más precisión</span>.
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <div className="flex items-center gap-2">
+                      <Sigma className="h-4 w-4" style={{ color: PURPLE }} />
+                      <p className="text-xs font-black tracking-wide text-slate-700">
+                        Dispersión (σ)
+                      </p>
+                    </div>
+                    <p className="mt-2 text-[12px] leading-5 text-slate-600 font-semibold">
+                      Mide variabilidad: σ alta implica percepciones muy distintas.
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4" style={{ color: PURPLE }} />
+                      <p className="text-xs font-black tracking-wide text-slate-700">
+                        Consistencia (α)
+                      </p>
+                    </div>
+                    <p className="mt-2 text-[12px] leading-5 text-slate-600 font-semibold">
+                      Alpha de Cronbach: <span className="font-black">≥ 0.70</span> suele
+                      considerarse aceptable.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-[1.75rem] border border-slate-200 bg-white overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-[980px] w-full text-left">
+                      <thead className="bg-[rgba(127,1,127,0.06)]">
+                        <tr className="text-[11px] uppercase tracking-widest text-slate-700">
+                          <th className="px-4 py-3 font-black">Dimensión</th>
+                          <th className="px-4 py-3 font-black">n encuestas</th>
+                          <th className="px-4 py-3 font-black">n respuestas</th>
+                          <th className="px-4 py-3 font-black">Prom</th>
+                          <th className="px-4 py-3 font-black">σ</th>
+                          <th className="px-4 py-3 font-black">Mediana</th>
+                          <th className="px-4 py-3 font-black">P25</th>
+                          <th className="px-4 py-3 font-black">P75</th>
+                          <th className="px-4 py-3 font-black">IC 95%</th>
+                          <th className="px-4 py-3 font-black">α</th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {advRows.map((row) => {
+                          const dimLabel =
+                            row.dimension === "frecuencia"
+                              ? "Frecuencia"
+                              : row.dimension === "normalidad"
+                              ? "Normalización"
+                              : row.dimension === "gravedad"
+                              ? "Gravedad"
+                              : row.dimension;
+
+                          const alpha = Number(row.alpha_cronbach ?? 0);
+                          const alphaBadge =
+                            alpha >= 0.8
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              : alpha >= 0.7
+                              ? "bg-amber-50 text-amber-800 border border-amber-200"
+                              : "bg-slate-50 text-slate-700 border border-slate-200";
+
+                          return (
+                            <tr key={row.dimension} className="border-t border-slate-200">
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className="inline-flex h-2.5 w-2.5 rounded-full"
+                                    style={{ background: PURPLE }}
+                                  />
+                                  <span className="font-black text-slate-900">{dimLabel}</span>
+                                </div>
+                                <div className="mt-1 text-[11px] font-semibold text-slate-500">
+                                  {pctFrom5(row.promedio)}% · {fmt2(row.promedio)} / 5
+                                </div>
+                              </td>
+
+                              <td className="px-4 py-3 text-sm font-black text-slate-900">
+                                {fmtInt(row.n_encuestas)}
+                              </td>
+
+                              <td className="px-4 py-3 text-sm font-black text-slate-900">
+                                {fmtInt(row.n_respuestas)}
+                              </td>
+
+                              <td className="px-4 py-3 text-sm font-black" style={{ color: PURPLE }}>
+                                {Number(row.promedio ?? 0).toFixed(2)}
+                              </td>
+
+                              <td className="px-4 py-3 text-sm font-black text-slate-900">
+                                {Number(row.std_dev ?? 0).toFixed(2)}
+                              </td>
+
+                              <td className="px-4 py-3 text-sm font-black text-slate-900">
+                                {Number(row.mediana ?? 0).toFixed(2)}
+                              </td>
+
+                              <td className="px-4 py-3 text-sm font-black text-slate-900">
+                                {Number(row.p25 ?? 0).toFixed(2)}
+                              </td>
+
+                              <td className="px-4 py-3 text-sm font-black text-slate-900">
+                                {Number(row.p75 ?? 0).toFixed(2)}
+                              </td>
+
+                              <td className="px-4 py-3">
+                                <div
+                                  className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-black"
+                                  style={{
+                                    background: "rgba(127,1,127,0.10)",
+                                    color: PURPLE,
+                                    border: "1px solid rgba(127,1,127,0.20)",
+                                  }}
+                                >
+                                  {Number(row.ic95_inferior ?? 0).toFixed(2)} –{" "}
+                                  {Number(row.ic95_superior ?? 0).toFixed(2)}
+                                </div>
+                              </td>
+
+                              <td className="px-4 py-3">
+                                <span
+                                  className={`inline-flex rounded-full px-3 py-1 text-[11px] font-black ${alphaBadge}`}
+                                >
+                                  {alpha.toFixed(2)}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="border-t border-slate-200 bg-white px-4 py-3 text-[12px] text-slate-600">
+                    <span className="font-black" style={{ color: PURPLE }}>
+                      Nota:
+                    </span>{" "}
+                    IC 95% calculado con aproximación normal (1.96·σ/√n). Percentiles por{" "}
+                    <span className="font-black">percentile_cont</span>. Alpha por dimensión.
+                  </div>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
       </main>
-      
-       {/* ✅ Modal Tendencias (NO afecta layout hasta que open=true) */}
-      <TrendsModal
-        open={trendsOpen}
-        onOpenChange={setTrendsOpen}
-      />
 
+      {/* ✅ Modal Tendencias */}
+      <TrendsModal open={trendsOpen} onOpenChange={setTrendsOpen} />
     </div>
   );
 }

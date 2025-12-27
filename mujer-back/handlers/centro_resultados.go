@@ -656,3 +656,240 @@ func (h CentroResultadosHandler) GetResumenCentroAnual(w http.ResponseWriter, r 
 		Series:  series,
 	})
 }
+
+
+// =======================================================
+// 📊 ESTADÍSTICA AVANZADA POR CENTRO Y AÑO
+// Incluye:
+// 1️⃣ Desviación estándar
+// 2️⃣ Mediana + percentiles (P25, P75)
+// 3️⃣ Tamaño muestral explícito (por dimensión + total anual)
+// 4️⃣ Intervalos de confianza 95%
+// 5️⃣ Alpha de Cronbach (consistencia interna)
+// =======================================================
+
+type EstadisticaDimension struct {
+	Dimension string `json:"dimension"`
+
+	// ✅ tamaño muestral
+	NRespuestas      int64 `json:"n_respuestas"`       // por dimensión (ej. 112 = 7*16)
+	NEncuestas       int64 `json:"n_encuestas"`        // encuestas finalizadas (ej. 7)
+	TotalRespuestas  int64 `json:"total_respuestas"`   // total anual (ej. 336 = 7*48)
+	KItems           int64 `json:"k_items"`            // #preguntas distintas por dimensión (ej. 16)
+
+	Promedio float64 `json:"promedio"`
+	StdDev   float64 `json:"std_dev"`
+
+	Mediana float64 `json:"mediana"`
+	P25     float64 `json:"p25"`
+	P75     float64 `json:"p75"`
+
+	IC95Inferior float64 `json:"ic95_inferior"`
+	IC95Superior float64 `json:"ic95_superior"`
+
+	AlphaCronbach float64 `json:"alpha_cronbach"`
+}
+
+type CentroEstadisticaAvanzadaResponse struct {
+	Centros []int64                `json:"centros"`
+	Year    int                    `json:"year"`
+	Datos   []EstadisticaDimension `json:"datos"`
+}
+
+func (h CentroResultadosHandler) GetCentroEstadisticaAvanzada(w http.ResponseWriter, r *http.Request) {
+	if !h.ensureCentroRole(w, r) {
+		return
+	}
+
+	centros := UserCentrosFromCtx(r.Context())
+	if len(centros) == 0 {
+		http.Error(w, "no_centros", http.StatusForbidden)
+		return
+	}
+
+	ys := r.URL.Query().Get("year")
+	if ys == "" {
+		http.Error(w, "year_required", http.StatusBadRequest)
+		return
+	}
+
+	year, err := strconv.Atoi(ys)
+	if err != nil {
+		http.Error(w, "bad_year", http.StatusBadRequest)
+		return
+	}
+
+	ctx := r.Context()
+
+	rows, err := h.DB.Query(ctx, `
+		-- ==========================
+		-- Base: una fila por respuesta (ya viene con dimension)
+		-- dimension -> (frecuencia|normalidad|gravedad)
+		-- ==========================
+		with base as (
+			select
+				r.dimension::text as dimension,
+				r.pregunta_id::text as pregunta_id,
+				r.valor::float8 as valor,
+				e.id as encuesta_id
+			from respuestas r
+			join encuestas e on e.id = r.encuesta_id
+			where e.centro_id = any($1::bigint[])
+			  and e.finished_at is not null
+			  and extract(year from e.finished_at)::int = $2
+		),
+
+		-- ✅ total real de respuestas del año (sumando todas las dimensiones)
+		total_respuestas as (
+			select count(*)::bigint as total_respuestas
+			from base
+		),
+
+		-- ==========================
+		-- Stats descriptiva por dimensión (n por dimensión)
+		-- ==========================
+		stats as (
+			select
+				dimension,
+				count(*)::bigint as n_respuestas,
+				count(distinct encuesta_id)::bigint as n_encuestas,
+				avg(valor)::float8 as promedio,
+				stddev_samp(valor)::float8 as stddev,
+				percentile_cont(0.5) within group (order by valor) as mediana,
+				percentile_cont(0.25) within group (order by valor) as p25,
+				percentile_cont(0.75) within group (order by valor) as p75
+			from base
+			group by dimension
+		),
+
+		-- ==========================
+		-- Cronbach alpha por dimensión
+		-- k = #preguntas distintas por dimensión
+		-- ==========================
+		-- Normalizamos a 1 valor por (encuesta_id, pregunta_id)
+		item_values as (
+			select
+				dimension,
+				encuesta_id,
+				pregunta_id,
+				avg(valor)::float8 as v
+			from base
+			group by dimension, encuesta_id, pregunta_id
+		),
+		item_vars as (
+			select
+				dimension,
+				pregunta_id,
+				var_samp(v)::float8 as var_item
+			from item_values
+			group by dimension, pregunta_id
+		),
+		k_items as (
+			select
+				dimension,
+				count(*)::bigint as k,
+				coalesce(sum(var_item), 0)::float8 as sum_var_items
+			from item_vars
+			group by dimension
+		),
+		total_scores as (
+			select
+				dimension,
+				encuesta_id,
+				sum(v)::float8 as total_score
+			from item_values
+			group by dimension, encuesta_id
+		),
+		total_var as (
+			select
+				dimension,
+				var_samp(total_score)::float8 as var_total
+			from total_scores
+			group by dimension
+		),
+		alpha as (
+			select
+				k.dimension,
+				k.k,
+				case
+					when k.k is null or k.k < 2 then 0::float8
+					when tv.var_total is null or tv.var_total <= 0 then 0::float8
+					else (k.k::float8 / (k.k::float8 - 1.0)) * (1.0 - (k.sum_var_items / tv.var_total))
+				end as alpha
+			from k_items k
+			left join total_var tv on tv.dimension = k.dimension
+		)
+
+		select
+			s.dimension,
+			s.n_respuestas,
+			s.n_encuestas,
+			tr.total_respuestas,
+			coalesce(a.k, 0)::bigint as k_items,
+
+			s.promedio,
+			coalesce(s.stddev, 0)::float8 as stddev,
+			s.mediana,
+			s.p25,
+			s.p75,
+
+			-- IC 95%: si n<2 o stddev=0, devolvemos promedio como rango
+			case
+				when s.n_respuestas < 2 or coalesce(s.stddev,0) = 0 then s.promedio
+				else (s.promedio - 1.96 * (coalesce(s.stddev,0) / sqrt(s.n_respuestas::float8)))
+			end as ic_inf,
+
+			case
+				when s.n_respuestas < 2 or coalesce(s.stddev,0) = 0 then s.promedio
+				else (s.promedio + 1.96 * (coalesce(s.stddev,0) / sqrt(s.n_respuestas::float8)))
+			end as ic_sup,
+
+			coalesce(a.alpha, 0)::float8 as alpha
+		from stats s
+		cross join total_respuestas tr
+		left join alpha a on a.dimension = s.dimension
+		order by s.dimension
+	`, centros, year)
+
+	if err != nil {
+		http.Error(w, "db_error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	out := make([]EstadisticaDimension, 0, 4)
+
+	for rows.Next() {
+		var d EstadisticaDimension
+		if err := rows.Scan(
+			&d.Dimension,
+			&d.NRespuestas,
+			&d.NEncuestas,
+			&d.TotalRespuestas,
+			&d.KItems,
+			&d.Promedio,
+			&d.StdDev,
+			&d.Mediana,
+			&d.P25,
+			&d.P75,
+			&d.IC95Inferior,
+			&d.IC95Superior,
+			&d.AlphaCronbach,
+		); err != nil {
+			http.Error(w, "db_error", http.StatusInternalServerError)
+			return
+		}
+		out = append(out, d)
+	}
+
+	if len(out) == 0 {
+		http.Error(w, "no_data", http.StatusNotFound)
+		return
+	}
+
+	writeJSONCentro(w, http.StatusOK, CentroEstadisticaAvanzadaResponse{
+		Centros: centros,
+		Year:    year,
+		Datos:   out,
+	})
+}

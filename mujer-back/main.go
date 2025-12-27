@@ -280,6 +280,20 @@ func main() {
 		})).ServeHTTP(w, r)
 	})
 
+	// ======================
+	// Centro: Estadística avanzada (por año)
+	// GET /api/centro/estadistica-avanzada?year=2025
+	// ======================
+	mux.HandleFunc("/api/centro/estadistica-avanzada", func(w http.ResponseWriter, r *http.Request) {
+		handlers.RequireJWT(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodGet {
+				crh.GetCentroEstadisticaAvanzada(w, r)
+				return
+			}
+			http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+		})).ServeHTTP(w, r)
+	})
+
 
 	// ======================
 	// CORS
