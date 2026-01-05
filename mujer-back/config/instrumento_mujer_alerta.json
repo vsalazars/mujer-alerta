@@ -447,7 +447,7 @@
         {
           "question_id": "P14",
           "order": 14,
-          "stem": "¿Qué tan normalizado está compartir contenido sobre una mujer sin su consentimiento?",
+          "stem": "¿Qué tan normalizado está compartir contenido en medios digitales sobre una mujer sin su consentimiento?",
           "cards": [
             {
               "dimension": "frecuencia",
