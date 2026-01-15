@@ -749,14 +749,17 @@ export default function DiagnosticoEncuestaPage() {
 
                 <span
                   style={{
-                    marginTop: 1,        // ✅ menos altura
-                    fontSize: 20,        // ✅ flecha más compacta
-                    lineHeight: "10px",
+                    marginTop: 2,
+                    fontSize: 14,
+                    lineHeight: "14px",
+                    paddingBottom: 2,       // ✅ margen inferior interno (aire abajo)
                     opacity: 0.75,
+                    animation: "bounceHint 1.2s ease-in-out infinite",
                   }}
                 >
                   ⌄
                 </span>
+
               </div>
             </div>
 
