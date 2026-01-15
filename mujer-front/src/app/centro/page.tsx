@@ -1053,68 +1053,67 @@ export default function CentroPage() {
                 <div className="h-[520px]">
                   {heatmap ? (
                    <ResponsiveHeatMap
-                      data={heatmap.data as any}
-                      margin={{ top: 30, right: 180, bottom: 140, left: 160 }}
-                      valueFormat=">-.2f"
-                      axisTop={null}
-                      axisRight={null}
-                      axisLeft={{ tickSize: 0, tickPadding: 10 }}
-                      tooltipPosition="fixed"
-                      axisBottom={{
-                        tickSize: 0,
-                        tickPadding: 16,
-                        tickRotation: -22,
-                        format: () => "",
-                      }}
-                      colors={{
-                        type: "sequential",
-                        scheme: "purples",
-                        minValue: 0,
-                        maxValue: 5,
-                      }}
-                      emptyColor="#F1F5F9"
-                      cellOpacity={1}
-                      cellBorderWidth={1}
-                      cellBorderColor="rgba(2,6,23,0.06)"
-                      enableLabels={true}
-                      labelTextColor={{ from: "color", modifiers: [["darker", 2.1]] }}
-                      legends={[
-                        {
-                          anchor: "bottom",
-                          translateX: 0,
-                          translateY: 80,
-                          length: 420,
-                          thickness: 26,
-                          direction: "row",
-                          tickPosition: "after",
-                          tickSize: 3,
-                          tickSpacing: 6,
-                          tickOverlap: false,
-                          tickFormat: ">-.1f",
-                          title: "Intensidad →",
-                          titleAlign: "start",
-                          titleOffset: 6,
-                        },
-                      ]}
-                      theme={{
-                        text: {
-                          fontFamily: "Montserrat",
-                          fontSize: 14,
+                    data={heatmap.data as any}
+                    margin={{ top: 30, right: 180, bottom: 140, left: 160 }}
+                    valueFormat=">-.2f"
+                    axisTop={null}
+                    axisRight={null}
+                    axisLeft={{ tickSize: 0, tickPadding: 10 }}
+                    axisBottom={{
+                      tickSize: 0,
+                      tickPadding: 16,
+                      tickRotation: -22,
+                      format: () => "",
+                    }}
+                    colors={{
+                      type: "sequential",
+                      scheme: "purples",
+                      minValue: 0,
+                      maxValue: 5,
+                    }}
+                    emptyColor="#F1F5F9"
+                    cellOpacity={1}
+                    cellBorderWidth={1}
+                    cellBorderColor="rgba(2,6,23,0.06)"
+                    enableLabels={true}
+                    labelTextColor={{ from: "color", modifiers: [["darker", 2.1]] }}
+                    legends={[
+                      {
+                        anchor: "bottom",
+                        translateX: 0,
+                        translateY: 80,
+                        length: 420,
+                        thickness: 26,
+                        direction: "row",
+                        tickPosition: "after",
+                        tickSize: 3,
+                        tickSpacing: 6,
+                        tickOverlap: false,
+                        tickFormat: ">-.1f",
+                        title: "Intensidad →",
+                        titleAlign: "start",
+                        titleOffset: 6,
+                      },
+                    ]}
+                    theme={{
+                      text: {
+                        fontFamily: "Montserrat",
+                        fontSize: 14,
+                        fontWeight: 900,
+                        fill: "#111827",
+                      },
+                      axis: { ticks: { text: { fill: "#111827", fontWeight: 900 } } },
+                      tooltip: {
+                        container: {
+                          background: "rgba(17,24,39,0.92)",
+                          color: "#fff",
+                          borderRadius: 12,
+                          boxShadow: "0 14px 40px rgba(0,0,0,0.22)",
                           fontWeight: 900,
-                          fill: "#111827",
                         },
-                        axis: { ticks: { text: { fill: "#111827", fontWeight: 900 } } },
-                        tooltip: {
-                          container: {
-                            background: "rgba(17,24,39,0.92)",
-                            color: "#fff",
-                            borderRadius: 12,
-                            boxShadow: "0 14px 40px rgba(0,0,0,0.22)",
-                            fontWeight: 900,
-                          },
-                        },
-                      }}
-                    />
+                      },
+                    }}
+                  />
 
 
                   ) : null}
