@@ -1056,7 +1056,6 @@ export default function CentroPage() {
                       data={heatmap.data as any}
                       margin={{ top: 30, right: 180, bottom: 140, left: 160 }}
                       valueFormat=">-.2f"
-                      valueScale={{ type: "linear", min: 0, max: 5 }}
                       axisTop={null}
                       axisRight={null}
                       axisLeft={{ tickSize: 0, tickPadding: 10 }}
@@ -1116,6 +1115,7 @@ export default function CentroPage() {
                         },
                       }}
                     />
+
 
                   ) : null}
                 </div>
