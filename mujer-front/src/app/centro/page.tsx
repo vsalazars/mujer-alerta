@@ -1072,8 +1072,8 @@ export default function CentroPage() {
                       maxValue: 5,
                     }}
                     emptyColor="#F1F5F9"
-                    cellBorderWidth={1}
-                    cellBorderColor="rgba(2,6,23,0.06)"
+                    borderWidth={1}
+                    borderColor="rgba(2,6,23,0.06)"
                     enableLabels={true}
                     labelTextColor={{ from: "color", modifiers: [["darker", 2.1]] }}
                     legends={[
