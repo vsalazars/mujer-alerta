@@ -306,7 +306,7 @@ func main() {
 			// ✅ Vercel (producción + previews)
 			"https://mujer-alerta.vercel.app",
 			"https://mujer-alerta-git-main-vidal-salazars-projects.vercel.app",
-			"https://mujer-alerta-k388o6kze-vidal-salazars-projects.vercel.app"
+			"https://mujer-alerta-k388o6kze-vidal-salazars-projects.vercel.app",
 			
 
 		},
