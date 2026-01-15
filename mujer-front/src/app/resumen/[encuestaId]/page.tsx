@@ -343,47 +343,50 @@ export default function ResultadosEncuestaPage() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                  {DIM_ORDER.map(dim => (
+                  {DIM_ORDER.map((dim) => (
                     <div key={dim} className="rounded-2xl bg-neutral-50 p-5 text-center">
                       <p className="text-sm font-medium text-neutral-600">{DIM_LABEL_FULL[dim]}</p>
+
                       <p className="mt-3 text-3xl font-bold tabular-nums text-neutral-900">
                         {fmt(global?.[dim])}
                       </p>
+
                       <Badge variant={levelBadgeVariant(global?.[dim] ?? 0)} className="mt-3">
                         {levelLabel(global?.[dim] ?? 0)}
                       </Badge>
                     </div>
                   ))}
-                  
+
                   <div
-                      className="rounded-2xl p-5 text-center"
+                    className="rounded-2xl p-5 text-center"
+                    style={{
+                      backgroundColor: "var(--primary)",
+                      color: "var(--primary-foreground)",
+                    }}
+                  >
+                    <p className="text-sm font-medium">Total</p>
+
+                    <p className="mt-3 text-3xl font-bold tabular-nums">
+                      {fmt(global?.total)}
+                    </p>
+
+                    <Badge
+                      variant="secondary"
+                      className="mt-3 inline-flex w-[132px] justify-center text-center whitespace-normal leading-tight"
                       style={{
-                        backgroundColor: "var(--primary)",
+                        backgroundColor:
+                          "color-mix(in oklch, var(--primary-foreground) 18%, transparent)",
                         color: "var(--primary-foreground)",
+                        border:
+                          "1px solid color-mix(in oklch, var(--primary-foreground) 35%, transparent)",
                       }}
                     >
-                      <p className="text-sm font-medium">Total</p>
-
-                      <p className="mt-3 text-3xl font-bold tabular-nums">
-                        {fmt(global?.total)}
-                      </p>
-
-                      <Badge
-                        variant="secondary"
-                        className="mt-3 inline-flex w-[132px] justify-center text-center whitespace-normal leading-tight"
-                        style={{
-                          backgroundColor: "color-mix(in oklch, var(--primary-foreground) 18%, transparent)",
-                          color: "var(--primary-foreground)",
-                          border: "1px solid color-mix(in oklch, var(--primary-foreground) 35%, transparent)",
-                        }}
-                      >
-                        Promedio<br />general
-                      </Badge>
-
-
-                
+                      Promedio<br />general
+                    </Badge>
+                  </div>
                 </div>
               </CardContent>
+
             </Card>
 
             <Separator className="my-10" />
@@ -426,7 +429,7 @@ export default function ResultadosEncuestaPage() {
                     </div>
                    
                     <div className="rounded-2xl border bg-white p-4 shadow-sm">
-                      <p className="mb-3 text-sm font-medium">Lista de tipos</p>
+                      <p className="mb-3 text-sm font-medium">Tipos de Violencia contra la Mujer</p>
 
                       <div className="space-y-2">
                         {tipos.map(t => (
