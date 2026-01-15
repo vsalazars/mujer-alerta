@@ -306,8 +306,8 @@ func main() {
 			// ✅ Vercel (producción + previews)
 			"https://mujer-alerta.vercel.app",
 			"https://mujer-alerta-git-main-vidal-salazars-projects.vercel.app",
-			"https://mujer-alerta-od9lm2csx-vidal-salazars-projects.vercel.app",
-						
+			"https://mujer-alerta-a8cp5osiq-vidal-salazars-projects.vercel.app",
+									
 						
 		},
 		AllowedMethods: "GET, POST, PUT, DELETE, OPTIONS",
