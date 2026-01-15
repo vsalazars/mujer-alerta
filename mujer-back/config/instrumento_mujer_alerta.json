@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "language": "es-MX",
   "context": ["escolar", "laboral"],
-  "instructions": "Las siguientes preguntas te invitan a reflexionar sobre prácticas y situaciones que pueden formar parte de la vida cotidiana en tu centro escolar o laboral. No se refieren a experiencias personales, sino a cómo se vive y se percibe el entorno cuando estas situaciones involucran a mujeres.",
+  "instructions": "Las siguientes preguntas te invitan a reflexionar sobre prácticas y situaciones que pueden formar parte de la vida cotidiana en tu centro escolar o laboral.",
   "dimensions": [
     {
       "key": "frecuencia",
