@@ -61,11 +61,8 @@ const TRACK_H = 10; // px
 const DOT_SIZE = 14; // px
 const DOT_R = DOT_SIZE / 2; // px
 
-// Degradado institucional (guinda)
 const GRADIENT =
   "linear-gradient(90deg, #7A003C 0%, #9A1B6E 55%, #C23C9A 100%)";
-
-// Glow sutil (no exagerado)
 const GLOW = "0 0 10px rgba(122,0,60,0.35)";
 
 function isObject(v: unknown): v is Record<string, any> {
@@ -84,7 +81,11 @@ function pickInstPayload(raw: any) {
 }
 
 function pickTypesOfViolence(inst: any): any[] {
-  const candidates = [inst?.types_of_violence, inst?.typesOfViolence, inst?.types];
+  const candidates = [
+    inst?.types_of_violence,
+    inst?.typesOfViolence,
+    inst?.types,
+  ];
   for (const c of candidates) {
     if (Array.isArray(c)) return c;
   }
@@ -138,7 +139,9 @@ function safeReadProgress(key: string): SavedProgress | null {
     const updated_at = Number((parsed as any).updated_at);
     const qIndex = Number((parsed as any).qIndex);
     const comentario =
-      typeof (parsed as any).comentario === "string" ? (parsed as any).comentario : "";
+      typeof (parsed as any).comentario === "string"
+        ? (parsed as any).comentario
+        : "";
     const answersRaw = (parsed as any).answers;
 
     if (!Number.isFinite(v) || v !== LS_VERSION) return null;
@@ -195,9 +198,9 @@ export default function DiagnosticoEncuestaPage() {
   const hydratedRef = useRef(false);
   const saveTimerRef = useRef<number | null>(null);
 
-  // ✅ Scroll inteligente dentro de la Card
+  // ✅ scroll natural + “hint” minimalista
   const scrollAreaRef = useRef<HTMLDivElement | null>(null);
-  const blockRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [showScrollHint, setShowScrollHint] = useState(false);
 
   function scrollContentTop() {
     const el = scrollAreaRef.current;
@@ -205,22 +208,13 @@ export default function DiagnosticoEncuestaPage() {
     el.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  // ✅ PRO: scroll estable (no brinca en móvil)
-  function scrollToBlock(key: string) {
-    const el = blockRefs.current[key];
-    const container = scrollAreaRef.current;
-    if (!el || !container) return;
-
-    el.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-      inline: "nearest",
-    });
-
-    // ajuste por padding/top
-    requestAnimationFrame(() => {
-      container.scrollTop = Math.max(0, container.scrollTop - 10);
-    });
+  // ✅ hint: muestra solo si hay contenido abajo (discreto)
+  function updateScrollHint() {
+    const el = scrollAreaRef.current;
+    if (!el) return;
+    const hasMore =
+      el.scrollHeight - el.scrollTop - el.clientHeight > 28; // umbral
+    setShowScrollHint(hasMore);
   }
 
   useEffect(() => {
@@ -310,61 +304,33 @@ export default function DiagnosticoEncuestaPage() {
     [answeredCount, totalExpected]
   );
 
-  // ✅ PRO: al contestar, baja al siguiente bloque INCOMPLETO (no se brinca el 2º)
   function setAnswer(
     questionId: string,
     dimension: RespuestaItem["dimension"],
-    value: number,
-    cardIndex?: number
+    value: number
   ) {
     const key = `${questionId}:${dimension}`;
+    setAnswers((prev) => ({ ...prev, [key]: value }));
 
-    setAnswers((prev) => {
-      const next = { ...prev, [key]: value };
-
-      if (
-        typeof cardIndex === "number" &&
-        current &&
-        current.question_id === questionId &&
-        Array.isArray(current.cards)
-      ) {
-        requestAnimationFrame(() => {
-          // siguiente bloque faltante dentro de esta misma pregunta
-          for (let i = cardIndex + 1; i < current.cards.length; i++) {
-            const nextKey = `${questionId}:${current.cards[i].dimension}`;
-            if (typeof next[nextKey] !== "number") {
-              scrollToBlock(nextKey);
-              return;
-            }
-          }
-          // si era el último, baja un poco hacia el final del scroll (opcional pro)
-          const container = scrollAreaRef.current;
-          if (container) {
-            container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
-          }
-        });
-      }
-
-      return next;
-    });
+    // ✅ sin autoscroll: solo re-evalúa si hay contenido abajo y deja el hint
+    requestAnimationFrame(() => updateScrollHint());
   }
 
-  // ✅ Botones: al cambiar de pregunta, subir arriba el scroll del contenido
   function goPrev() {
     setQIndex((i) => Math.max(0, i - 1));
-    requestAnimationFrame(() => scrollContentTop());
+    requestAnimationFrame(() => {
+      scrollContentTop();
+      updateScrollHint();
+    });
   }
 
   function goNext() {
     setQIndex((i) => Math.min(totalQuestions, i + 1));
-    requestAnimationFrame(() => scrollContentTop());
+    requestAnimationFrame(() => {
+      scrollContentTop();
+      updateScrollHint();
+    });
   }
-
-  // ✅ EXTRA: garantiza top al cambiar de paso (aunque cambie por hidratación o validación)
-  useEffect(() => {
-    requestAnimationFrame(() => scrollContentTop());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [qIndex]);
 
   function findFirstIncompleteIndex(): number {
     for (let i = 0; i < questions.length; i++) {
@@ -389,7 +355,7 @@ export default function DiagnosticoEncuestaPage() {
     const saved = safeReadProgress(key);
 
     if (saved && !hydratedRef.current) {
-      const maxIdx = totalQuestions; // incluye comentario
+      const maxIdx = totalQuestions;
       const nextIdx = clamp(saved.qIndex, 0, maxIdx);
 
       setAnswers(saved.answers || {});
@@ -440,7 +406,10 @@ export default function DiagnosticoEncuestaPage() {
     const firstBad = findFirstIncompleteIndex();
     if (firstBad !== -1) {
       setQIndex(firstBad);
-      requestAnimationFrame(() => scrollContentTop());
+      requestAnimationFrame(() => {
+        scrollContentTop();
+        updateScrollHint();
+      });
       alert("Te faltan respuestas. Te llevé a la primera pregunta incompleta.");
       return;
     }
@@ -509,8 +478,7 @@ export default function DiagnosticoEncuestaPage() {
               <b>keys:</b> {rawKeys.length ? rawKeys.join(", ") : "(sin llaves)"}
             </p>
             <p className="mt-2">
-              Si aquí dice <b>undefined</b>, el backend no está devolviendo el JSON
-              esperado.
+              Si aquí dice <b>undefined</b>, el backend no está devolviendo el JSON esperado.
             </p>
           </div>
 
@@ -543,12 +511,14 @@ export default function DiagnosticoEncuestaPage() {
     );
   }
 
-  // progreso
+  // progreso general
   const steps = Math.max(1, totalQuestions + 1);
   const denom = Math.max(1, steps - 1);
   const snapPct = clamp((qIndex / denom) * 100, 0, 100);
 
-  const snapPctLabel = isCommentStep ? 100 : Math.round(((qIndex + 1) / steps) * 100);
+  const snapPctLabel = isCommentStep
+    ? 100
+    : Math.round(((qIndex + 1) / steps) * 100);
 
   const stepLabel = isCommentStep
     ? `Comentario (opcional)`
@@ -560,15 +530,19 @@ export default function DiagnosticoEncuestaPage() {
 
   return (
     <main className="h-dvh bg-white overflow-x-hidden">
-      {/* ✅ iOS momentum scroll */}
       <style jsx global>{`
         .scroll-area {
           -webkit-overflow-scrolling: touch;
         }
+        @keyframes hintFloat {
+          0% { transform: translateY(0); opacity: .55; }
+          60% { transform: translateY(6px); opacity: .85; }
+          100% { transform: translateY(0); opacity: .55; }
+        }
       `}</style>
 
       <div className="mx-auto h-dvh w-full max-w-md px-5 py-5 pb-[env(safe-area-inset-bottom)] flex flex-col">
-        {/* Header fijo (NO scrollea) */}
+        {/* Header fijo */}
         <div className="flex items-start justify-between gap-3 shrink-0">
           <div className="min-w-0 flex-1">
             <h2 className="text-xl font-extrabold tracking-tight" style={{ color: BRAND }}>
@@ -583,20 +557,8 @@ export default function DiagnosticoEncuestaPage() {
                 </span>
               </div>
 
-              <div
-                className="relative mt-2 w-full"
-                style={{ height: `${TRACK_H}px` }}
-                role="progressbar"
-                aria-label="Progreso del cuestionario"
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={Math.round(snapPct)}
-              >
-                <div
-                  className="absolute inset-0 rounded-full"
-                  style={{ backgroundColor: "rgba(122,0,60,0.12)" }}
-                />
-
+              <div className="relative mt-2 w-full" style={{ height: `${TRACK_H}px` }}>
+                <div className="absolute inset-0 rounded-full" style={{ backgroundColor: "rgba(122,0,60,0.12)" }} />
                 <div
                   className="absolute left-0 top-0 h-full rounded-full transition-[width] duration-300 ease-out"
                   style={{
@@ -605,7 +567,6 @@ export default function DiagnosticoEncuestaPage() {
                     boxShadow: snapPct > 0 ? GLOW : "none",
                   }}
                 />
-
                 <div
                   className="absolute top-1/2 -translate-y-1/2 transition-[left] duration-250 ease-out"
                   style={{ left: dotLeft }}
@@ -637,10 +598,7 @@ export default function DiagnosticoEncuestaPage() {
 
         <Card className="mt-4 flex-1 min-h-0 flex flex-col">
           <CardHeader className="shrink-0">
-            <CardTitle
-              className="text-base font-heading font-semibold leading-snug"
-              style={{ color: "var(--primary)" }}
-            >
+            <CardTitle className="text-base font-heading font-semibold leading-snug" style={{ color: "var(--primary)" }}>
               {isCommentStep
                 ? "Comentario final (opcional)"
                 : `${current!.question_id}. ${current!.stem}`}
@@ -648,15 +606,43 @@ export default function DiagnosticoEncuestaPage() {
           </CardHeader>
 
           <CardContent className="flex-1 min-h-0 flex flex-col p-0">
+            {/* Scroll */}
             <div
               ref={scrollAreaRef}
-              className="scroll-area flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 pb-4"
+              onScroll={updateScrollHint}
+              className="scroll-area relative flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 pb-4"
             >
+              {/* ✅ HINT MINIMALISTA: solo un “chevron” + fade inferior */}
+              {!isCommentStep && showScrollHint ? (
+                <>
+                  <div
+                    className="pointer-events-none absolute bottom-0 left-0 right-0 h-12"
+                    style={{
+                      background:
+                        "linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,1) 70%)",
+                    }}
+                  />
+                  <div
+                      className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 font-black"
+                      style={{
+                        color: "rgba(122,0,60,0.75)",
+                        animation: "hintFloat 1.3s ease-in-out infinite",
+                        fontSize: "22px",     // ✅ más grande
+                        lineHeight: "22px",   // ✅ evita que “brinque”
+                        textShadow: "0 6px 14px rgba(122,0,60,0.18)", // ✅ leve glow
+                      }}
+                      aria-hidden="true"
+                    >
+                      ⌄
+                    </div>
+
+                </>
+              ) : null}
+
               {isCommentStep ? (
                 <div className="flex flex-col gap-3">
                   <p className="text-sm text-neutral-700">
-                    Si quieres, deja un comentario breve sobre el entorno del centro. No es
-                    obligatorio.
+                    Si quieres, deja un comentario breve sobre el entorno del centro. No es obligatorio.
                   </p>
 
                   <Textarea
@@ -677,14 +663,13 @@ export default function DiagnosticoEncuestaPage() {
               ) : (
                 <div className="space-y-4">
                   {Array.isArray(current!.cards) &&
-                    current!.cards.map((c, cardIndex) => {
+                    current!.cards.map((c) => {
                       const scale = pickScale(inst as any, c.scale_id);
                       const picked = answers[`${current!.question_id}:${c.dimension}`];
-                      const blockKey = `${current!.question_id}:${c.dimension}`;
 
                       if (!scale) {
                         return (
-                          <div key={blockKey} className="rounded-xl border p-3">
+                          <div key={`${current!.question_id}:${c.dimension}`} className="rounded-xl border p-3">
                             <p className="text-sm text-neutral-700">
                               No se encontró la escala <code>{c.scale_id}</code>.
                             </p>
@@ -693,13 +678,7 @@ export default function DiagnosticoEncuestaPage() {
                       }
 
                       return (
-                        <div
-                          key={blockKey}
-                          ref={(el) => {
-                            blockRefs.current[blockKey] = el;
-                          }}
-                          className="space-y-3"
-                        >
+                        <div key={`${current!.question_id}:${c.dimension}`} className="space-y-3">
                           <p className="text-sm font-medium text-neutral-800">{c.prompt}</p>
 
                           <div className="grid grid-cols-5 gap-2">
@@ -709,15 +688,7 @@ export default function DiagnosticoEncuestaPage() {
                                 <button
                                   key={opt.value}
                                   type="button"
-                                  onMouseDown={(e) => e.preventDefault()} // ✅ evita salto por focus en móvil
-                                  onClick={() =>
-                                    setAnswer(
-                                      current!.question_id,
-                                      c.dimension,
-                                      opt.value,
-                                      cardIndex
-                                    )
-                                  }
+                                  onClick={() => setAnswer(current!.question_id, c.dimension, opt.value)}
                                   aria-pressed={active}
                                   className={[
                                     "h-11 w-11 rounded-full flex items-center justify-center",
@@ -776,6 +747,7 @@ export default function DiagnosticoEncuestaPage() {
               )}
             </div>
 
+            {/* Footer fijo */}
             <div className="shrink-0 border-t bg-white/90 backdrop-blur px-6 py-4">
               {isCommentStep ? (
                 <div className="flex gap-3">
