@@ -1052,12 +1052,11 @@ export default function CentroPage() {
               <div style={{ minWidth: Math.max(980, (heatmap?.xCount || 0) * 112) }}>
                 <div className="h-[520px]">
                   {heatmap ? (
-                    <ResponsiveHeatMap
+                   <ResponsiveHeatMap
                       data={heatmap.data as any}
                       margin={{ top: 30, right: 180, bottom: 140, left: 160 }}
                       valueFormat=">-.2f"
-                      minValue={0}
-                      maxValue={5}
+                      valueScale={{ type: "linear", min: 0, max: 5 }}
                       axisTop={null}
                       axisRight={null}
                       axisLeft={{ tickSize: 0, tickPadding: 10 }}
@@ -1117,6 +1116,7 @@ export default function CentroPage() {
                         },
                       }}
                     />
+
                   ) : null}
                 </div>
               </div>
