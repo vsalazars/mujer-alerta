@@ -276,26 +276,13 @@ export default function ResultadosEncuestaPage() {
       axisLine: { lineStyle: { color: "#e5e7eb" } }
     },
     visualMap: {
-    min: 1,
-    max: 5,
-    calculable: false,
-    orient: "horizontal",
-    left: "center",
-    bottom: isMobile ? 14 : 20,
+      min: 1, max: 5, calculable: false,
+      orient: "horizontal", left: "center", bottom: 20,
+      inRange: { color: ["#F7F3F6", "#E7C7D7", "#D29AB9", "#B96C98", "#7A003C"] },
+      text: ["Muy alto (5)", "Bajo (1)"],
+      textGap: 14,
+      textStyle: { fontSize: isMobile ? 11 : 12, fontWeight: 500, overflow: "break", width: isMobile ? 140 : 180 }      
 
-    // ✅ barra un poquito más corta en móvil para que quepan los textos
-    itemWidth: isMobile ? 170 : 220,
-    itemHeight: 12,
-
-    inRange: { color: ["#F7F3F6", "#E7C7D7", "#D29AB9", "#B96C98", "#7A003C"] },
-
-    // ✅ en móvil, textos más cortos (cero recorte)
-    text: isMobile ? ["Muy alto", "Bajo"] : ["Muy alto (5)", "Bajo (1)"],
-
-    textGap: isMobile ? 8 : 14,
-    textStyle: {
-      fontSize: isMobile ? 11 : 12,
-      fontWeight: 500,
     },
     series: [{
       type: "heatmap",
