@@ -198,7 +198,7 @@ export default function DiagnosticoEncuestaPage() {
   const hydratedRef = useRef(false);
   const saveTimerRef = useRef<number | null>(null);
 
-  // ✅ scroll natural + “hint” minimalista (FUERA del contenido)
+  // ✅ scroll natural + hint (NO absolute, NO se recorta)
   const scrollAreaRef = useRef<HTMLDivElement | null>(null);
   const [showScrollHint, setShowScrollHint] = useState(false);
 
@@ -341,6 +341,7 @@ export default function DiagnosticoEncuestaPage() {
     return -1;
   }
 
+  // hidratar progreso
   useEffect(() => {
     if (!encuestaId) return;
     if (!inst) return;
@@ -374,6 +375,7 @@ export default function DiagnosticoEncuestaPage() {
     });
   }, [encuestaId, inst, questions.length, totalQuestions]);
 
+  // autoguardado debounced
   useEffect(() => {
     if (!encuestaId) return;
     if (!hydratedRef.current) return;
@@ -515,6 +517,7 @@ export default function DiagnosticoEncuestaPage() {
     );
   }
 
+  // progreso general
   const steps = Math.max(1, totalQuestions + 1);
   const denom = Math.max(1, steps - 1);
   const snapPct = clamp((qIndex / denom) * 100, 0, 100);
@@ -726,30 +729,41 @@ export default function DiagnosticoEncuestaPage() {
               )}
             </div>
 
-            {/* ✅ INDICADOR FUERA DEL CONTENIDO (no tapa preguntas) */}
+            {/* ✅ INDICADOR ENTRE SCROLL Y FOOTER (NO se recorta y NO tapa) */}
             {!isCommentStep && showScrollHint ? (
-              <div className="relative shrink-0">
-                <div className="h-px w-full bg-neutral-200/80" />
-                <div className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2">
-                  <div
-                    className="rounded-full px-3 py-1 text-[11px] font-semibold"
-                    style={{
-                      color: "rgba(122,0,60,0.72)",
-                      background: "rgba(255,255,255,0.90)",
-                      border: "1px solid rgba(122,0,60,0.16)",
-                      boxShadow: "0 10px 22px rgba(0,0,0,0.06)",
-                      backdropFilter: "blur(8px)",
-                    }}
-                    aria-hidden="true"
-                  >
-                    Desliza para ver más <span style={{ marginLeft: 6 }}>⌄</span>
-                  </div>
-                </div>
+            <div className="shrink-0 px-6 pb-1">
+              <div
+                className="mx-auto flex flex-col items-center rounded-full px-3 py-1 text-[11px] font-semibold text-center"
+                style={{
+                  color: "rgba(122,0,60,0.70)",
+                  background: "rgba(255,255,255,0.92)",
+                  border: "1px solid rgba(122,0,60,0.14)",
+                  boxShadow: "0 8px 18px rgba(0,0,0,0.05)",
+                  backdropFilter: "blur(6px)",
+                }}
+                aria-hidden="true"
+              >
+                <span className="leading-none whitespace-nowrap">
+                  Desliza para ver más
+                </span>
+
+                <span
+                  style={{
+                    marginTop: 1,        // ✅ menos altura
+                    fontSize: 20,        // ✅ flecha más compacta
+                    lineHeight: "10px",
+                    opacity: 0.75,
+                  }}
+                >
+                  ⌄
+                </span>
               </div>
+            </div>
+
             ) : null}
 
             {/* Footer fijo */}
-            <div className="shrink-0 border-t bg-white/90 backdrop-blur px-6 py-4">
+            <div className="shrink-0 border-t bg-white/90 backdrop-blur px-6 py-4 pt-5">
               {isCommentStep ? (
                 <div className="flex gap-3">
                   <Button
