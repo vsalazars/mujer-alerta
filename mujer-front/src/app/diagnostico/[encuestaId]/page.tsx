@@ -195,6 +195,24 @@ export default function DiagnosticoEncuestaPage() {
   const hydratedRef = useRef(false);
   const saveTimerRef = useRef<number | null>(null);
 
+  // ✅ NUEVO: Scroll inteligente dentro de la Card
+  const scrollAreaRef = useRef<HTMLDivElement | null>(null);
+  const blockRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  function scrollContentTop() {
+    const el = scrollAreaRef.current;
+    if (!el) return;
+    el.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function scrollToBlock(key: string) {
+    const el = blockRefs.current[key];
+    const container = scrollAreaRef.current;
+    if (!el || !container) return;
+    const top = el.offsetTop - 8; // margen
+    container.scrollTo({ top, behavior: "smooth" });
+  }
+
   useEffect(() => {
     (async () => {
       try {
@@ -282,19 +300,44 @@ export default function DiagnosticoEncuestaPage() {
     [answeredCount, totalExpected]
   );
 
-  function setAnswer(questionId: string, dimension: RespuestaItem["dimension"], value: number) {
+  // ✅ AJUSTE: al contestar una dimensión, bajar automáticamente a la siguiente (si existe)
+  function setAnswer(
+    questionId: string,
+    dimension: RespuestaItem["dimension"],
+    value: number,
+    cardIndex?: number
+  ) {
     const key = `${questionId}:${dimension}`;
-    setAnswers((prev) => ({ ...prev, [key]: value }));
+
+    setAnswers((prev) => {
+      const next = { ...prev, [key]: value };
+
+      if (
+        typeof cardIndex === "number" &&
+        current &&
+        current.question_id === questionId &&
+        Array.isArray(current.cards)
+      ) {
+        const nextCard = current.cards[cardIndex + 1];
+        if (nextCard) {
+          const nextKey = `${questionId}:${nextCard.dimension}`;
+          requestAnimationFrame(() => scrollToBlock(nextKey));
+        }
+      }
+
+      return next;
+    });
   }
 
+  // ✅ AJUSTE: al cambiar de pregunta con botones, subir arriba el scroll del contenido
   function goPrev() {
     setQIndex((i) => Math.max(0, i - 1));
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    requestAnimationFrame(() => scrollContentTop());
   }
 
   function goNext() {
     setQIndex((i) => Math.min(totalQuestions, i + 1));
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    requestAnimationFrame(() => scrollContentTop());
   }
 
   function findFirstIncompleteIndex(): number {
@@ -371,7 +414,7 @@ export default function DiagnosticoEncuestaPage() {
     const firstBad = findFirstIncompleteIndex();
     if (firstBad !== -1) {
       setQIndex(firstBad);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      requestAnimationFrame(() => scrollContentTop());
       alert("Te faltan respuestas. Te llevé a la primera pregunta incompleta.");
       return;
     }
@@ -490,8 +533,6 @@ export default function DiagnosticoEncuestaPage() {
   const fillWidth = `calc((${snapPct} / 100) * ${railWidthExpr})`;
 
   return (
-    // ✅ CLAVE: NO bloquees el scroll vertical global con overflow-hidden.
-    // Dejamos el layout a dvh pero el scroll se hace dentro de la Card (contenido).
     <main className="h-dvh bg-white overflow-x-hidden">
       {/* ✅ iOS momentum scroll */}
       <style jsx global>{`
@@ -581,10 +622,12 @@ export default function DiagnosticoEncuestaPage() {
             </CardTitle>
           </CardHeader>
 
-          {/* ✅ CLAVE: CardContent con min-h-0, y el scroll va en un hijo .scroll-area */}
           <CardContent className="flex-1 min-h-0 flex flex-col p-0">
             {/* ZONA SCROLL */}
-            <div className="scroll-area flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 pb-4">
+            <div
+              ref={scrollAreaRef}
+              className="scroll-area flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 pb-4"
+            >
               {isCommentStep ? (
                 <div className="flex flex-col gap-3">
                   <p className="text-sm text-neutral-700">
@@ -610,14 +653,15 @@ export default function DiagnosticoEncuestaPage() {
               ) : (
                 <div className="space-y-4">
                   {Array.isArray(current!.cards) &&
-                    current!.cards.map((c) => {
+                    current!.cards.map((c, cardIndex) => {
                       const scale = pickScale(inst as any, c.scale_id);
                       const picked = answers[`${current!.question_id}:${c.dimension}`];
+                      const blockKey = `${current!.question_id}:${c.dimension}`;
 
                       if (!scale) {
                         return (
                           <div
-                            key={`${current!.question_id}:${c.dimension}`}
+                            key={blockKey}
                             className="rounded-xl border p-3"
                           >
                             <p className="text-sm text-neutral-700">
@@ -629,7 +673,10 @@ export default function DiagnosticoEncuestaPage() {
 
                       return (
                         <div
-                          key={`${current!.question_id}:${c.dimension}`}
+                          key={blockKey}
+                          ref={(el) => {
+                            blockRefs.current[blockKey] = el;
+                          }}
                           className="space-y-3"
                         >
                           <p className="text-sm font-medium text-neutral-800">{c.prompt}</p>
@@ -642,7 +689,12 @@ export default function DiagnosticoEncuestaPage() {
                                   key={opt.value}
                                   type="button"
                                   onClick={() =>
-                                    setAnswer(current!.question_id, c.dimension, opt.value)
+                                    setAnswer(
+                                      current!.question_id,
+                                      c.dimension,
+                                      opt.value,
+                                      cardIndex
+                                    )
                                   }
                                   aria-pressed={active}
                                   className={[
@@ -702,7 +754,7 @@ export default function DiagnosticoEncuestaPage() {
               )}
             </div>
 
-            {/* ✅ FOOTER PEGADO ABAJO (NO scrollea), siempre visible */}
+            {/* FOOTER fijo */}
             <div className="shrink-0 border-t bg-white/90 backdrop-blur px-6 py-4">
               {isCommentStep ? (
                 <div className="flex gap-3">
