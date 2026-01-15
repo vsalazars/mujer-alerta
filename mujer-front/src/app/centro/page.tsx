@@ -1153,8 +1153,6 @@ export default function CentroPage() {
                   indexBy="label"
                   groupMode="grouped"
                   layout="horizontal"
-                  minValue={0}
-                  maxValue={5}
                   valueScale={{ type: "linear", min: 0, max: 5 }}
                   indexScale={{ type: "band", round: true }}
                   margin={{ top: 44, right: 110, bottom: 52, left: 210 }}
