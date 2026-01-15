@@ -198,7 +198,7 @@ export default function DiagnosticoEncuestaPage() {
   const hydratedRef = useRef(false);
   const saveTimerRef = useRef<number | null>(null);
 
-  // ✅ scroll natural + “hint” minimalista
+  // ✅ scroll natural + “hint” minimalista (FUERA del contenido)
   const scrollAreaRef = useRef<HTMLDivElement | null>(null);
   const [showScrollHint, setShowScrollHint] = useState(false);
 
@@ -208,12 +208,10 @@ export default function DiagnosticoEncuestaPage() {
     el.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  // ✅ hint: muestra solo si hay contenido abajo (discreto)
   function updateScrollHint() {
     const el = scrollAreaRef.current;
     if (!el) return;
-    const hasMore =
-      el.scrollHeight - el.scrollTop - el.clientHeight > 28; // umbral
+    const hasMore = el.scrollHeight - el.scrollTop - el.clientHeight > 28;
     setShowScrollHint(hasMore);
   }
 
@@ -311,8 +309,6 @@ export default function DiagnosticoEncuestaPage() {
   ) {
     const key = `${questionId}:${dimension}`;
     setAnswers((prev) => ({ ...prev, [key]: value }));
-
-    // ✅ sin autoscroll: solo re-evalúa si hay contenido abajo y deja el hint
     requestAnimationFrame(() => updateScrollHint());
   }
 
@@ -345,7 +341,6 @@ export default function DiagnosticoEncuestaPage() {
     return -1;
   }
 
-  // hidratar progreso
   useEffect(() => {
     if (!encuestaId) return;
     if (!inst) return;
@@ -363,13 +358,22 @@ export default function DiagnosticoEncuestaPage() {
       setQIndex(nextIdx);
 
       hydratedRef.current = true;
+
+      requestAnimationFrame(() => {
+        scrollContentTop();
+        updateScrollHint();
+      });
       return;
     }
 
     hydratedRef.current = true;
+
+    requestAnimationFrame(() => {
+      scrollContentTop();
+      updateScrollHint();
+    });
   }, [encuestaId, inst, questions.length, totalQuestions]);
 
-  // autoguardado debounced
   useEffect(() => {
     if (!encuestaId) return;
     if (!hydratedRef.current) return;
@@ -511,7 +515,6 @@ export default function DiagnosticoEncuestaPage() {
     );
   }
 
-  // progreso general
   const steps = Math.max(1, totalQuestions + 1);
   const denom = Math.max(1, steps - 1);
   const snapPct = clamp((qIndex / denom) * 100, 0, 100);
@@ -534,11 +537,6 @@ export default function DiagnosticoEncuestaPage() {
         .scroll-area {
           -webkit-overflow-scrolling: touch;
         }
-        @keyframes hintFloat {
-          0% { transform: translateY(0); opacity: .55; }
-          60% { transform: translateY(6px); opacity: .85; }
-          100% { transform: translateY(0); opacity: .55; }
-        }
       `}</style>
 
       <div className="mx-auto h-dvh w-full max-w-md px-5 py-5 pb-[env(safe-area-inset-bottom)] flex flex-col">
@@ -558,7 +556,10 @@ export default function DiagnosticoEncuestaPage() {
               </div>
 
               <div className="relative mt-2 w-full" style={{ height: `${TRACK_H}px` }}>
-                <div className="absolute inset-0 rounded-full" style={{ backgroundColor: "rgba(122,0,60,0.12)" }} />
+                <div
+                  className="absolute inset-0 rounded-full"
+                  style={{ backgroundColor: "rgba(122,0,60,0.12)" }}
+                />
                 <div
                   className="absolute left-0 top-0 h-full rounded-full transition-[width] duration-300 ease-out"
                   style={{
@@ -598,7 +599,10 @@ export default function DiagnosticoEncuestaPage() {
 
         <Card className="mt-4 flex-1 min-h-0 flex flex-col">
           <CardHeader className="shrink-0">
-            <CardTitle className="text-base font-heading font-semibold leading-snug" style={{ color: "var(--primary)" }}>
+            <CardTitle
+              className="text-base font-heading font-semibold leading-snug"
+              style={{ color: "var(--primary)" }}
+            >
               {isCommentStep
                 ? "Comentario final (opcional)"
                 : `${current!.question_id}. ${current!.stem}`}
@@ -612,33 +616,6 @@ export default function DiagnosticoEncuestaPage() {
               onScroll={updateScrollHint}
               className="scroll-area relative flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 pb-4"
             >
-              {/* ✅ HINT MINIMALISTA: solo un “chevron” + fade inferior */}
-              {!isCommentStep && showScrollHint ? (
-                <>
-                  <div
-                    className="pointer-events-none absolute bottom-0 left-0 right-0 h-12"
-                    style={{
-                      background:
-                        "linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,1) 70%)",
-                    }}
-                  />
-                  <div
-                      className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 font-black"
-                      style={{
-                        color: "rgba(122,0,60,0.75)",
-                        animation: "hintFloat 1.3s ease-in-out infinite",
-                        fontSize: "22px",     // ✅ más grande
-                        lineHeight: "22px",   // ✅ evita que “brinque”
-                        textShadow: "0 6px 14px rgba(122,0,60,0.18)", // ✅ leve glow
-                      }}
-                      aria-hidden="true"
-                    >
-                      ⌄
-                    </div>
-
-                </>
-              ) : null}
-
               {isCommentStep ? (
                 <div className="flex flex-col gap-3">
                   <p className="text-sm text-neutral-700">
@@ -688,7 +665,9 @@ export default function DiagnosticoEncuestaPage() {
                                 <button
                                   key={opt.value}
                                   type="button"
-                                  onClick={() => setAnswer(current!.question_id, c.dimension, opt.value)}
+                                  onClick={() =>
+                                    setAnswer(current!.question_id, c.dimension, opt.value)
+                                  }
                                   aria-pressed={active}
                                   className={[
                                     "h-11 w-11 rounded-full flex items-center justify-center",
@@ -746,6 +725,28 @@ export default function DiagnosticoEncuestaPage() {
                 </div>
               )}
             </div>
+
+            {/* ✅ INDICADOR FUERA DEL CONTENIDO (no tapa preguntas) */}
+            {!isCommentStep && showScrollHint ? (
+              <div className="relative shrink-0">
+                <div className="h-px w-full bg-neutral-200/80" />
+                <div className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2">
+                  <div
+                    className="rounded-full px-3 py-1 text-[11px] font-semibold"
+                    style={{
+                      color: "rgba(122,0,60,0.72)",
+                      background: "rgba(255,255,255,0.90)",
+                      border: "1px solid rgba(122,0,60,0.16)",
+                      boxShadow: "0 10px 22px rgba(0,0,0,0.06)",
+                      backdropFilter: "blur(8px)",
+                    }}
+                    aria-hidden="true"
+                  >
+                    Desliza para ver más <span style={{ marginLeft: 6 }}>⌄</span>
+                  </div>
+                </div>
+              </div>
+            ) : null}
 
             {/* Footer fijo */}
             <div className="shrink-0 border-t bg-white/90 backdrop-blur px-6 py-4">
