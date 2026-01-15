@@ -4,12 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import ReactECharts from "echarts-for-react";
 
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +20,8 @@ import {
 
 import { ArrowLeft, Home, RefreshCw } from "lucide-react";
 import { api } from "@/lib/api";
+import { CheckCircle } from "lucide-react";
+
 
 // =========================
 // Tipos del backend
@@ -69,31 +66,95 @@ const DIM_LABEL_SHORT: Record<BackendDimension, string> = {
 // =========================
 // Mapeo LGAMVLV
 // =========================
-const LGAM_MAP: Record<number, { tipo: string; articulo?: string; nota?: string }[]> = {
-  1: [{ tipo: "Violencia psicológica", articulo: "LGAMVLV Art. 6", nota: "Humillación, descalificación o devaluación que afecta la estabilidad emocional." }],
-  2: [
-    { tipo: "Violencia psicológica", articulo: "LGAMVLV Art. 6", nota: "Discriminación y trato degradante por razón de género." },
-    { tipo: "Violencia institucional", nota: "Obstaculización del acceso a derechos o atención por parte de autoridades." },
+const LGAM_MAP: Record<
+  number,
+  { tipo: string; articulo?: string; nota?: string }[]
+> = {
+  1: [
+    {
+      tipo: "Violencia psicológica",
+      articulo: "LGAMVLV Art. 6",
+      nota: "Humillación, descalificación o devaluación que afecta la estabilidad emocional.",
+    },
   ],
-  3: [{ tipo: "Violencia sexual", articulo: "LGAMVLV Art. 6", nota: "Sexualización, comentarios o conductas de contenido sexual no consentido." }],
+  2: [
+    {
+      tipo: "Violencia psicológica",
+      articulo: "LGAMVLV Art. 6",
+      nota: "Discriminación y trato degradante por razón de género.",
+    },
+    {
+      tipo: "Violencia institucional",
+      nota: "Obstaculización del acceso a derechos o atención por parte de autoridades.",
+    },
+  ],
+  3: [
+    {
+      tipo: "Violencia sexual",
+      articulo: "LGAMVLV Art. 6",
+      nota: "Sexualización, comentarios o conductas de contenido sexual no consentido.",
+    },
+  ],
   4: [
-    { tipo: "Violencia sexual", articulo: "LGAMVLV Art. 6", nota: "Hostigamiento o presión de naturaleza sexual." },
-    { tipo: "Violencia laboral y docente", nota: "En contextos de poder jerárquico escolar o laboral." },
+    {
+      tipo: "Violencia sexual",
+      articulo: "LGAMVLV Art. 6",
+      nota: "Hostigamiento o presión de naturaleza sexual.",
+    },
+    {
+      tipo: "Violencia laboral y docente",
+      nota: "En contextos de poder jerárquico escolar o laboral.",
+    },
   ],
   5: [
-    { tipo: "Violencia psicológica", articulo: "LGAMVLV Art. 6", nota: "Control, intimidación o abuso jerárquico." },
-    { tipo: "Violencia económica", articulo: "LGAMVLV Art. 6", nota: "Limitación de recursos o oportunidades por razón de género." },
-    { tipo: "Violencia institucional", nota: "Uso indebido de autoridad para restringir derechos." },
+    {
+      tipo: "Violencia psicológica",
+      articulo: "LGAMVLV Art. 6",
+      nota: "Control, intimidación o abuso jerárquico.",
+    },
+    {
+      tipo: "Violencia económica",
+      articulo: "LGAMVLV Art. 6",
+      nota: "Limitación de recursos o oportunidades por razón de género.",
+    },
+    {
+      tipo: "Violencia institucional",
+      nota: "Uso indebido de autoridad para restringir derechos.",
+    },
   ],
   6: [
-    { tipo: "Violencia laboral y docente", nota: "Obstaculización en ámbitos escolar/laboral por razón de género." },
-    { tipo: "Violencia económica", articulo: "LGAMVLV Art. 6", nota: "Afectación de ingresos o condiciones laborales." },
-    { tipo: "Violencia psicológica", articulo: "LGAMVLV Art. 6", nota: "Amenazas o desvalorización ligada al desempeño." },
+    {
+      tipo: "Violencia laboral y docente",
+      nota: "Obstaculización en ámbitos escolar/laboral por razón de género.",
+    },
+    {
+      tipo: "Violencia económica",
+      articulo: "LGAMVLV Art. 6",
+      nota: "Afectación de ingresos o condiciones laborales.",
+    },
+    {
+      tipo: "Violencia psicológica",
+      articulo: "LGAMVLV Art. 6",
+      nota: "Amenazas o desvalorización ligada al desempeño.",
+    },
   ],
-  7: [{ tipo: "Violencia digital y mediática", nota: "Daño mediante difusión, exposición o hostigamiento digital." }],
+  7: [
+    {
+      tipo: "Violencia digital y mediática",
+      nota: "Daño mediante difusión, exposición o hostigamiento digital.",
+    },
+  ],
   8: [
-    { tipo: "Violencia física", articulo: "LGAMVLV Art. 6", nota: "Agresión o daño físico no accidental." },
-    { tipo: "Violencia psicológica", articulo: "LGAMVLV Art. 6", nota: "Amenazas que generan temor o control." },
+    {
+      tipo: "Violencia física",
+      articulo: "LGAMVLV Art. 6",
+      nota: "Agresión o daño físico no accidental.",
+    },
+    {
+      tipo: "Violencia psicológica",
+      articulo: "LGAMVLV Art. 6",
+      nota: "Amenazas que generan temor o control.",
+    },
   ],
 };
 
@@ -113,7 +174,9 @@ function levelLabel(v: number): string {
   return "Muy alto";
 }
 
-function levelBadgeVariant(v: number): "default" | "secondary" | "destructive" | "outline" {
+function levelBadgeVariant(
+  v: number
+): "default" | "secondary" | "destructive" | "outline" {
   if (v < 2) return "secondary";
   if (v < 3) return "outline";
   if (v < 4) return "default";
@@ -154,14 +217,18 @@ export default function ResultadosEncuestaPage() {
   const params = useParams();
   const isMobile = useIsMobile();
 
-  const encuestaId = (params?.encuestaId as string) || (params?.id as string) || "";
+  const encuestaId =
+    (params?.encuestaId as string) || (params?.id as string) || "";
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [data, setData] = useState<EncuestaResumenResponseBE | null>(null);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [selected, setSelected] = useState<{ tipoIndex: number; dimIndex: number } | null>(null);
+  const [selected, setSelected] = useState<{
+    tipoIndex: number;
+    dimIndex: number;
+  } | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -173,7 +240,9 @@ export default function ResultadosEncuestaPage() {
       }
       try {
         setLoading(true);
-        const payload = await api<EncuestaResumenResponseBE>(`/api/encuestas/${encuestaId}/resumen`);
+        const payload = await api<EncuestaResumenResponseBE>(
+          `/api/encuestas/${encuestaId}/resumen`
+        );
         if (alive) setData(payload);
       } catch (e: any) {
         if (alive) setErr(e?.message || "Error al cargar los resultados.");
@@ -182,14 +251,16 @@ export default function ResultadosEncuestaPage() {
       }
     }
     fetchData();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [encuestaId]);
 
   const global = data?.global;
 
   const tipos = useMemo(() => {
     const map = new Map<number, string>();
-    data?.matriz.forEach(it => {
+    data?.matriz.forEach((it) => {
       if (!map.has(it.tipo_num)) map.set(it.tipo_num, it.tipo_nombre);
     });
     return Array.from(map.entries())
@@ -199,115 +270,157 @@ export default function ResultadosEncuestaPage() {
 
   const tipoAgg = useMemo<TipoAgg[]>(() => {
     const map = new Map<number, TipoAgg>();
-    tipos.forEach(t => map.set(t.tipo_num, { ...t }));
-    data?.matriz.forEach(it => {
+    tipos.forEach((t) => map.set(t.tipo_num, { ...t }));
+    data?.matriz.forEach((it) => {
       const obj = map.get(it.tipo_num);
       if (obj) (obj as any)[it.dimension] = it.promedio;
     });
-    return tipos.map(t => map.get(t.tipo_num)!);
+    return tipos.map((t) => map.get(t.tipo_num)!);
   }, [data, tipos]);
 
-  const yAxisLabelsFull = useMemo(() => tipos.map(t => `${t.tipo_num}. ${t.tipo_nombre}`), [tipos]);
-  const yAxisLabelsShort = useMemo(() => tipos.map(t => String(t.tipo_num)), [tipos]);
+  const yAxisLabelsFull = useMemo(
+    () => tipos.map((t) => `${t.tipo_num}. ${t.tipo_nombre}`),
+    [tipos]
+  );
+  const yAxisLabelsShort = useMemo(() => tipos.map((t) => String(t.tipo_num)), [
+    tipos,
+  ]);
 
   const heatmapSeriesData = useMemo<[number, number, number][]>(() => {
     const yMap = new Map<number, number>();
     tipos.forEach((t, i) => yMap.set(t.tipo_num, i));
-    const xMap: Record<BackendDimension, number> = { frecuencia: 0, normalidad: 1, gravedad: 2 };
-    return (data?.matriz ?? []).map(it => [
+    const xMap: Record<BackendDimension, number> = {
+      frecuencia: 0,
+      normalidad: 1,
+      gravedad: 2,
+    };
+    return (data?.matriz ?? []).map((it) => [
       xMap[it.dimension],
       yMap.get(it.tipo_num) ?? 0,
-      it.promedio
+      it.promedio,
     ]);
   }, [data, tipos]);
 
-  const xAxisLabels = useMemo(() => 
-    isMobile ? DIM_ORDER.map(d => DIM_LABEL_SHORT[d]) : DIM_ORDER.map(d => DIM_LABEL_FULL[d])
-  , [isMobile]);
+  const xAxisLabels = useMemo(
+    () =>
+      isMobile
+        ? DIM_ORDER.map((d) => DIM_LABEL_SHORT[d])
+        : DIM_ORDER.map((d) => DIM_LABEL_FULL[d]),
+    [isMobile]
+  );
 
   const chartHeight = useMemo(() => {
     const rows = Math.max(1, tipos.length);
-    return isMobile 
+    return isMobile
       ? Math.min(900, Math.max(560, 140 + rows * 64))
       : Math.min(640, Math.max(360, 100 + rows * 48));
   }, [tipos.length, isMobile]);
 
-  const chartOption = useMemo(() => ({
-    animation: false,
-    grid: {
-      left: 16,
-      right: 16,
-      top: 16,
-      bottom: isMobile ? 104 : 80, // ✅ más espacio para los textos en móvil
-      containLabel: true,
-    },    tooltip: {
-      show: !isMobile,
-      trigger: "item",
-      confine: true,
-      backgroundColor: "rgba(255,255,255,0.95)",
-      borderColor: "#e5e7eb",
-      borderWidth: 1,
-      padding: 12,
-      textStyle: { color: "#111", fontSize: 13 },
-      formatter: (p: any) => {
-        const x = p.data[0], y = p.data[1], v = p.data[2];
-        const dim = DIM_LABEL_FULL[DIM_ORDER[x]];
-        const tipo = yAxisLabelsFull[y];
-        return `<strong>${tipo}</strong><br/>${dim}: <strong>${fmt(v)}</strong> <em>(${levelLabel(v)})</em>`;
-      }
-    },
-    xAxis: {
-      type: "category",
-      data: xAxisLabels,
-      axisLabel: { fontSize: 13, margin: 16 },
-      axisTick: { show: false },
-      axisLine: { lineStyle: { color: "#e5e7eb" } }
-    },
-    yAxis: {
-      type: "category",
-      data: isMobile ? yAxisLabelsShort : yAxisLabelsFull,
-      axisLabel: {
-        fontSize: 12,
-        width: isMobile ? 32 : 300,
-        overflow: isMobile ? "truncate" : "truncate",
-        margin: 14
+  const chartOption = useMemo(
+    () => ({
+      animation: false,
+      grid: {
+        left: 16,
+        right: 16,
+        top: 16,
+        bottom: isMobile ? 104 : 80,
+        containLabel: true,
       },
-      axisTick: { show: false },
-      axisLine: { lineStyle: { color: "#e5e7eb" } }
-    },
-    visualMap: {
-      min: 1, max: 5, calculable: false,
-      orient: "horizontal", left: "center", bottom: 20,
-      inRange: { color: ["#F7F3F6", "#E7C7D7", "#D29AB9", "#B96C98", "#7A003C"] },
-      text: ["Muy alto (5)", "Bajo (1)"],
-      textGap: 14,
-      textStyle: { fontSize: isMobile ? 11 : 12, fontWeight: 500, overflow: "break", width: isMobile ? 140 : 180 }      
-
-    },
-    series: [{
-      type: "heatmap",
-      data: heatmapSeriesData,
-      label: { show: !isMobile, fontSize: 11, formatter: (p: any) => fmt(p.data[2]) },
-      itemStyle: {
-        borderColor: "#fff",
-        borderWidth: 2,
-        borderRadius: isMobile ? 20 : 14,
-        shadowBlur: 6,
-        shadowColor: "rgba(0,0,0,0.08)"
+      tooltip: {
+        show: !isMobile,
+        trigger: "item",
+        confine: true,
+        backgroundColor: "rgba(255,255,255,0.95)",
+        borderColor: "#e5e7eb",
+        borderWidth: 1,
+        padding: 12,
+        textStyle: { color: "#111", fontSize: 13 },
+        formatter: (p: any) => {
+          const x = p.data[0],
+            y = p.data[1],
+            v = p.data[2];
+          const dim = DIM_LABEL_FULL[DIM_ORDER[x]];
+          const tipo = yAxisLabelsFull[y];
+          return `<strong>${tipo}</strong><br/>${dim}: <strong>${fmt(
+            v
+          )}</strong> <em>(${levelLabel(v)})</em>`;
+        },
       },
-      emphasis: { itemStyle: { borderWidth: 4, borderColor: "#7A003C" } }
-    }]
-  }), [isMobile, xAxisLabels, yAxisLabelsFull, yAxisLabelsShort, heatmapSeriesData]);
+      xAxis: {
+        type: "category",
+        data: xAxisLabels,
+        axisLabel: { fontSize: 13, margin: 16 },
+        axisTick: { show: false },
+        axisLine: { lineStyle: { color: "#e5e7eb" } },
+      },
+      yAxis: {
+        type: "category",
+        data: isMobile ? yAxisLabelsShort : yAxisLabelsFull,
+        axisLabel: {
+          fontSize: 12,
+          width: isMobile ? 32 : 300,
+          overflow: isMobile ? "truncate" : "truncate",
+          margin: 14,
+        },
+        axisTick: { show: false },
+        axisLine: { lineStyle: { color: "#e5e7eb" } },
+      },
+      visualMap: {
+        min: 1,
+        max: 5,
+        calculable: false,
+        orient: "horizontal",
+        left: "center",
+        bottom: 20,
+        inRange: {
+          color: ["#F7F3F6", "#E7C7D7", "#D29AB9", "#B96C98", "#7A003C"],
+        },
+        text: ["Muy alto", "Bajo"],
+        textGap: 14,
+        textStyle: {
+          fontSize: isMobile ? 11 : 12,
+          fontWeight: 500,
+          overflow: "break",
+          width: isMobile ? 140 : 180,
+        },
+      },
+      series: [
+        {
+          type: "heatmap",
+          data: heatmapSeriesData,
+          label: {
+            show: !isMobile,
+            fontSize: 11,
+            formatter: (p: any) => fmt(p.data[2]),
+          },
+          itemStyle: {
+            borderColor: "#fff",
+            borderWidth: 2,
+            borderRadius: isMobile ? 20 : 14,
+            shadowBlur: 6,
+            shadowColor: "rgba(0,0,0,0.08)",
+          },
+          emphasis: { itemStyle: { borderWidth: 4, borderColor: "#7A003C" } },
+        },
+      ],
+    }),
+    [isMobile, xAxisLabels, yAxisLabelsFull, yAxisLabelsShort, heatmapSeriesData]
+  );
 
-  const onEvents = useMemo(() => isMobile ? {
-    click: (params: any) => {
-      if (params.data) {
-        setSelected({ dimIndex: params.data[0], tipoIndex: params.data[1] });
-        setDrawerOpen(true);
-      }
-    }
-  } : undefined, [isMobile]);  
-
+  const onEvents = useMemo(
+    () =>
+      isMobile
+        ? {
+            click: (params: any) => {
+              if (params.data) {
+                setSelected({ dimIndex: params.data[0], tipoIndex: params.data[1] });
+                setDrawerOpen(true);
+              }
+            },
+          }
+        : undefined,
+    [isMobile]
+  );
 
   const selectedDetail = useMemo(() => {
     if (!selected) return null;
@@ -324,46 +437,64 @@ export default function ResultadosEncuestaPage() {
         {/* Header */}
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-neutral-600">Resultados del diagnóstico</p>
-            <h1 className="mt-1 text-2xl font-bold text-neutral-900">Tu percepción del entorno</h1>
+            <p className="text-sm font-medium text-neutral-600">
+              Resultados del diagnóstico
+            </p>
+            <h1 className="mt-1 text-2xl font-bold text-neutral-900">
+              Tu percepción del entorno
+            </h1>
           </div>
-         
         </div>
 
         {loading ? (
           <Card className="rounded-3xl border-neutral-200">
-            <CardContent className="py-12 text-center text-neutral-600">Cargando resultados...</CardContent>
+            <CardContent className="py-12 text-center text-neutral-600">
+              Cargando resultados...
+            </CardContent>
           </Card>
         ) : err ? (
           <Card className="rounded-3xl border-red-200 bg-red-50">
-            <CardContent className="py-10 text-center text-red-700">{err}</CardContent>
+            <CardContent className="py-10 text-center text-red-700">
+              {err}
+            </CardContent>
           </Card>
         ) : (
           <>
             {/* Indicadores globales */}
             <Card className="overflow-hidden rounded-3xl border-neutral-200 shadow-sm">
               <CardHeader>
-                <CardTitle className="text-lg font-semibold">Indicadores globales</CardTitle>
-                <p className="text-sm text-neutral-600">Promedio general en escala 1–5</p>
+                <CardTitle className="text-lg font-semibold">
+                  Indicadores globales
+                </CardTitle>
+                <p className="text-sm text-neutral-600">
+                  Promedio general en escala 1–5
+                </p>
               </CardHeader>
+
               <CardContent>
                 <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
                   {DIM_ORDER.map((dim) => (
                     <div key={dim} className="rounded-2xl bg-neutral-50 p-5 text-center">
-                      <p className="text-sm font-medium text-neutral-600">{DIM_LABEL_FULL[dim]}</p>
+                      <p className="text-sm font-medium text-neutral-600">
+                        {DIM_LABEL_FULL[dim]}
+                      </p>
 
                       <p className="mt-3 text-3xl font-bold tabular-nums text-neutral-900">
                         {fmt(global?.[dim])}
                       </p>
 
-                      <Badge variant={levelBadgeVariant(global?.[dim] ?? 0)} className="mt-3">
+                      <Badge
+                        variant={levelBadgeVariant(global?.[dim] ?? 0)}
+                        className="mt-3"
+                      >
                         {levelLabel(global?.[dim] ?? 0)}
                       </Badge>
                     </div>
                   ))}
 
+                  {/* ✅ ÚNICO CAMBIO: card Total con layout flex para centrar el badge REAL */}
                   <div
-                    className="rounded-2xl p-5 text-center"
+                    className="rounded-2xl p-5 flex flex-col items-center text-center"
                     style={{
                       backgroundColor: "var(--primary)",
                       color: "var(--primary-foreground)",
@@ -375,24 +506,36 @@ export default function ResultadosEncuestaPage() {
                       {fmt(global?.total)}
                     </p>
 
-                    <Badge
-                      variant="secondary"
-                      className="mt-3 mx-auto inline-flex w-[132px] justify-center text-center whitespace-normal leading-tight"
-                      style={{
-                        backgroundColor:
-                          "color-mix(in oklch, var(--primary-foreground) 18%, transparent)",
-                        color: "var(--primary-foreground)",
-                        border:
-                          "1px solid color-mix(in oklch, var(--primary-foreground) 35%, transparent)",
-                      }}
-                    >
-                      Promedio<br />general
-                    </Badge>
+                   <div className="mt-3 flex justify-center">
+                      <Badge
+                        variant="secondary"
+                        className="
+                          inline-flex
+                          w-[110px]
+                          min-h-[34px]
+                          items-center
+                          justify-center
+                          text-center
+                          leading-[1.05]
+                          py-1
+                        "
+                        style={{
+                          backgroundColor:
+                            "color-mix(in oklch, var(--primary-foreground) 18%, transparent)",
+                          color: "var(--primary-foreground)",
+                          border:
+                            "1px solid color-mix(in oklch, var(--primary-foreground) 35%, transparent)",
+                        }}
+                      >
+                        <span className="block">
+                          Promedio<br />general
+                        </span>
+                      </Badge>
+                  </div>
 
                   </div>
                 </div>
               </CardContent>
-
             </Card>
 
             <Separator className="my-10" />
@@ -400,13 +543,16 @@ export default function ResultadosEncuestaPage() {
             {/* Heatmap */}
             <Card className="overflow-hidden rounded-3xl border-neutral-200 shadow-sm">
               <CardHeader>
-                <CardTitle className="text-lg font-semibold">Mapa de calor por tipo de conducta</CardTitle>
+                <CardTitle className="text-lg font-semibold">
+                  Mapa de calor por tipo de violencia
+                </CardTitle>
                 <p className="text-xs text-neutral-600">
-                  {isMobile 
+                  {isMobile
                     ? "Toca una celda para ver detalle y referencias de la Ley General de Acceso de las Mujeres a una Vida Libre de Violencia (LGAMVLV)."
                     : "Pasa el ratón sobre una celda para ver detalle."}
                 </p>
               </CardHeader>
+
               <CardContent className="pb-8">
                 <div className="rounded-2xl bg-neutral-50/50 p-4">
                   <ReactECharts
@@ -416,54 +562,60 @@ export default function ResultadosEncuestaPage() {
                     onEvents={onEvents}
                   />
                 </div>
+
                 {isMobile && (
                   <div className="mt-6 space-y-4">
                     <div className="rounded-2xl border bg-white p-4 shadow-sm">
-                      
-                   
                       <div className="flex items-center justify-between gap-3 text-sm">
-                        <span className="font-medium leading-none">Leyenda de dimensiones</span>
-                        <span className="text-neutral-500 leading-none whitespace-nowrap">Escala 1 → 5</span>
+                        <span className="font-medium leading-none">
+                          Leyenda de dimensiones
+                        </span>
+                        <span className="text-neutral-500 leading-none whitespace-nowrap">
+                          Escala 1 → 5
+                        </span>
                       </div>
 
-                      
                       <div className="mt-3 flex gap-2">
-                        {[1,2,3,4,5].map(v => (
-                          <div key={v} className="h-6 flex-1 rounded-full" style={{ backgroundColor: colorForValue(v) }} />
+                        {[1, 2, 3, 4, 5].map((v) => (
+                          <div
+                            key={v}
+                            className="h-6 flex-1 rounded-full"
+                            style={{ backgroundColor: colorForValue(v) }}
+                          />
                         ))}
                       </div>
                     </div>
-                   
+
                     <div className="rounded-2xl border bg-white p-4 shadow-sm">
-                      <p className="mb-3 text-sm font-medium">Tipos de Violencia contra la Mujer</p>
+                      <p className="mb-3 text-sm font-medium">
+                        Tipos de Violencia contra la Mujer
+                      </p>
 
                       <div className="space-y-2">
-                        {tipos.map(t => (
+                        {tipos.map((t) => (
                           <div
-                              key={t.tipo_num}
-                              className="flex items-start gap-3 rounded-xl px-3 py-2 hover:bg-neutral-50 transition-colors"
+                            key={t.tipo_num}
+                            className="flex items-start gap-3 rounded-xl px-3 py-2 hover:bg-neutral-50 transition-colors"
+                          >
+                            <span
+                              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold tabular-nums"
+                              style={{
+                                backgroundColor: "var(--primary)",
+                                color: "var(--primary-foreground)",
+                                boxShadow:
+                                  "0 0 0 3px color-mix(in oklch, var(--ring) 18%, transparent)",
+                              }}
                             >
-                              {/* Pill morado */}
-                              <span
-                                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold tabular-nums"
-                                style={{
-                                  backgroundColor: "var(--primary)",
-                                  color: "var(--primary-foreground)",
-                                  boxShadow: "0 0 0 3px color-mix(in oklch, var(--ring) 18%, transparent)",
-                                }}
-                              >
-                                {t.tipo_num}
-                              </span>
+                              {t.tipo_num}
+                            </span>
 
-                              <span className="text-sm text-neutral-800 leading-snug">
-                                {t.tipo_nombre}
-                              </span>
-                            </div>
+                            <span className="text-sm text-neutral-800 leading-snug">
+                              {t.tipo_nombre}
+                            </span>
+                          </div>
                         ))}
                       </div>
                     </div>
-
-                  
                   </div>
                 )}
               </CardContent>
@@ -473,18 +625,16 @@ export default function ResultadosEncuestaPage() {
 
             {/* Acciones finales */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              
               <Button
                 size="lg"
                 className="h-14 rounded-full text-base font-semibold text-white"
                 style={{ backgroundColor: "#7F017F" }}
                 onClick={() => router.push("/")}
               >
-                <Home className="mr-3 h-5 w-5" />
-                Ir al inicio
+                <CheckCircle className="mr-3 h-5 w-5" />
+
+                Finalizar
               </Button>
-
-
             </div>
           </>
         )}
@@ -492,88 +642,142 @@ export default function ResultadosEncuestaPage() {
 
       {/* Drawer móvil */}
       <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
-        <DrawerContent className="max-h-[90dvh] rounded-t-3xl">
-          <div className="mx-auto mt-3 h-1.5 w-12 rounded-full bg-neutral-300" />
-          <DrawerHeader className="pt-4">
-            <DrawerTitle>Detalle del tipo seleccionado</DrawerTitle>
-            <DrawerDescription>Referencias legales y valores por dimensión</DrawerDescription>
+        <DrawerContent
+          className="rounded-t-3xl flex flex-col overflow-hidden"
+          style={{ maxHeight: "calc(100dvh - 96px)" }}
+        >
+          {/* Handle */}
+          <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-neutral-300" />
+
+          {/* Header compacto */}
+          <DrawerHeader className="relative shrink-0 pt-3 pb-2">
+            <DrawerTitle className="text-base">
+              Detalle del tipo seleccionado
+            </DrawerTitle>
+            <DrawerDescription className="text-xs">
+              Referencias legales y valores por dimensión
+            </DrawerDescription>
+
+            <button
+              aria-label="Cerrar"
+              onClick={() => setDrawerOpen(false)}
+              className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-neutral-100 hover:bg-neutral-200 transition"
+            >
+              ✕
+            </button>
           </DrawerHeader>
 
-          <ScrollArea className="px-4 pb-6">
-            {selectedDetail ? (
-              <div className="space-y-5">
+          {/* ✅ Scroll SOLO contenido */}
+          <ScrollArea className="flex-1 min-h-0">
+            <div className="px-4 pb-28">
+              {selectedDetail ? (
                 <Card className="rounded-2xl border-neutral-200">
-                  <CardContent className="pt-6">
-                    <h3 className="mb-4 text-lg font-bold text-neutral-900">
-                      {selectedDetail.tipo.tipo_num}. {selectedDetail.tipo.tipo_nombre}
+                  <CardContent className="pt-4 pb-4">
+                    <h3 className="mb-3 text-sm font-bold text-neutral-900 leading-snug">
+                      {selectedDetail.tipo.tipo_num}.{" "}
+                      {selectedDetail.tipo.tipo_nombre}
                     </h3>
 
                     {selectedDetail.refs.length > 0 && (
-                      <div className="mb-5">
-                        <p className="mb-3 text-sm font-medium text-neutral-700">Clasificación LGAMVLV</p>
-                        <div className="flex flex-wrap gap-2">
+                      <div className="mb-3">
+                        <p className="mb-2 text-xs font-medium text-neutral-700">
+                          Clasificación LGAMVLV
+                        </p>
+
+                        <div className="flex flex-wrap gap-1.5">
                           {selectedDetail.refs.map((ref, i) => (
                             <Badge
                               key={i}
                               variant="secondary"
-                              className="bg-pink-50 text-pink-900 border-pink-200"
+                              className="px-2 py-0.5 text-[11px] bg-pink-50 text-pink-900 border-pink-200"
                             >
                               {ref.tipo}
                             </Badge>
                           ))}
                         </div>
+
                         {selectedDetail.refs[0]?.nota && (
-                          <p className="mt-3 text-sm text-neutral-600">{selectedDetail.refs[0].nota}</p>
+                          <p className="mt-2 text-xs text-neutral-600 leading-snug">
+                            {selectedDetail.refs[0].nota}
+                          </p>
                         )}
                       </div>
                     )}
 
-                    <div className="grid grid-cols-3 gap-3">
-                      {DIM_ORDER.map(dim => {
-                        const val = selectedDetail.tipo[dim as keyof TipoAgg] as number | undefined;
+                    <div className="grid grid-cols-3 gap-2">
+                      {DIM_ORDER.map((dim) => {
+                        const val = selectedDetail.tipo[
+                          dim as keyof TipoAgg
+                        ] as number | undefined;
                         const isActive = dim === selectedDetail.dimKey;
+
                         return (
                           <div
                             key={dim}
-                            className={`rounded-2xl border-2 p-4 text-center transition-all ${
-                              isActive ? "border-neutral-900 bg-neutral-50" : "border-neutral-200"
+                            className={`rounded-2xl border-2 p-2.5 text-center transition-all ${
+                              isActive
+                                ? "border-neutral-900 bg-neutral-50"
+                                : "border-neutral-200"
                             }`}
                           >
-                            <div className="flex items-center justify-center gap-2">
-                              <span className="text-lg font-bold">{DIM_LABEL_SHORT[dim]}</span>
-                              <div className="h-3 w-3 rounded-full" style={{ backgroundColor: colorForValue(val ?? 1) }} />
+                            <div className="flex items-center justify-center gap-1.5">
+                              <span className="text-sm font-bold">
+                                {DIM_LABEL_SHORT[dim]}
+                              </span>
+                              <div
+                                className="h-2.5 w-2.5 rounded-full"
+                                style={{
+                                  backgroundColor: colorForValue(val ?? 1),
+                                }}
+                              />
                             </div>
-                            <p className="mt-2 text-2xl font-bold tabular-nums">{fmt(val)}</p>
-                            <p className="mt-1 text-xs text-neutral-600">{levelLabel(val ?? 0)}</p>
+
+                            <p className="mt-1 text-xl font-bold tabular-nums leading-none">
+                              {fmt(val)}
+                            </p>
+                            <p className="mt-0.5 text-[11px] text-neutral-600 leading-none">
+                              {levelLabel(val ?? 0)}
+                            </p>
                           </div>
                         );
                       })}
                     </div>
 
-                    <div className="mt-5 rounded-xl bg-neutral-100 p-4 text-center">
-                      <p className="text-sm text-neutral-600">
+                    <div className="mt-3 rounded-xl bg-neutral-100 p-3 text-center">
+                      <p className="text-xs text-neutral-600">
                         Dimensión seleccionada:{" "}
-                        <span className="font-bold text-neutral-900">
+                        <span className="font-semibold text-neutral-900">
                           {DIM_LABEL_FULL[selectedDetail.dimKey]}
                         </span>
                       </p>
-                      <p className="mt-1 text-2xl font-bold">
+                      <p className="mt-1 text-xl font-bold leading-none">
                         {fmt(selectedDetail.value)}
                       </p>
                     </div>
                   </CardContent>
                 </Card>
-              </div>
-            ) : (
-              <p className="text-center text-neutral-600">Selecciona una celda del mapa de calor.</p>
-            )}
+              ) : (
+                <p className="px-4 text-center text-sm text-neutral-600">
+                  Selecciona una celda del mapa de calor.
+                </p>
+              )}
+            </div>
           </ScrollArea>
 
-          <DrawerFooter className="border-t pt-4">
-            <Button className="h-12 rounded-full" onClick={() => setDrawerOpen(false)}>
+          {/* ✅ Footer fijo REAL (siempre visible) */}
+          <div
+            className="shrink-0 border-t bg-white/95 backdrop-blur px-4 pt-3"
+            style={{
+              paddingBottom: "calc(env(safe-area-inset-bottom) + 16px)",
+            }}
+          >
+            <Button
+              className="h-11 w-full rounded-full mb-2"
+              onClick={() => setDrawerOpen(false)}
+            >
               Cerrar
             </Button>
-          </DrawerFooter>
+          </div>
         </DrawerContent>
       </Drawer>
     </main>
