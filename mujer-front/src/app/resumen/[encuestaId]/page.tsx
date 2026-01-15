@@ -275,7 +275,9 @@ export default function ResultadosEncuestaPage() {
       orient: "horizontal", left: "center", bottom: 20,
       inRange: { color: ["#F7F3F6", "#E7C7D7", "#D29AB9", "#B96C98", "#7A003C"] },
       text: ["Muy alto (5)", "Bajo (1)"],
-      textStyle: { fontSize: 12, fontWeight: 500 }
+      textGap: 14,
+      textStyle: { fontSize: isMobile ? 11 : 12, fontWeight: 500, overflow: "break", width: isMobile ? 140 : 180 }      
+
     },
     series: [{
       type: "heatmap",
@@ -368,16 +370,16 @@ export default function ResultadosEncuestaPage() {
 
                       <Badge
                         variant="secondary"
-                        className="mt-3"
+                        className="mt-3 inline-flex w-[132px] justify-center text-center whitespace-normal leading-tight"
                         style={{
                           backgroundColor: "color-mix(in oklch, var(--primary-foreground) 18%, transparent)",
                           color: "var(--primary-foreground)",
                           border: "1px solid color-mix(in oklch, var(--primary-foreground) 35%, transparent)",
                         }}
                       >
-                        Promedio general
+                        Promedio<br />general
                       </Badge>
-                    </div>
+
 
                 
                 </div>
@@ -408,10 +410,14 @@ export default function ResultadosEncuestaPage() {
                 {isMobile && (
                   <div className="mt-6 space-y-4">
                     <div className="rounded-2xl border bg-white p-4 shadow-sm">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">Leyenda de dimensiones</span>
-                        <span className="text-neutral-500">Escala 1 → 5</span>
+                      
+                   
+                      <div className="flex items-center justify-between gap-3 text-sm">
+                        <span className="font-medium leading-none">Leyenda de dimensiones</span>
+                        <span className="text-neutral-500 leading-none whitespace-nowrap">Escala 1 → 5</span>
                       </div>
+
+                      
                       <div className="mt-3 flex gap-2">
                         {[1,2,3,4,5].map(v => (
                           <div key={v} className="h-6 flex-1 rounded-full" style={{ backgroundColor: colorForValue(v) }} />
