@@ -573,16 +573,7 @@ export default function DiagnosticoInicioPage() {
                               <span className="font-semibold">{formatRemaining(lock!.remainingMs)}</span>.
                             </p>
 
-                            {/* Si quieres permitir quitar lock manualmente, descomenta */}
-                            {/*
-                            <Button
-                              onClick={onClearLock}
-                              variant="outline"
-                              className="mt-2 h-9 rounded-full text-xs"
-                            >
-                              Quitar candado (pruebas)
-                            </Button>
-                            */}
+                           
                           </div>
                         </div>
                       </div>

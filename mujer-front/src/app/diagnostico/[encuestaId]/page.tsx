@@ -84,11 +84,7 @@ function pickInstPayload(raw: any) {
 }
 
 function pickTypesOfViolence(inst: any): any[] {
-  const candidates = [
-    inst?.types_of_violence,
-    inst?.typesOfViolence,
-    inst?.types,
-  ];
+  const candidates = [inst?.types_of_violence, inst?.typesOfViolence, inst?.types];
   for (const c of candidates) {
     if (Array.isArray(c)) return c;
   }
@@ -115,7 +111,7 @@ type RespuestaItem = {
   valor: number;
 };
 
-// ===== LocalStorage helpers (NUEVO) =====
+// ===== LocalStorage helpers =====
 const LS_VERSION = 1;
 
 function storageKey(encuestaId: string) {
@@ -141,7 +137,8 @@ function safeReadProgress(key: string): SavedProgress | null {
     const v = Number((parsed as any).v);
     const updated_at = Number((parsed as any).updated_at);
     const qIndex = Number((parsed as any).qIndex);
-    const comentario = typeof (parsed as any).comentario === "string" ? (parsed as any).comentario : "";
+    const comentario =
+      typeof (parsed as any).comentario === "string" ? (parsed as any).comentario : "";
     const answersRaw = (parsed as any).answers;
 
     if (!Number.isFinite(v) || v !== LS_VERSION) return null;
@@ -152,9 +149,7 @@ function safeReadProgress(key: string): SavedProgress | null {
     const answers: Record<string, number> = {};
     for (const [k, val] of Object.entries(answersRaw)) {
       const n = Number(val);
-      if (typeof k === "string" && Number.isFinite(n)) {
-        answers[k] = n;
-      }
+      if (typeof k === "string" && Number.isFinite(n)) answers[k] = n;
     }
 
     return { v, updated_at, qIndex, comentario, answers };
@@ -168,7 +163,7 @@ function safeWriteProgress(key: string, payload: SavedProgress) {
   try {
     window.localStorage.setItem(key, JSON.stringify(payload));
   } catch {
-    // storage full / blocked: no hacemos nada (no rompe UX)
+    // ignore
   }
 }
 
@@ -195,10 +190,8 @@ export default function DiagnosticoEncuestaPage() {
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [qIndex, setQIndex] = useState(0);
 
-  // ✅ Comentario opcional
   const [comentario, setComentario] = useState<string>("");
 
-  // ===== NUEVO: flags para evitar que el autoguardado sobreescriba al cargar =====
   const hydratedRef = useRef(false);
   const saveTimerRef = useRef<number | null>(null);
 
@@ -266,7 +259,6 @@ export default function DiagnosticoEncuestaPage() {
 
   const totalQuestions = questions.length || 16;
 
-  // ✅ Paso extra comentario
   const isCommentStep = qIndex === totalQuestions;
   const current = !isCommentStep ? questions[qIndex] : null;
 
@@ -290,11 +282,7 @@ export default function DiagnosticoEncuestaPage() {
     [answeredCount, totalExpected]
   );
 
-  function setAnswer(
-    questionId: string,
-    dimension: RespuestaItem["dimension"],
-    value: number
-  ) {
+  function setAnswer(questionId: string, dimension: RespuestaItem["dimension"], value: number) {
     const key = `${questionId}:${dimension}`;
     setAnswers((prev) => ({ ...prev, [key]: value }));
   }
@@ -322,18 +310,17 @@ export default function DiagnosticoEncuestaPage() {
     return -1;
   }
 
-  // ===== NUEVO: hidratar progreso desde localStorage cuando ya tenemos questions =====
+  // hidratar progreso
   useEffect(() => {
     if (!encuestaId) return;
-    if (!inst) return; // esperamos a que haya instrumento
-    if (!questions.length) return; // esperamos preguntas reales
+    if (!inst) return;
+    if (!questions.length) return;
 
     const key = storageKey(encuestaId);
     const saved = safeReadProgress(key);
 
     if (saved && !hydratedRef.current) {
-      // clamp del índice: 0..totalQuestions (incluye comentario)
-      const maxIdx = totalQuestions;
+      const maxIdx = totalQuestions; // incluye comentario
       const nextIdx = clamp(saved.qIndex, 0, maxIdx);
 
       setAnswers(saved.answers || {});
@@ -344,18 +331,16 @@ export default function DiagnosticoEncuestaPage() {
       return;
     }
 
-    // si no hay saved, marcamos hidratado para habilitar autoguardado
     hydratedRef.current = true;
   }, [encuestaId, inst, questions.length, totalQuestions]);
 
-  // ===== NUEVO: autoguardado (debounced) =====
+  // autoguardado debounced
   useEffect(() => {
     if (!encuestaId) return;
     if (!hydratedRef.current) return;
 
     const key = storageKey(encuestaId);
 
-    // debounce 250ms para no escribir a cada click/tecla
     if (saveTimerRef.current) {
       window.clearTimeout(saveTimerRef.current);
       saveTimerRef.current = null;
@@ -418,9 +403,7 @@ export default function DiagnosticoEncuestaPage() {
         }),
       });
 
-      // ✅ NUEVO: al finalizar, borrar progreso guardado
       safeRemoveProgress(storageKey(encuestaId));
-
       router.push(`/resumen/${encuestaId}`);
     } catch (err: any) {
       console.error("save error:", err);
@@ -478,9 +461,7 @@ export default function DiagnosticoEncuestaPage() {
     return (
       <main className="min-h-dvh bg-white">
         <div className="mx-auto w-full max-w-md px-5 py-8">
-          <p className="text-sm text-neutral-600">
-            No se pudo cargar el instrumento.
-          </p>
+          <p className="text-sm text-neutral-600">No se pudo cargar el instrumento.</p>
           <Button
             className="mt-4 h-12 w-full rounded-full"
             style={{ backgroundColor: BRAND }}
@@ -493,15 +474,12 @@ export default function DiagnosticoEncuestaPage() {
     );
   }
 
-  // ✅ SNAP por paso (incluye comentario como paso final)
+  // progreso
   const steps = Math.max(1, totalQuestions + 1);
   const denom = Math.max(1, steps - 1);
   const snapPct = clamp((qIndex / denom) * 100, 0, 100);
 
-  // ✅ Etiqueta: en comentario debe ser 100%
-  const snapPctLabel = isCommentStep
-    ? 100
-    : Math.round(((qIndex + 1) / steps) * 100);
+  const snapPctLabel = isCommentStep ? 100 : Math.round(((qIndex + 1) / steps) * 100);
 
   const stepLabel = isCommentStep
     ? `Comentario (opcional)`
@@ -512,26 +490,28 @@ export default function DiagnosticoEncuestaPage() {
   const fillWidth = `calc((${snapPct} / 100) * ${railWidthExpr})`;
 
   return (
-    <main className="h-dvh bg-white overflow-hidden">
+    // ✅ CLAVE: NO bloquees el scroll vertical global con overflow-hidden.
+    // Dejamos el layout a dvh pero el scroll se hace dentro de la Card (contenido).
+    <main className="h-dvh bg-white overflow-x-hidden">
+      {/* ✅ iOS momentum scroll */}
+      <style jsx global>{`
+        .scroll-area {
+          -webkit-overflow-scrolling: touch;
+        }
+      `}</style>
+
       <div className="mx-auto h-dvh w-full max-w-md px-5 py-5 pb-[env(safe-area-inset-bottom)] flex flex-col">
-        <div className="flex items-start justify-between gap-3">
+        {/* Header fijo (NO scrollea) */}
+        <div className="flex items-start justify-between gap-3 shrink-0">
           <div className="min-w-0 flex-1">
-            <h2
-              className="text-xl font-extrabold tracking-tight"
-              style={{ color: BRAND }}
-            >
+            <h2 className="text-xl font-extrabold tracking-tight" style={{ color: BRAND }}>
               {inst.name}
             </h2>
 
             <div className="mt-2">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-medium text-neutral-600">
-                  {stepLabel}
-                </span>
-                <span
-                  className="text-[11px] font-semibold tabular-nums"
-                  style={{ color: BRAND }}
-                >
+                <span className="text-[11px] font-medium text-neutral-600">{stepLabel}</span>
+                <span className="text-[11px] font-semibold tabular-nums" style={{ color: BRAND }}>
                   {snapPctLabel}%
                 </span>
               </div>
@@ -583,13 +563,14 @@ export default function DiagnosticoEncuestaPage() {
         </div>
 
         {inst.instructions ? (
-          <p className="mt-2 text-[11px] leading-4 text-muted-foreground">
+          <p className="mt-2 text-[11px] leading-4 text-muted-foreground shrink-0">
             {inst.instructions}
           </p>
         ) : null}
 
-        <Card className="mt-4 mb-2 flex-1 min-h-0 flex flex-col">
-          <CardHeader>
+        {/* Card ocupa el resto; su contenido sí puede scrollear */}
+        <Card className="mt-4 flex-1 min-h-0 flex flex-col">
+          <CardHeader className="shrink-0">
             <CardTitle
               className="text-base font-heading font-semibold leading-snug"
               style={{ color: "var(--primary)" }}
@@ -600,55 +581,33 @@ export default function DiagnosticoEncuestaPage() {
             </CardTitle>
           </CardHeader>
 
-          <CardContent className="flex-1 min-h-0 flex flex-col overflow-hidden">
-            {isCommentStep ? (
-              <div className="flex-1 min-h-0 flex flex-col">
-                <p className="text-sm text-neutral-700">
-                  Si quieres, deja un comentario breve sobre el entorno del centro. No es
-                  obligatorio.
-                </p>
+          {/* ✅ CLAVE: CardContent con min-h-0, y el scroll va en un hijo .scroll-area */}
+          <CardContent className="flex-1 min-h-0 flex flex-col p-0">
+            {/* ZONA SCROLL */}
+            <div className="scroll-area flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 pb-4">
+              {isCommentStep ? (
+                <div className="flex flex-col gap-3">
+                  <p className="text-sm text-neutral-700">
+                    Si quieres, deja un comentario breve sobre el entorno del centro. No es
+                    obligatorio.
+                  </p>
 
-                <div className="mt-3 flex-1 min-h-0">
                   <Textarea
                     value={comentario}
                     onChange={(e) => setComentario(e.target.value)}
                     placeholder="Escribe aquí (opcional)…"
-                    className="min-h-[160px] resize-none rounded-2xl"
+                    className="min-h-[180px] resize-none rounded-2xl"
                     maxLength={2000}
                   />
-                  <div className="mt-2 flex items-center justify-between text-[11px] text-neutral-500">
+
+                  <div className="flex items-center justify-between text-[11px] text-neutral-500">
                     <span>Máximo 2000 caracteres.</span>
                     <span className="tabular-nums">
                       {Math.min(2000, comentario.length)}/2000
                     </span>
                   </div>
                 </div>
-
-                <Separator className="my-4" />
-
-                <div className="mt-auto">
-                  <div className="flex gap-3">
-                    <Button
-                      variant="outline"
-                      className="h-12 flex-1 rounded-full"
-                      onClick={goPrev}
-                    >
-                      Atrás
-                    </Button>
-
-                    <Button
-                      className="h-12 flex-1 rounded-full text-base font-semibold"
-                      style={{ backgroundColor: BRAND }}
-                      onClick={onSubmitAll}
-                      disabled={!allDone || saving}
-                    >
-                      {saving ? "Guardando…" : "Finalizar"}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <>
+              ) : (
                 <div className="space-y-4">
                   {Array.isArray(current!.cards) &&
                     current!.cards.map((c) => {
@@ -673,9 +632,7 @@ export default function DiagnosticoEncuestaPage() {
                           key={`${current!.question_id}:${c.dimension}`}
                           className="space-y-3"
                         >
-                          <p className="text-sm font-medium text-neutral-800">
-                            {c.prompt}
-                          </p>
+                          <p className="text-sm font-medium text-neutral-800">{c.prompt}</p>
 
                           <div className="grid grid-cols-5 gap-2">
                             {scale.options.map((opt) => {
@@ -685,11 +642,7 @@ export default function DiagnosticoEncuestaPage() {
                                   key={opt.value}
                                   type="button"
                                   onClick={() =>
-                                    setAnswer(
-                                      current!.question_id,
-                                      c.dimension,
-                                      opt.value
-                                    )
+                                    setAnswer(current!.question_id, c.dimension, opt.value)
                                   }
                                   aria-pressed={active}
                                   className={[
@@ -699,15 +652,11 @@ export default function DiagnosticoEncuestaPage() {
                                     active ? "font-bold" : "font-medium",
                                   ].join(" ")}
                                   style={{
-                                    backgroundColor: active
-                                      ? "var(--primary)"
-                                      : "transparent",
+                                    backgroundColor: active ? "var(--primary)" : "transparent",
                                     color: active
                                       ? "var(--primary-foreground)"
                                       : "var(--foreground)",
-                                    borderColor: active
-                                      ? "var(--primary)"
-                                      : "var(--border)",
+                                    borderColor: active ? "var(--primary)" : "var(--border)",
                                     boxShadow: active
                                       ? "0 0 0 4px color-mix(in oklch, var(--ring) 35%, transparent)"
                                       : "none",
@@ -750,30 +699,52 @@ export default function DiagnosticoEncuestaPage() {
                       );
                     })}
                 </div>
+              )}
+            </div>
 
-                <div className="mt-auto pt-4">
-                  <div className="flex gap-3">
-                    <Button
-                      variant="outline"
-                      className="h-12 flex-1 rounded-full"
-                      onClick={goPrev}
-                      disabled={qIndex === 0}
-                    >
-                      Atrás
-                    </Button>
+            {/* ✅ FOOTER PEGADO ABAJO (NO scrollea), siempre visible */}
+            <div className="shrink-0 border-t bg-white/90 backdrop-blur px-6 py-4">
+              {isCommentStep ? (
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    className="h-12 flex-1 rounded-full"
+                    onClick={goPrev}
+                  >
+                    Atrás
+                  </Button>
 
-                    <Button
-                      className="h-12 flex-1 rounded-full text-base font-semibold"
-                      style={{ backgroundColor: BRAND }}
-                      onClick={goNext}
-                      disabled={!currentDone}
-                    >
-                      {qIndex < totalQuestions - 1 ? "Siguiente" : "Continuar"}
-                    </Button>
-                  </div>
+                  <Button
+                    className="h-12 flex-1 rounded-full text-base font-semibold"
+                    style={{ backgroundColor: BRAND }}
+                    onClick={onSubmitAll}
+                    disabled={!allDone || saving}
+                  >
+                    {saving ? "Guardando…" : "Finalizar"}
+                  </Button>
                 </div>
-              </>
-            )}
+              ) : (
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    className="h-12 flex-1 rounded-full"
+                    onClick={goPrev}
+                    disabled={qIndex === 0}
+                  >
+                    Atrás
+                  </Button>
+
+                  <Button
+                    className="h-12 flex-1 rounded-full text-base font-semibold"
+                    style={{ backgroundColor: BRAND }}
+                    onClick={goNext}
+                    disabled={!currentDone}
+                  >
+                    {qIndex < totalQuestions - 1 ? "Siguiente" : "Continuar"}
+                  </Button>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>

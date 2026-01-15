@@ -140,7 +140,7 @@ export default function HomePage() {
               className="mt-4 text-4xl font-extrabold tracking-tight"
               style={{ color: BRAND }}
             >
-              Mujer Alerta 1.0
+              Mujer Alerta
             </h1>
 
             <p className="mt-2 text-sm leading-6 text-slate-600">
