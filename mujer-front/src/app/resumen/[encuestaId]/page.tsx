@@ -299,7 +299,8 @@ export default function ResultadosEncuestaPage() {
         setDrawerOpen(true);
       }
     }
-  } : {}, [isMobile]);
+  } : undefined, [isMobile]);  
+
 
   const selectedDetail = useMemo(() => {
     if (!selected) return null;
