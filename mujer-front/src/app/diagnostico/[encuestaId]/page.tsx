@@ -195,7 +195,7 @@ export default function DiagnosticoEncuestaPage() {
   const hydratedRef = useRef(false);
   const saveTimerRef = useRef<number | null>(null);
 
-  // ✅ NUEVO: Scroll inteligente dentro de la Card
+  // ✅ Scroll inteligente dentro de la Card
   const scrollAreaRef = useRef<HTMLDivElement | null>(null);
   const blockRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
@@ -205,12 +205,22 @@ export default function DiagnosticoEncuestaPage() {
     el.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  // ✅ PRO: scroll estable (no brinca en móvil)
   function scrollToBlock(key: string) {
     const el = blockRefs.current[key];
     const container = scrollAreaRef.current;
     if (!el || !container) return;
-    const top = el.offsetTop - 8; // margen
-    container.scrollTo({ top, behavior: "smooth" });
+
+    el.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+      inline: "nearest",
+    });
+
+    // ajuste por padding/top
+    requestAnimationFrame(() => {
+      container.scrollTop = Math.max(0, container.scrollTop - 10);
+    });
   }
 
   useEffect(() => {
@@ -300,7 +310,7 @@ export default function DiagnosticoEncuestaPage() {
     [answeredCount, totalExpected]
   );
 
-  // ✅ AJUSTE: al contestar una dimensión, bajar automáticamente a la siguiente (si existe)
+  // ✅ PRO: al contestar, baja al siguiente bloque INCOMPLETO (no se brinca el 2º)
   function setAnswer(
     questionId: string,
     dimension: RespuestaItem["dimension"],
@@ -318,18 +328,28 @@ export default function DiagnosticoEncuestaPage() {
         current.question_id === questionId &&
         Array.isArray(current.cards)
       ) {
-        const nextCard = current.cards[cardIndex + 1];
-        if (nextCard) {
-          const nextKey = `${questionId}:${nextCard.dimension}`;
-          requestAnimationFrame(() => scrollToBlock(nextKey));
-        }
+        requestAnimationFrame(() => {
+          // siguiente bloque faltante dentro de esta misma pregunta
+          for (let i = cardIndex + 1; i < current.cards.length; i++) {
+            const nextKey = `${questionId}:${current.cards[i].dimension}`;
+            if (typeof next[nextKey] !== "number") {
+              scrollToBlock(nextKey);
+              return;
+            }
+          }
+          // si era el último, baja un poco hacia el final del scroll (opcional pro)
+          const container = scrollAreaRef.current;
+          if (container) {
+            container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+          }
+        });
       }
 
       return next;
     });
   }
 
-  // ✅ AJUSTE: al cambiar de pregunta con botones, subir arriba el scroll del contenido
+  // ✅ Botones: al cambiar de pregunta, subir arriba el scroll del contenido
   function goPrev() {
     setQIndex((i) => Math.max(0, i - 1));
     requestAnimationFrame(() => scrollContentTop());
@@ -339,6 +359,12 @@ export default function DiagnosticoEncuestaPage() {
     setQIndex((i) => Math.min(totalQuestions, i + 1));
     requestAnimationFrame(() => scrollContentTop());
   }
+
+  // ✅ EXTRA: garantiza top al cambiar de paso (aunque cambie por hidratación o validación)
+  useEffect(() => {
+    requestAnimationFrame(() => scrollContentTop());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qIndex]);
 
   function findFirstIncompleteIndex(): number {
     for (let i = 0; i < questions.length; i++) {
@@ -609,7 +635,6 @@ export default function DiagnosticoEncuestaPage() {
           </p>
         ) : null}
 
-        {/* Card ocupa el resto; su contenido sí puede scrollear */}
         <Card className="mt-4 flex-1 min-h-0 flex flex-col">
           <CardHeader className="shrink-0">
             <CardTitle
@@ -623,7 +648,6 @@ export default function DiagnosticoEncuestaPage() {
           </CardHeader>
 
           <CardContent className="flex-1 min-h-0 flex flex-col p-0">
-            {/* ZONA SCROLL */}
             <div
               ref={scrollAreaRef}
               className="scroll-area flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 pb-4"
@@ -660,10 +684,7 @@ export default function DiagnosticoEncuestaPage() {
 
                       if (!scale) {
                         return (
-                          <div
-                            key={blockKey}
-                            className="rounded-xl border p-3"
-                          >
+                          <div key={blockKey} className="rounded-xl border p-3">
                             <p className="text-sm text-neutral-700">
                               No se encontró la escala <code>{c.scale_id}</code>.
                             </p>
@@ -688,6 +709,7 @@ export default function DiagnosticoEncuestaPage() {
                                 <button
                                   key={opt.value}
                                   type="button"
+                                  onMouseDown={(e) => e.preventDefault()} // ✅ evita salto por focus en móvil
                                   onClick={() =>
                                     setAnswer(
                                       current!.question_id,
@@ -754,7 +776,6 @@ export default function DiagnosticoEncuestaPage() {
               )}
             </div>
 
-            {/* FOOTER fijo */}
             <div className="shrink-0 border-t bg-white/90 backdrop-blur px-6 py-4">
               {isCommentStep ? (
                 <div className="flex gap-3">
