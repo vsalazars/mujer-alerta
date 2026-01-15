@@ -393,7 +393,7 @@ export default function CentroPage() {
 
         if (clean.length) {
           const opts: YearOption[] = [{ value: "all", label: "Todos" }].concat(
-            clean.map((yy) => ({ value: String(yy), label: String(yy) }))
+            clean.map((yy: number) => ({ value: String(yy), label: String(yy) }))
           );
           setYearOptions(opts);
 
