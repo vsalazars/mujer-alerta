@@ -385,10 +385,11 @@ export default function CentroPage() {
           : Array.isArray((years as any)?.years)
           ? (years as any).years
           : [];
-        const clean = arr
-          .map((n) => Number(n))
-          .filter((n) => Number.isFinite(n) && n >= 2000 && n <= 2100)
-          .sort((a, b) => b - a);
+       const clean = arr
+        .map((n: unknown) => Number(n))
+        .filter((n: number) => Number.isFinite(n) && n >= 2000 && n <= 2100)
+        .sort((a: number, b: number) => b - a);
+
 
         if (clean.length) {
           const opts: YearOption[] = [{ value: "all", label: "Todos" }].concat(
