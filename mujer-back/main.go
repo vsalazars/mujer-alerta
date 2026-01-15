@@ -302,10 +302,16 @@ func main() {
 		AllowedOrigins: []string{
 			"http://localhost:3000",
 			"http://127.0.0.1:3000",
+
+			// ✅ Vercel (producción + previews)
+			"https://mujer-alerta.vercel.app",
+			"https://mujer-alerta-git-main-vidal-salazars-projects.vercel.app",
+			"https://mujer-alerta-7919wc1kf-vidal-salazars-projects.vercel.app",
 		},
 		AllowedMethods: "GET, POST, PUT, DELETE, OPTIONS",
 		AllowedHeaders: "Content-Type, Authorization",
 	})
+
 
 	addr := os.Getenv("ADDR")
 	if addr == "" {
