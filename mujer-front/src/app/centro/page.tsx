@@ -1072,7 +1072,6 @@ export default function CentroPage() {
                       maxValue: 5,
                     }}
                     emptyColor="#F1F5F9"
-                    cellOpacity={1}
                     cellBorderWidth={1}
                     cellBorderColor="rgba(2,6,23,0.06)"
                     enableLabels={true}
