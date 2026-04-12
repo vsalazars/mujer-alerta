@@ -1,0 +1,304 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import dynamic from "next/dynamic";
+
+import { fmt2, PURPLE } from "@/components/centro/dashboard/helpers";
+
+const ResponsiveHeatMap = dynamic(
+  () => import("@nivo/heatmap").then((m) => m.ResponsiveHeatMap),
+  { ssr: false }
+);
+const ResponsiveRadar = dynamic(
+  () => import("@nivo/radar").then((m) => m.ResponsiveRadar),
+  { ssr: false }
+);
+const ResponsiveBar = dynamic(
+  () => import("@nivo/bar").then((m) => m.ResponsiveBar),
+  { ssr: false }
+);
+
+export function BarValueChipLayer({ bars }: any) {
+  return (
+    <>
+      {bars.map((bar: any) => {
+        const value = Math.round(bar.data.value);
+        if (!value) return null;
+
+        return (
+          <g
+            key={bar.key}
+            transform={`translate(${bar.x + bar.width + 8}, ${bar.y + bar.height / 2})`}
+          >
+            <foreignObject width={56} height={28} x={0} y={-14} style={{ overflow: "visible" }}>
+              <div
+                style={{
+                  background: "rgba(127,1,127,0.12)",
+                  color: PURPLE,
+                  border: "1px solid rgba(127,1,127,0.25)",
+                  borderRadius: 999,
+                  padding: "2px 10px",
+                  fontSize: 12,
+                  fontWeight: 900,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  whiteSpace: "nowrap",
+                  boxShadow: "0 6px 18px rgba(127,1,127,0.25)",
+                }}
+              >
+                {value}
+              </div>
+            </foreignObject>
+          </g>
+        );
+      })}
+    </>
+  );
+}
+
+export function GroupedBarValuePillLayer({ bars }: any) {
+  return (
+    <>
+      {bars.map((bar: any) => {
+        const raw = Number(bar.data.value);
+        if (!Number.isFinite(raw)) return null;
+
+        return (
+          <g
+            key={bar.key}
+            transform={`translate(${bar.x + bar.width + 8}, ${bar.y + bar.height / 2})`}
+          >
+            <foreignObject width={62} height={24} x={0} y={-12} style={{ overflow: "visible" }}>
+              <div
+                style={{
+                  background: "rgba(127,1,127,0.12)",
+                  color: PURPLE,
+                  border: "1px solid rgba(127,1,127,0.25)",
+                  borderRadius: 999,
+                  padding: "1px 8px",
+                  fontSize: 9,
+                  fontWeight: 900,
+                  letterSpacing: "0.01em",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  whiteSpace: "nowrap",
+                  boxShadow: "0 6px 18px rgba(127,1,127,0.22)",
+                }}
+              >
+                {fmt2(raw)}
+              </div>
+            </foreignObject>
+          </g>
+        );
+      })}
+    </>
+  );
+}
+
+export function RadarChart({ radar }: { radar: { keys: string[]; data: unknown[] } | null }) {
+  if (!radar) return null;
+
+  return (
+    <ResponsiveRadar
+      data={radar.data as any}
+      keys={radar.keys as any}
+      indexBy="dimension"
+      maxValue={5}
+      valueFormat={(v: any) => fmt2(Number(v))}
+      margin={{ top: 70, right: 80, bottom: 40, left: 80 }}
+      gridLabelOffset={36}
+      curve="catmullRomClosed"
+      dotSize={10}
+      dotColor={{ theme: "background" }}
+      dotBorderWidth={2}
+      colors={[PURPLE]}
+      fillOpacity={0.14}
+      borderWidth={3}
+      blendMode="multiply"
+      enableDotLabel={false}
+      legends={[]}
+      theme={{
+        text: { fontSize: 12, fontWeight: 900, fill: "#111827" },
+        grid: {
+          line: { stroke: "rgba(2,6,23,0.10)", strokeWidth: 1 },
+        },
+        tooltip: {
+          container: {
+            background: "rgba(17,24,39,0.92)",
+            color: "#fff",
+            borderRadius: 12,
+            boxShadow: "0 14px 40px rgba(0,0,0,0.22)",
+            fontWeight: 900,
+          },
+        },
+      }}
+    />
+  );
+}
+
+export function HorizontalCountBarChart({ data }: { data: unknown[] }) {
+  return (
+    <ResponsiveBar
+      data={data as any}
+      keys={["total"]}
+      indexBy="label"
+      layout="horizontal"
+      margin={{ top: 10, right: 96, bottom: 36, left: 190 }}
+      padding={0.32}
+      colors={[PURPLE]}
+      borderRadius={10}
+      enableGridY={false}
+      axisTop={null}
+      axisRight={null}
+      axisBottom={{
+        tickSize: 0,
+        tickPadding: 8,
+        format: (v) => String(Math.round(Number(v))),
+      }}
+      axisLeft={{ tickSize: 0, tickPadding: 10 }}
+      enableLabel={false}
+      layers={["grid", "axes", "bars", "markers", "legends", BarValueChipLayer]}
+    />
+  );
+}
+
+export function HeatmapChart({
+  heatmap,
+}: {
+  heatmap: { xCount: number; data: unknown[] } | null;
+}) {
+  if (!heatmap) return null;
+
+  return (
+    <ResponsiveHeatMap
+      data={heatmap.data as any}
+      margin={{ top: 30, right: 180, bottom: 140, left: 160 }}
+      valueFormat=">-.2f"
+      axisTop={null}
+      axisRight={null}
+      axisLeft={{ tickSize: 0, tickPadding: 10 }}
+      axisBottom={{
+        tickSize: 0,
+        tickPadding: 16,
+        tickRotation: -22,
+        format: () => "",
+      }}
+      colors={{
+        type: "sequential",
+        scheme: "purples",
+        minValue: 0,
+        maxValue: 5,
+      }}
+      emptyColor="#F1F5F9"
+      borderWidth={1}
+      borderColor="rgba(2,6,23,0.06)"
+      enableLabels={true}
+      labelTextColor={{ from: "color", modifiers: [["darker", 2.1]] }}
+      legends={[
+        {
+          anchor: "bottom",
+          translateX: 0,
+          translateY: 80,
+          length: 420,
+          thickness: 26,
+          direction: "row",
+          tickPosition: "after",
+          tickSize: 3,
+          tickSpacing: 6,
+          tickOverlap: false,
+          tickFormat: ">-.1f",
+          title: "Intensidad →",
+          titleAlign: "start",
+          titleOffset: 6,
+        },
+      ]}
+      theme={{
+        text: {
+          fontFamily: "Montserrat",
+          fontSize: 14,
+          fontWeight: 900,
+          fill: "#111827",
+        },
+        axis: { ticks: { text: { fill: "#111827", fontWeight: 900 } } },
+        tooltip: {
+          container: {
+            background: "rgba(17,24,39,0.92)",
+            color: "#fff",
+            borderRadius: 12,
+            boxShadow: "0 14px 40px rgba(0,0,0,0.22)",
+            fontWeight: 900,
+          },
+        },
+      }}
+    />
+  );
+}
+
+export function GroupedGeneroBarChart({ data, wrapLabel }: { data: unknown[]; wrapLabel: (s: string, maxLen?: number, maxLines?: number) => string }) {
+  return (
+    <ResponsiveBar
+      data={data as any}
+      keys={["Frecuencia", "Normalización", "Gravedad"]}
+      indexBy="label"
+      groupMode="grouped"
+      layout="horizontal"
+      valueScale={{ type: "linear", min: 0, max: 5 }}
+      indexScale={{ type: "band", round: true }}
+      margin={{ top: 44, right: 110, bottom: 52, left: 210 }}
+      padding={0.32}
+      innerPadding={10}
+      borderRadius={10}
+      colors={({ id }) => {
+        const k = String(id);
+        if (k === "Frecuencia") return "rgba(127,1,127,0.95)";
+        if (k === "Normalización") return "rgba(127,1,127,0.55)";
+        return "rgba(127,1,127,0.30)";
+      }}
+      enableGridX={true}
+      enableGridY={false}
+      axisTop={null}
+      axisRight={null}
+      axisBottom={{
+        tickSize: 0,
+        tickPadding: 10,
+        tickValues: [0, 1, 2, 3, 4, 5],
+        format: (v) => String(v),
+        legend: "Promedio (1–5)",
+        legendPosition: "middle",
+        legendOffset: 38,
+      }}
+      axisLeft={{
+        tickSize: 0,
+        tickPadding: 12,
+        format: (v) => wrapLabel(String(v), 22, 2),
+      }}
+      enableLabel={false}
+      layers={["grid", "axes", "bars", "markers", "legends", GroupedBarValuePillLayer]}
+      valueFormat={(v: any) => fmt2(Number(v))}
+      legends={[
+        {
+          dataFrom: "keys",
+          anchor: "top",
+          direction: "row",
+          justify: false,
+          translateY: -28,
+          itemsSpacing: 18,
+          itemWidth: 90,
+          itemHeight: 18,
+          symbolSize: 10,
+          symbolShape: "circle",
+        },
+      ]}
+      theme={{
+        text: {
+          fontFamily: "Montserrat",
+          fontSize: 12,
+          fontWeight: 900,
+          fill: "#111827",
+        },
+        axis: { ticks: { text: { fill: "#111827", fontWeight: 900 } } },
+        grid: { line: { stroke: "rgba(2,6,23,0.08)", strokeWidth: 1 } },
+      }}
+    />
+  );
+}

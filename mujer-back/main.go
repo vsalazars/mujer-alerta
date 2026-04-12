@@ -44,6 +44,7 @@ func main() {
 	fmt.Println("Instrumento cargado:", instrumento.Name, instrumento.Version)
 
 	mux := http.NewServeMux()
+	nlpRunner := services.NewNLPRunner(dsn)
 
 	// ======================
 	// Health
@@ -237,7 +238,6 @@ func main() {
 		).ServeHTTP(w, r)
 	})
 
-
 	// ======================
 	// Centro: Resumen agregado (ÚNICO endpoint válido)
 	// ======================
@@ -264,7 +264,6 @@ func main() {
 			http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
 		})).ServeHTTP(w, r)
 	})
-
 
 	// ======================
 	// Centro: Serie anual (comparar años)
@@ -294,6 +293,20 @@ func main() {
 		})).ServeHTTP(w, r)
 	})
 
+	// ======================
+	// Centro: Ejecutar pipeline NLP
+	// POST /api/centro/nlp/procesar
+	// ======================
+	cnlp := handlers.CentroNLPHandler{Runner: nlpRunner}
+	mux.HandleFunc("/api/centro/nlp/procesar", func(w http.ResponseWriter, r *http.Request) {
+		handlers.RequireJWT(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost {
+				cnlp.Process(w, r)
+				return
+			}
+			http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+		})).ServeHTTP(w, r)
+	})
 
 	// ======================
 	// CORS
@@ -307,12 +320,10 @@ func main() {
 			"https://mujer-alerta.vercel.app",
 			"https://mujer-alerta-git-main-vidal-salazars-projects.vercel.app",
 			"https://mujer-alerta-92958pdcf-vidal-salazars-projects.vercel.app",
-															
 		},
 		AllowedMethods: "GET, POST, PUT, DELETE, OPTIONS",
 		AllowedHeaders: "Content-Type, Authorization",
 	})
-
 
 	addr := os.Getenv("ADDR")
 	if addr == "" {
@@ -325,5 +336,3 @@ func main() {
 		os.Exit(1)
 	}
 }
-
-

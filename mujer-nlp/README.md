@@ -45,4 +45,3 @@ Crear un script que:
 - `keybert`: extracción de keywords
 - `sqlalchemy` y `psycopg`: acceso a PostgreSQL
 - `pandas` y `numpy`: manipulación de datos
-
