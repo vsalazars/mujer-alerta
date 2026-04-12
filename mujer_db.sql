@@ -2,8 +2,10 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 17.5
--- Dumped by pg_dump version 17.5
+\restrict J0NSxVx4uDkB0BHzXLINFztvx9aLTxpQT24VJzlVLP518F9AsMjuef8TZcbQysn
+
+-- Dumped from database version 18.3
+-- Dumped by pg_dump version 18.3
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -25,14 +27,14 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
 
 
 --
--- Name: EXTENSION pgcrypto; Type: COMMENT; Schema: -; Owner: 
+-- Name: EXTENSION pgcrypto; Type: COMMENT; Schema: -; Owner: -
 --
 
 COMMENT ON EXTENSION pgcrypto IS 'cryptographic functions';
 
 
 --
--- Name: dimension_enum; Type: TYPE; Schema: public; Owner: vsalazars
+-- Name: dimension_enum; Type: TYPE; Schema: public; Owner: -
 --
 
 CREATE TYPE public.dimension_enum AS ENUM (
@@ -42,14 +44,22 @@ CREATE TYPE public.dimension_enum AS ENUM (
 );
 
 
-ALTER TYPE public.dimension_enum OWNER TO vsalazars;
+--
+-- Name: rol_usuario_enum; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.rol_usuario_enum AS ENUM (
+    'admin',
+    'centro'
+);
+
 
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
 
 --
--- Name: centros; Type: TABLE; Schema: public; Owner: vsalazars
+-- Name: centros; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.centros (
@@ -65,10 +75,8 @@ CREATE TABLE public.centros (
 );
 
 
-ALTER TABLE public.centros OWNER TO vsalazars;
-
 --
--- Name: centros_id_seq; Type: SEQUENCE; Schema: public; Owner: vsalazars
+-- Name: centros_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.centros_id_seq
@@ -79,17 +87,15 @@ CREATE SEQUENCE public.centros_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.centros_id_seq OWNER TO vsalazars;
-
 --
--- Name: centros_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: vsalazars
+-- Name: centros_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.centros_id_seq OWNED BY public.centros.id;
 
 
 --
--- Name: encuestas; Type: TABLE; Schema: public; Owner: vsalazars
+-- Name: encuestas; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.encuestas (
@@ -104,14 +110,14 @@ CREATE TABLE public.encuestas (
     started_at timestamp with time zone DEFAULT now() NOT NULL,
     finished_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
+    comentario text,
+    CONSTRAINT encuestas_comentario_len_check CHECK (((comentario IS NULL) OR (length(comentario) <= 2000))),
     CONSTRAINT encuestas_edad_check CHECK (((edad >= 10) AND (edad <= 120)))
 );
 
 
-ALTER TABLE public.encuestas OWNER TO vsalazars;
-
 --
--- Name: generos; Type: TABLE; Schema: public; Owner: vsalazars
+-- Name: generos; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.generos (
@@ -123,10 +129,8 @@ CREATE TABLE public.generos (
 );
 
 
-ALTER TABLE public.generos OWNER TO vsalazars;
-
 --
--- Name: generos_id_seq; Type: SEQUENCE; Schema: public; Owner: vsalazars
+-- Name: generos_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.generos_id_seq
@@ -137,17 +141,15 @@ CREATE SEQUENCE public.generos_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.generos_id_seq OWNER TO vsalazars;
-
 --
--- Name: generos_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: vsalazars
+-- Name: generos_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.generos_id_seq OWNED BY public.generos.id;
 
 
 --
--- Name: respuestas; Type: TABLE; Schema: public; Owner: vsalazars
+-- Name: respuestas; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.respuestas (
@@ -162,10 +164,8 @@ CREATE TABLE public.respuestas (
 );
 
 
-ALTER TABLE public.respuestas OWNER TO vsalazars;
-
 --
--- Name: respuestas_id_seq; Type: SEQUENCE; Schema: public; Owner: vsalazars
+-- Name: respuestas_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.respuestas_id_seq
@@ -176,17 +176,42 @@ CREATE SEQUENCE public.respuestas_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.respuestas_id_seq OWNER TO vsalazars;
-
 --
--- Name: respuestas_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: vsalazars
+-- Name: respuestas_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.respuestas_id_seq OWNED BY public.respuestas.id;
 
 
 --
--- Name: v_encuestas_conteo_respuestas; Type: VIEW; Schema: public; Owner: vsalazars
+-- Name: usuario_centros; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.usuario_centros (
+    usuario_id uuid NOT NULL,
+    centro_id bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: usuarios; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.usuarios (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    email text NOT NULL,
+    nombre text NOT NULL,
+    rol public.rol_usuario_enum DEFAULT 'centro'::public.rol_usuario_enum NOT NULL,
+    password_hash text NOT NULL,
+    activo boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    last_login_at timestamp with time zone
+);
+
+
+--
+-- Name: v_encuestas_conteo_respuestas; Type: VIEW; Schema: public; Owner: -
 --
 
 CREATE VIEW public.v_encuestas_conteo_respuestas AS
@@ -198,10 +223,8 @@ CREATE VIEW public.v_encuestas_conteo_respuestas AS
   GROUP BY e.id, e.centro_id;
 
 
-ALTER VIEW public.v_encuestas_conteo_respuestas OWNER TO vsalazars;
-
 --
--- Name: v_matriz_tipo_dimension; Type: VIEW; Schema: public; Owner: vsalazars
+-- Name: v_matriz_tipo_dimension; Type: VIEW; Schema: public; Owner: -
 --
 
 CREATE VIEW public.v_matriz_tipo_dimension AS
@@ -225,75 +248,100 @@ CREATE VIEW public.v_matriz_tipo_dimension AS
   GROUP BY r.encuesta_id, t.tipo_num, t.tipo_nombre, r.dimension;
 
 
-ALTER VIEW public.v_matriz_tipo_dimension OWNER TO vsalazars;
-
 --
--- Name: centros id; Type: DEFAULT; Schema: public; Owner: vsalazars
+-- Name: centros id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.centros ALTER COLUMN id SET DEFAULT nextval('public.centros_id_seq'::regclass);
 
 
 --
--- Name: generos id; Type: DEFAULT; Schema: public; Owner: vsalazars
+-- Name: generos id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.generos ALTER COLUMN id SET DEFAULT nextval('public.generos_id_seq'::regclass);
 
 
 --
--- Name: respuestas id; Type: DEFAULT; Schema: public; Owner: vsalazars
+-- Name: respuestas id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.respuestas ALTER COLUMN id SET DEFAULT nextval('public.respuestas_id_seq'::regclass);
 
 
 --
--- Data for Name: centros; Type: TABLE DATA; Schema: public; Owner: vsalazars
+-- Data for Name: centros; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.centros (id, tipo, nombre, clave, ciudad, estado, activo, created_at) FROM stdin;
-1	escolar	Centro de prueba	\N	\N	\N	t	2025-12-22 22:31:26.985374-06
+2	laboral	Sección 11 SNTE	Sección-11	CDMX	CDMX	t	2025-12-24 01:48:42.503036-06
+1	escolar	UPIIITA	IPN-UPIITA	CDMX	CDMX	t	2025-12-22 22:31:26.985374-06
 \.
 
 
 --
--- Data for Name: encuestas; Type: TABLE DATA; Schema: public; Owner: vsalazars
+-- Data for Name: encuestas; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY public.encuestas (id, instrumento_id, centro_id, email, email_hash, genero_id, edad, consent, started_at, finished_at, created_at) FROM stdin;
-62a98d2d-761a-40d4-b2b5-744cabd9153b	mujer_alerta_v1	1	test@ejemplo.com	\N	1	22	t	2025-12-22 22:32:49.284654-06	\N	2025-12-22 22:32:49.284654-06
-223e0ba1-e2e1-4f10-a6cb-a615ccecff33	mujer_alerta_v1	1	\N	\N	3	19	t	2025-12-22 23:10:43.090838-06	\N	2025-12-22 23:10:43.090838-06
-678b0a0c-74db-4fb7-aa51-52856f8c4a95	mujer_alerta_v1	1	\N	\N	2	18	t	2025-12-22 23:14:05.239067-06	\N	2025-12-22 23:14:05.239067-06
-9238a6aa-c264-4e63-9cd6-a52574a14ba7	mujer_alerta_v1	1	\N	\N	2	21	t	2025-12-22 23:14:44.097778-06	\N	2025-12-22 23:14:44.097778-06
-9c31004e-5880-4128-b359-b3db66c38ddb	mujer_alerta_v1	1	\N	\N	2	45	t	2025-12-22 23:18:34.10518-06	\N	2025-12-22 23:18:34.10518-06
-f589cd47-3c0e-4db9-a03f-dbf62387755b	mujer_alerta_v1	1	\N	\N	2	15	t	2025-12-22 23:19:27.124499-06	\N	2025-12-22 23:19:27.124499-06
-7ddaa0a6-dac7-4064-94db-61bfad03c512	mujer_alerta_v1	1	\N	\N	1	12	t	2025-12-22 23:20:32.488212-06	\N	2025-12-22 23:20:32.488212-06
-d672471d-b9ff-4bfa-a6b9-b2f995696bf4	mujer_alerta_v1	1	\N	\N	2	15	t	2025-12-22 23:24:16.440321-06	\N	2025-12-22 23:24:16.440321-06
-7dfd62ca-f6d8-4961-b927-dfd3e93fa2bb	mujer_alerta_v1	1	\N	\N	1	20	t	2025-12-22 23:26:19.935988-06	\N	2025-12-22 23:26:19.935988-06
-7bceedef-6760-4f4f-8b1f-eb6bb35c8821	mujer_alerta_v1	1	\N	\N	2	18	t	2025-12-22 23:29:08.128294-06	\N	2025-12-22 23:29:08.128294-06
-0c195731-23e4-4b51-a8fb-ccc2341c89f4	mujer_alerta_v1	1	\N	\N	3	56	t	2025-12-22 23:31:18.390708-06	\N	2025-12-22 23:31:18.390708-06
-5ed565bc-991e-430e-877f-63f38ec7765e	mujer_alerta_v1	1	\N	\N	3	12	t	2025-12-22 23:32:39.68451-06	\N	2025-12-22 23:32:39.68451-06
-f7aa84c8-fe1c-4bb4-b985-3045b54fd28f	mujer_alerta_v1	1	\N	\N	2	20	t	2025-12-22 23:48:28.806097-06	\N	2025-12-22 23:48:28.806097-06
-7131bcfd-fdf4-481c-8ddf-e9344efbed87	mujer_alerta_v1	1	\N	\N	2	78	t	2025-12-22 23:54:02.846749-06	\N	2025-12-22 23:54:02.846749-06
-cc8e12f2-b96e-4a8d-835e-29e2d1a07a1a	mujer_alerta_v1	1	\N	\N	2	78	t	2025-12-22 23:57:21.980057-06	\N	2025-12-22 23:57:21.980057-06
-8334e638-51c0-471c-8118-9b9cf55f1cbd	mujer_alerta_v1	1	\N	\N	4	12	t	2025-12-23 00:40:40.530105-06	\N	2025-12-23 00:40:40.530105-06
-a1ff5612-30c0-481d-af9b-2a563871869d	mujer_alerta_v1	1	\N	\N	3	20	t	2025-12-23 00:42:29.836692-06	\N	2025-12-23 00:42:29.836692-06
-e2ed95c3-b74f-4a5c-ad9d-e712f66fad47	mujer_alerta_v1	1	\N	\N	2	34	t	2025-12-23 01:03:05.111933-06	\N	2025-12-23 01:03:05.111933-06
-2af03b0f-91a2-4c09-baaf-46ccd0749197	mujer_alerta_v1	1	\N	\N	3	45	t	2025-12-23 01:06:03.89115-06	\N	2025-12-23 01:06:03.89115-06
-78a23e73-19cd-4cff-ab6c-1acceff73e66	mujer_alerta_v1	1	\N	\N	2	45	t	2025-12-23 01:15:00.378044-06	\N	2025-12-23 01:15:00.378044-06
-f06036f1-b0a7-41ae-b186-6d5d0b56d55f	mujer_alerta_v1	1	\N	\N	2	45	t	2025-12-23 01:36:24.143043-06	\N	2025-12-23 01:36:24.143043-06
-c9d3c582-4bc7-4e07-bb85-cf9097587be3	mujer_alerta_v1	1	\N	\N	3	78	t	2025-12-23 01:37:53.549901-06	\N	2025-12-23 01:37:53.549901-06
-6e02bcfc-e3a1-4cae-9773-69dfef549f41	mujer_alerta_v1	1	\N	\N	2	41	t	2025-12-23 02:11:31.924268-06	\N	2025-12-23 02:11:31.924268-06
-8e5a2cb7-02c7-45c8-a3ea-5b9d35e5f265	mujer_alerta_v1	1	\N	\N	2	42	t	2025-12-23 02:26:04.421257-06	\N	2025-12-23 02:26:04.421257-06
-9ee4b8c8-b41d-475d-930c-2f83b32c4261	mujer_alerta_v1	1	\N	\N	3	78	t	2025-12-23 02:27:32.931278-06	\N	2025-12-23 02:27:32.931278-06
-48f326d0-71e0-45f5-984e-77fb81133b9d	mujer_alerta_v1	1	\N	\N	2	56	t	2025-12-23 02:42:41.600951-06	\N	2025-12-23 02:42:41.600951-06
-56222357-bef0-40db-9c3b-b2e93520fc01	mujer_alerta_v1	1	\N	\N	2	18	t	2025-12-23 15:59:15.693591-06	\N	2025-12-23 15:59:15.693591-06
+COPY public.encuestas (id, instrumento_id, centro_id, email, email_hash, genero_id, edad, consent, started_at, finished_at, created_at, comentario) FROM stdin;
+223e0ba1-e2e1-4f10-a6cb-a615ccecff33	mujer_alerta_v1	1	\N	\N	3	19	t	2025-12-22 23:10:43.090838-06	\N	2025-12-22 23:10:43.090838-06	\N
+9238a6aa-c264-4e63-9cd6-a52574a14ba7	mujer_alerta_v1	1	\N	\N	2	21	t	2025-12-22 23:14:44.097778-06	\N	2025-12-22 23:14:44.097778-06	\N
+9c31004e-5880-4128-b359-b3db66c38ddb	mujer_alerta_v1	1	\N	\N	2	45	t	2025-12-22 23:18:34.10518-06	\N	2025-12-22 23:18:34.10518-06	\N
+f589cd47-3c0e-4db9-a03f-dbf62387755b	mujer_alerta_v1	1	\N	\N	2	15	t	2025-12-22 23:19:27.124499-06	\N	2025-12-22 23:19:27.124499-06	\N
+7ddaa0a6-dac7-4064-94db-61bfad03c512	mujer_alerta_v1	1	\N	\N	1	12	t	2025-12-22 23:20:32.488212-06	\N	2025-12-22 23:20:32.488212-06	\N
+d672471d-b9ff-4bfa-a6b9-b2f995696bf4	mujer_alerta_v1	1	\N	\N	2	15	t	2025-12-22 23:24:16.440321-06	\N	2025-12-22 23:24:16.440321-06	\N
+7dfd62ca-f6d8-4961-b927-dfd3e93fa2bb	mujer_alerta_v1	1	\N	\N	1	20	t	2025-12-22 23:26:19.935988-06	\N	2025-12-22 23:26:19.935988-06	\N
+7bceedef-6760-4f4f-8b1f-eb6bb35c8821	mujer_alerta_v1	1	\N	\N	2	18	t	2025-12-22 23:29:08.128294-06	\N	2025-12-22 23:29:08.128294-06	\N
+0c195731-23e4-4b51-a8fb-ccc2341c89f4	mujer_alerta_v1	1	\N	\N	3	56	t	2025-12-22 23:31:18.390708-06	\N	2025-12-22 23:31:18.390708-06	\N
+f7aa84c8-fe1c-4bb4-b985-3045b54fd28f	mujer_alerta_v1	1	\N	\N	2	20	t	2025-12-22 23:48:28.806097-06	\N	2025-12-22 23:48:28.806097-06	\N
+7131bcfd-fdf4-481c-8ddf-e9344efbed87	mujer_alerta_v1	1	\N	\N	2	78	t	2025-12-22 23:54:02.846749-06	\N	2025-12-22 23:54:02.846749-06	\N
+cc8e12f2-b96e-4a8d-835e-29e2d1a07a1a	mujer_alerta_v1	1	\N	\N	2	78	t	2025-12-22 23:57:21.980057-06	\N	2025-12-22 23:57:21.980057-06	\N
+8334e638-51c0-471c-8118-9b9cf55f1cbd	mujer_alerta_v1	1	\N	\N	4	12	t	2025-12-23 00:40:40.530105-06	\N	2025-12-23 00:40:40.530105-06	\N
+a1ff5612-30c0-481d-af9b-2a563871869d	mujer_alerta_v1	1	\N	\N	3	20	t	2025-12-23 00:42:29.836692-06	\N	2025-12-23 00:42:29.836692-06	\N
+e2ed95c3-b74f-4a5c-ad9d-e712f66fad47	mujer_alerta_v1	1	\N	\N	2	34	t	2025-12-23 01:03:05.111933-06	\N	2025-12-23 01:03:05.111933-06	\N
+2af03b0f-91a2-4c09-baaf-46ccd0749197	mujer_alerta_v1	1	\N	\N	3	45	t	2025-12-23 01:06:03.89115-06	\N	2025-12-23 01:06:03.89115-06	\N
+78a23e73-19cd-4cff-ab6c-1acceff73e66	mujer_alerta_v1	1	\N	\N	2	45	t	2025-12-23 01:15:00.378044-06	\N	2025-12-23 01:15:00.378044-06	\N
+f06036f1-b0a7-41ae-b186-6d5d0b56d55f	mujer_alerta_v1	1	\N	\N	2	45	t	2025-12-23 01:36:24.143043-06	\N	2025-12-23 01:36:24.143043-06	\N
+c9d3c582-4bc7-4e07-bb85-cf9097587be3	mujer_alerta_v1	1	\N	\N	3	78	t	2025-12-23 01:37:53.549901-06	\N	2025-12-23 01:37:53.549901-06	\N
+8e5a2cb7-02c7-45c8-a3ea-5b9d35e5f265	mujer_alerta_v1	1	\N	\N	2	42	t	2025-12-23 02:26:04.421257-06	\N	2025-12-23 02:26:04.421257-06	\N
+9ee4b8c8-b41d-475d-930c-2f83b32c4261	mujer_alerta_v1	1	\N	\N	3	78	t	2025-12-23 02:27:32.931278-06	\N	2025-12-23 02:27:32.931278-06	\N
+34fa1f2e-ebfb-4f4e-9564-e17c5b227549	mujer_alerta_v1	1	\N	\N	2	10	t	2025-12-24 02:42:13.429749-06	\N	2025-12-24 02:42:13.429749-06	\N
+7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	mujer_alerta_v1	1	\N	\N	1	15	t	2025-12-24 04:44:37.575025-06	\N	2025-12-24 04:44:37.575025-06	\N
+a2bc9323-1ea5-48b8-ad8a-3f42d34e43f6	mujer_alerta_v1	1	\N	\N	8	15	t	2025-12-25 19:36:38.574407-06	\N	2025-12-25 19:36:38.574407-06	\N
+e139e9b8-6f1f-4730-a8bc-8305d7f11e11	mujer_alerta_v1	1	ali@mail.com	\N	3	15	t	2025-12-25 12:51:15.253755-06	\N	2025-12-25 12:51:15.253755-06	\N
+cb553e5a-3775-4769-8950-154389c39bdd	mujer_alerta_v1	1	gfggfdg	\N	3	48	t	2025-12-25 12:52:05.299144-06	\N	2025-12-25 12:52:05.299144-06	\N
+ccf7fea8-8755-4236-8cc7-89aaee74f5bf	mujer_alerta_v1	1	mail@mailco.com	\N	3	20	t	2025-12-25 12:55:27.452169-06	\N	2025-12-25 12:55:27.452169-06	\N
+df6c0bc6-9aeb-4290-8704-7c77def242f2	mujer_alerta_v1	1	paty@culona	\N	3	15	t	2025-12-25 13:02:35.990919-06	\N	2025-12-25 13:02:35.990919-06	\N
+ae074147-2466-4adf-89fb-3827d099b556	mujer_alerta_v1	1	paty@mail.bom	\N	3	15	t	2025-12-25 13:05:52.011129-06	\N	2025-12-25 13:05:52.011129-06	\N
+ba9b8487-b295-4b2a-8be7-f6de8f79bc03	mujer_alerta_v1	1	\N	\N	3	15	t	2025-12-25 13:06:39.349119-06	\N	2025-12-25 13:06:39.349119-06	\N
+935150a3-a447-4adc-942c-150f29d64353	mujer_alerta_v1	1	paty@mail.com	\N	3	15	t	2025-12-25 13:13:53.785301-06	\N	2025-12-25 13:13:53.785301-06	\N
+6f4b2de4-d3dd-4111-91c1-8e4f53a15eb2	mujer_alerta_v1	1	paty@mail.com	\N	3	16	t	2025-12-25 13:21:14.197795-06	\N	2025-12-25 13:21:14.197795-06	\N
+11cdf54d-9201-4da2-a493-d725ef504604	mujer_alerta_v1	1	\N	\N	1	15	t	2025-12-25 13:29:59.857309-06	\N	2025-12-25 13:29:59.857309-06	\N
+6f4b29e2-1c0f-4a27-a958-50a691690ad0	mujer_alerta_v1	1	paty@nalgona.mail	\N	1	15	t	2025-12-25 13:24:15.250352-06	2025-12-25 13:25:33.81964-06	2025-12-25 13:24:15.250352-06	El trozo de texto estándar de Lorem Ipsum usado desde el año 1500 es reproducido debajo para aquellos interesados. Las secciones 1.10.32 y 1.10.33
+99abf3d3-f393-425d-8f38-7e35ac490475	mujer_alerta_v1	1	\N	\N	2	25	t	2025-12-25 18:40:14.151119-06	2025-12-25 18:41:26.103079-06	2025-12-25 18:40:14.151119-06	El trozo de texto estándar de Lorem Ipsum usado desde el año 1500 es reproducido debajo para aquellos interesados. Las secciones 1.10.32 y 1.10.33
+20acd552-a741-4c31-be87-f9a4949797dd	mujer_alerta_v1	1	\N	\N	4	33	t	2025-12-25 18:49:28.257389-06	2025-12-25 18:50:21.189714-06	2025-12-25 18:49:28.257389-06	\N
+0bc88783-9ae9-4f7d-b061-ccce7302f24f	mujer_alerta_v1	1	mail@mail.com	\N	1	15	t	2025-12-25 18:37:17.550894-06	2025-12-25 18:38:11.9906-06	2025-12-25 18:37:17.550894-06	El trozo de texto estándar de Lorem Ipsum usado desde el año 1500 es reproducido debajo para aquellos interesados. Las secciones 1.10.32 y 1.10.33
+48f326d0-71e0-45f5-984e-77fb81133b9d	mujer_alerta_v1	1	\N	\N	2	56	t	2025-12-23 02:42:41.600951-06	2024-12-25 18:50:21.189714-06	2025-12-23 02:42:41.600951-06	\N
+56222357-bef0-40db-9c3b-b2e93520fc01	mujer_alerta_v1	1	\N	\N	2	18	t	2025-12-23 15:59:15.693591-06	2024-12-25 18:50:21.189714-06	2025-12-23 15:59:15.693591-06	\N
+59822a5b-cb10-4645-b7a8-637dc9bb2fb8	mujer_alerta_v1	1	\N	\N	3	16	t	2025-12-25 12:28:26.158712-06	2024-12-25 18:50:21.189714-06	2025-12-25 12:28:26.158712-06	\N
+5ed565bc-991e-430e-877f-63f38ec7765e	mujer_alerta_v1	1	\N	\N	3	12	t	2025-12-22 23:32:39.68451-06	2024-12-25 18:50:21.189714-06	2025-12-22 23:32:39.68451-06	\N
+62a98d2d-761a-40d4-b2b5-744cabd9153b	mujer_alerta_v1	1	test@ejemplo.com	\N	1	22	t	2025-12-22 22:32:49.284654-06	2024-12-25 18:50:21.189714-06	2025-12-22 22:32:49.284654-06	\N
+678b0a0c-74db-4fb7-aa51-52856f8c4a95	mujer_alerta_v1	1	\N	\N	2	18	t	2025-12-22 23:14:05.239067-06	2024-12-25 18:50:21.189714-06	2025-12-22 23:14:05.239067-06	\N
+68bac82d-26c2-4d7d-a5a9-0fb996cfa5a8	mujer_alerta_v1	1	paty@mail.com	\N	3	15	t	2025-12-25 13:15:05.295852-06	2024-12-25 18:50:21.189714-06	2025-12-25 13:15:05.295852-06	\N
+6e02bcfc-e3a1-4cae-9773-69dfef549f41	mujer_alerta_v1	1	\N	\N	2	41	t	2025-12-23 02:11:31.924268-06	2024-12-25 18:50:21.189714-06	2025-12-23 02:11:31.924268-06	\N
+20902056-ec59-48a5-8167-6c5410281f07	mujer_alerta_v1	1	\N	\N	7	15	t	2025-12-25 19:32:34.437573-06	2025-12-25 19:34:00.068155-06	2025-12-25 19:32:34.437573-06	Es un hecho establecido hace demasiado tiempo que un lector se distraerá con el contenido del texto de un sitio mientras que mira su diseño. El punto de usar Lorem Ipsum es que tiene una distribución más o menos normal de las letras, al contrario de usar textos como por ejemplo "Contenido aquí, contenido aquí". Estos textos hacen parecerlo un español que se puede leer. Muchos paquetes de autoedición y editores de páginas web usan el Lorem Ipsum como su texto por defecto, y al hacer una búsqueda de "Lorem Ipsum" va a dar por resultado muchos sitios web que usan este texto si se encuentran en estado de desarrollo. Muchas versiones han evolucionado a través de los años, algunas veces por accidente, otras veces a propósito (por ejemplo insertándole humor y cosas por el estilo).
+3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	mujer_alerta_v1	1	yo@mail.com	\N	3	20	t	2025-12-25 12:44:27.300633-06	2025-12-25 12:45:28.233288-06	2025-12-25 12:44:27.300633-06	El trozo de texto estándar de Lorem Ipsum usado desde el año 1500 es reproducido debajo para aquellos interesados. Las secciones 1.10.32 y 1.10.33
+e2986526-d3ac-4115-a46d-489687e4a5b6	mujer_alerta_v1	1	\N	\N	5	46	t	2025-12-25 18:51:18.315862-06	2025-12-25 18:52:14.512869-06	2025-12-25 18:51:18.315862-06	El trozo de texto estándar de Lorem Ipsum usado desde el año 1500 es reproducido debajo para aquellos interesados. Las secciones 1.10.32 y 1.10.33
+95c01992-ff5c-4e98-8901-f90d2d9825c0	mujer_alerta_v1	1	\N	\N	2	18	t	2025-12-26 20:23:08.375774-06	2025-12-26 20:24:06.237453-06	2025-12-26 20:23:08.375774-06	Coemntario opcional
+80b0ba11-92ea-4765-8eae-7d411ebfef0d	mujer_alerta_v1	2	\N	\N	2	19	t	2025-12-26 20:25:30.97884-06	2025-12-26 20:26:26.732888-06	2025-12-26 20:25:30.97884-06	Comentario opcional
+8c9938e5-93ef-4641-ad3b-cd65023a8446	mujer_alerta_v1	1	\N	\N	2	22	t	2025-12-26 20:41:36.916176-06	2025-12-26 20:42:32.49386-06	2025-12-26 20:41:36.916176-06	Comentario opcional
+5bf9065c-7a79-4c26-9c5c-d28648097ec7	mujer_alerta_v1	1	\N	\N	2	22	t	2026-01-04 23:14:04.766157-06	\N	2026-01-04 23:14:04.766157-06	\N
+06e21c23-d70e-4a3f-9f27-070200994f61	mujer_alerta_v1	1	\N	\N	2	22	t	2026-01-04 23:25:30.736376-06	\N	2026-01-04 23:25:30.736376-06	\N
 \.
 
 
 --
--- Data for Name: generos; Type: TABLE DATA; Schema: public; Owner: vsalazars
+-- Data for Name: generos; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.generos (id, clave, etiqueta, descripcion, activo) FROM stdin;
@@ -309,7 +357,7 @@ COPY public.generos (id, clave, etiqueta, descripcion, activo) FROM stdin;
 
 
 --
--- Data for Name: respuestas; Type: TABLE DATA; Schema: public; Owner: vsalazars
+-- Data for Name: respuestas; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.respuestas (id, encuesta_id, pregunta_id, dimension, valor, created_at) FROM stdin;
@@ -985,32 +1033,675 @@ COPY public.respuestas (id, encuesta_id, pregunta_id, dimension, valor, created_
 1054	56222357-bef0-40db-9c3b-b2e93520fc01	P16	frecuencia	4	2025-12-23 16:00:19.380805-06
 1055	56222357-bef0-40db-9c3b-b2e93520fc01	P16	normalidad	4	2025-12-23 16:00:19.380805-06
 1056	56222357-bef0-40db-9c3b-b2e93520fc01	P16	gravedad	5	2025-12-23 16:00:19.380805-06
+1057	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P1	frecuencia	4	2025-12-24 02:43:00.041086-06
+1058	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P1	normalidad	3	2025-12-24 02:43:00.041086-06
+1059	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P1	gravedad	4	2025-12-24 02:43:00.041086-06
+1060	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P2	frecuencia	4	2025-12-24 02:43:00.041086-06
+1061	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P2	normalidad	4	2025-12-24 02:43:00.041086-06
+1062	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P2	gravedad	4	2025-12-24 02:43:00.041086-06
+1063	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P3	frecuencia	4	2025-12-24 02:43:00.041086-06
+1064	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P3	normalidad	4	2025-12-24 02:43:00.041086-06
+1065	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P3	gravedad	3	2025-12-24 02:43:00.041086-06
+1066	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P4	frecuencia	5	2025-12-24 02:43:00.041086-06
+1067	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P4	normalidad	4	2025-12-24 02:43:00.041086-06
+1068	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P4	gravedad	4	2025-12-24 02:43:00.041086-06
+1069	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P5	frecuencia	5	2025-12-24 02:43:00.041086-06
+1070	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P5	normalidad	4	2025-12-24 02:43:00.041086-06
+1071	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P5	gravedad	4	2025-12-24 02:43:00.041086-06
+1072	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P6	frecuencia	5	2025-12-24 02:43:00.041086-06
+1073	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P6	normalidad	5	2025-12-24 02:43:00.041086-06
+1074	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P6	gravedad	5	2025-12-24 02:43:00.041086-06
+1075	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P7	frecuencia	4	2025-12-24 02:43:00.041086-06
+1076	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P7	normalidad	4	2025-12-24 02:43:00.041086-06
+1077	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P7	gravedad	4	2025-12-24 02:43:00.041086-06
+1078	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P8	frecuencia	5	2025-12-24 02:43:00.041086-06
+1079	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P8	normalidad	5	2025-12-24 02:43:00.041086-06
+1080	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P8	gravedad	5	2025-12-24 02:43:00.041086-06
+1081	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P9	frecuencia	4	2025-12-24 02:43:00.041086-06
+1082	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P9	normalidad	4	2025-12-24 02:43:00.041086-06
+1083	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P9	gravedad	5	2025-12-24 02:43:00.041086-06
+1084	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P10	frecuencia	5	2025-12-24 02:43:00.041086-06
+1085	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P10	normalidad	4	2025-12-24 02:43:00.041086-06
+1086	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P10	gravedad	5	2025-12-24 02:43:00.041086-06
+1087	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P11	frecuencia	5	2025-12-24 02:43:00.041086-06
+1088	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P11	normalidad	4	2025-12-24 02:43:00.041086-06
+1089	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P11	gravedad	5	2025-12-24 02:43:00.041086-06
+1090	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P12	frecuencia	5	2025-12-24 02:43:00.041086-06
+1091	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P12	normalidad	4	2025-12-24 02:43:00.041086-06
+1092	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P12	gravedad	5	2025-12-24 02:43:00.041086-06
+1093	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P13	frecuencia	5	2025-12-24 02:43:00.041086-06
+1094	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P13	normalidad	4	2025-12-24 02:43:00.041086-06
+1095	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P13	gravedad	5	2025-12-24 02:43:00.041086-06
+1096	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P14	frecuencia	5	2025-12-24 02:43:00.041086-06
+1097	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P14	normalidad	5	2025-12-24 02:43:00.041086-06
+1098	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P14	gravedad	5	2025-12-24 02:43:00.041086-06
+1099	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P15	frecuencia	4	2025-12-24 02:43:00.041086-06
+1100	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P15	normalidad	4	2025-12-24 02:43:00.041086-06
+1101	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P15	gravedad	5	2025-12-24 02:43:00.041086-06
+1102	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P16	frecuencia	5	2025-12-24 02:43:00.041086-06
+1103	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P16	normalidad	4	2025-12-24 02:43:00.041086-06
+1104	34fa1f2e-ebfb-4f4e-9564-e17c5b227549	P16	gravedad	4	2025-12-24 02:43:00.041086-06
+1105	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P1	frecuencia	1	2025-12-24 04:45:25.548792-06
+1106	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P1	normalidad	2	2025-12-24 04:45:25.548792-06
+1107	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P1	gravedad	3	2025-12-24 04:45:25.548792-06
+1108	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P2	frecuencia	5	2025-12-24 04:45:25.548792-06
+1109	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P2	normalidad	4	2025-12-24 04:45:25.548792-06
+1110	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P2	gravedad	3	2025-12-24 04:45:25.548792-06
+1111	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P3	frecuencia	1	2025-12-24 04:45:25.548792-06
+1112	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P3	normalidad	2	2025-12-24 04:45:25.548792-06
+1113	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P3	gravedad	3	2025-12-24 04:45:25.548792-06
+1114	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P4	frecuencia	5	2025-12-24 04:45:25.548792-06
+1115	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P4	normalidad	4	2025-12-24 04:45:25.548792-06
+1116	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P4	gravedad	3	2025-12-24 04:45:25.548792-06
+1117	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P5	frecuencia	1	2025-12-24 04:45:25.548792-06
+1118	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P5	normalidad	2	2025-12-24 04:45:25.548792-06
+1119	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P5	gravedad	3	2025-12-24 04:45:25.548792-06
+1120	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P6	frecuencia	5	2025-12-24 04:45:25.548792-06
+1121	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P6	normalidad	4	2025-12-24 04:45:25.548792-06
+1122	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P6	gravedad	3	2025-12-24 04:45:25.548792-06
+1123	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P7	frecuencia	1	2025-12-24 04:45:25.548792-06
+1124	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P7	normalidad	2	2025-12-24 04:45:25.548792-06
+1125	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P7	gravedad	3	2025-12-24 04:45:25.548792-06
+1126	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P8	frecuencia	5	2025-12-24 04:45:25.548792-06
+1127	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P8	normalidad	4	2025-12-24 04:45:25.548792-06
+1128	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P8	gravedad	3	2025-12-24 04:45:25.548792-06
+1129	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P9	frecuencia	1	2025-12-24 04:45:25.548792-06
+1130	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P9	normalidad	2	2025-12-24 04:45:25.548792-06
+1131	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P9	gravedad	3	2025-12-24 04:45:25.548792-06
+1132	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P10	frecuencia	5	2025-12-24 04:45:25.548792-06
+1133	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P10	normalidad	4	2025-12-24 04:45:25.548792-06
+1134	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P10	gravedad	3	2025-12-24 04:45:25.548792-06
+1135	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P11	frecuencia	1	2025-12-24 04:45:25.548792-06
+1136	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P11	normalidad	2	2025-12-24 04:45:25.548792-06
+1137	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P11	gravedad	3	2025-12-24 04:45:25.548792-06
+1138	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P12	frecuencia	5	2025-12-24 04:45:25.548792-06
+1139	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P12	normalidad	4	2025-12-24 04:45:25.548792-06
+1140	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P12	gravedad	3	2025-12-24 04:45:25.548792-06
+1141	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P13	frecuencia	1	2025-12-24 04:45:25.548792-06
+1142	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P13	normalidad	2	2025-12-24 04:45:25.548792-06
+1143	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P13	gravedad	3	2025-12-24 04:45:25.548792-06
+1144	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P14	frecuencia	5	2025-12-24 04:45:25.548792-06
+1145	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P14	normalidad	4	2025-12-24 04:45:25.548792-06
+1146	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P14	gravedad	3	2025-12-24 04:45:25.548792-06
+1147	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P15	frecuencia	1	2025-12-24 04:45:25.548792-06
+1148	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P15	normalidad	2	2025-12-24 04:45:25.548792-06
+1149	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P15	gravedad	3	2025-12-24 04:45:25.548792-06
+1150	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P16	frecuencia	5	2025-12-24 04:45:25.548792-06
+1151	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P16	normalidad	4	2025-12-24 04:45:25.548792-06
+1152	7c1de0e7-9e9c-4899-bdcf-8db05948fc4f	P16	gravedad	3	2025-12-24 04:45:25.548792-06
+1153	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P1	frecuencia	2	2025-12-25 12:41:34.201592-06
+1154	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P1	normalidad	3	2025-12-25 12:41:34.201592-06
+1155	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P1	gravedad	3	2025-12-25 12:41:34.201592-06
+1156	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P2	frecuencia	4	2025-12-25 12:41:34.201592-06
+1157	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P2	normalidad	4	2025-12-25 12:41:34.201592-06
+1158	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P2	gravedad	3	2025-12-25 12:41:34.201592-06
+1159	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P3	frecuencia	4	2025-12-25 12:41:34.201592-06
+1160	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P3	normalidad	4	2025-12-25 12:41:34.201592-06
+1161	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P3	gravedad	4	2025-12-25 12:41:34.201592-06
+1162	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P4	frecuencia	3	2025-12-25 12:41:34.201592-06
+1163	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P4	normalidad	4	2025-12-25 12:41:34.201592-06
+1164	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P4	gravedad	3	2025-12-25 12:41:34.201592-06
+1165	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P5	frecuencia	4	2025-12-25 12:41:34.201592-06
+1166	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P5	normalidad	4	2025-12-25 12:41:34.201592-06
+1167	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P5	gravedad	4	2025-12-25 12:41:34.201592-06
+1168	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P6	frecuencia	3	2025-12-25 12:41:34.201592-06
+1169	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P6	normalidad	4	2025-12-25 12:41:34.201592-06
+1170	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P6	gravedad	3	2025-12-25 12:41:34.201592-06
+1171	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P7	frecuencia	3	2025-12-25 12:41:34.201592-06
+1172	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P7	normalidad	4	2025-12-25 12:41:34.201592-06
+1173	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P7	gravedad	3	2025-12-25 12:41:34.201592-06
+1174	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P8	frecuencia	4	2025-12-25 12:41:34.201592-06
+1175	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P8	normalidad	4	2025-12-25 12:41:34.201592-06
+1176	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P8	gravedad	3	2025-12-25 12:41:34.201592-06
+1177	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P9	frecuencia	3	2025-12-25 12:41:34.201592-06
+1178	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P9	normalidad	4	2025-12-25 12:41:34.201592-06
+1179	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P9	gravedad	3	2025-12-25 12:41:34.201592-06
+1180	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P10	frecuencia	3	2025-12-25 12:41:34.201592-06
+1181	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P10	normalidad	4	2025-12-25 12:41:34.201592-06
+1182	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P10	gravedad	3	2025-12-25 12:41:34.201592-06
+1183	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P11	frecuencia	4	2025-12-25 12:41:34.201592-06
+1184	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P11	normalidad	4	2025-12-25 12:41:34.201592-06
+1185	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P11	gravedad	3	2025-12-25 12:41:34.201592-06
+1186	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P12	frecuencia	4	2025-12-25 12:41:34.201592-06
+1187	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P12	normalidad	4	2025-12-25 12:41:34.201592-06
+1188	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P12	gravedad	3	2025-12-25 12:41:34.201592-06
+1189	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P13	frecuencia	3	2025-12-25 12:41:34.201592-06
+1190	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P13	normalidad	4	2025-12-25 12:41:34.201592-06
+1191	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P13	gravedad	4	2025-12-25 12:41:34.201592-06
+1192	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P14	frecuencia	3	2025-12-25 12:41:34.201592-06
+1193	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P14	normalidad	4	2025-12-25 12:41:34.201592-06
+1194	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P14	gravedad	4	2025-12-25 12:41:34.201592-06
+1195	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P15	frecuencia	4	2025-12-25 12:41:34.201592-06
+1196	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P15	normalidad	4	2025-12-25 12:41:34.201592-06
+1197	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P15	gravedad	3	2025-12-25 12:41:34.201592-06
+1198	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P16	frecuencia	4	2025-12-25 12:41:34.201592-06
+1199	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P16	normalidad	4	2025-12-25 12:41:34.201592-06
+1200	59822a5b-cb10-4645-b7a8-637dc9bb2fb8	P16	gravedad	4	2025-12-25 12:41:34.201592-06
+1201	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P1	frecuencia	3	2025-12-25 12:45:28.233288-06
+1202	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P1	normalidad	3	2025-12-25 12:45:28.233288-06
+1203	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P1	gravedad	3	2025-12-25 12:45:28.233288-06
+1204	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P2	frecuencia	4	2025-12-25 12:45:28.233288-06
+1205	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P2	normalidad	3	2025-12-25 12:45:28.233288-06
+1206	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P2	gravedad	4	2025-12-25 12:45:28.233288-06
+1207	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P3	frecuencia	5	2025-12-25 12:45:28.233288-06
+1208	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P3	normalidad	4	2025-12-25 12:45:28.233288-06
+1209	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P3	gravedad	4	2025-12-25 12:45:28.233288-06
+1210	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P4	frecuencia	5	2025-12-25 12:45:28.233288-06
+1211	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P4	normalidad	4	2025-12-25 12:45:28.233288-06
+1212	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P4	gravedad	5	2025-12-25 12:45:28.233288-06
+1213	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P5	frecuencia	4	2025-12-25 12:45:28.233288-06
+1214	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P5	normalidad	3	2025-12-25 12:45:28.233288-06
+1215	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P5	gravedad	4	2025-12-25 12:45:28.233288-06
+1216	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P6	frecuencia	4	2025-12-25 12:45:28.233288-06
+1217	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P6	normalidad	5	2025-12-25 12:45:28.233288-06
+1218	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P6	gravedad	5	2025-12-25 12:45:28.233288-06
+1219	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P7	frecuencia	3	2025-12-25 12:45:28.233288-06
+1220	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P7	normalidad	5	2025-12-25 12:45:28.233288-06
+1221	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P7	gravedad	4	2025-12-25 12:45:28.233288-06
+1222	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P8	frecuencia	4	2025-12-25 12:45:28.233288-06
+1223	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P8	normalidad	5	2025-12-25 12:45:28.233288-06
+1224	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P8	gravedad	4	2025-12-25 12:45:28.233288-06
+1225	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P9	frecuencia	4	2025-12-25 12:45:28.233288-06
+1226	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P9	normalidad	5	2025-12-25 12:45:28.233288-06
+1227	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P9	gravedad	5	2025-12-25 12:45:28.233288-06
+1228	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P10	frecuencia	4	2025-12-25 12:45:28.233288-06
+1229	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P10	normalidad	5	2025-12-25 12:45:28.233288-06
+1230	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P10	gravedad	5	2025-12-25 12:45:28.233288-06
+1231	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P11	frecuencia	5	2025-12-25 12:45:28.233288-06
+1232	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P11	normalidad	4	2025-12-25 12:45:28.233288-06
+1233	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P11	gravedad	4	2025-12-25 12:45:28.233288-06
+1234	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P12	frecuencia	4	2025-12-25 12:45:28.233288-06
+1235	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P12	normalidad	5	2025-12-25 12:45:28.233288-06
+1236	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P12	gravedad	5	2025-12-25 12:45:28.233288-06
+1237	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P13	frecuencia	4	2025-12-25 12:45:28.233288-06
+1238	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P13	normalidad	5	2025-12-25 12:45:28.233288-06
+1239	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P13	gravedad	5	2025-12-25 12:45:28.233288-06
+1240	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P14	frecuencia	4	2025-12-25 12:45:28.233288-06
+1241	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P14	normalidad	5	2025-12-25 12:45:28.233288-06
+1242	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P14	gravedad	5	2025-12-25 12:45:28.233288-06
+1243	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P15	frecuencia	4	2025-12-25 12:45:28.233288-06
+1244	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P15	normalidad	5	2025-12-25 12:45:28.233288-06
+1245	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P15	gravedad	5	2025-12-25 12:45:28.233288-06
+1246	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P16	frecuencia	4	2025-12-25 12:45:28.233288-06
+1247	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P16	normalidad	5	2025-12-25 12:45:28.233288-06
+1248	3eee1c58-385b-4a83-aaf6-2ddfeb4018c7	P16	gravedad	5	2025-12-25 12:45:28.233288-06
+1249	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P1	frecuencia	3	2025-12-25 13:25:33.81964-06
+1250	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P1	normalidad	3	2025-12-25 13:25:33.81964-06
+1251	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P1	gravedad	2	2025-12-25 13:25:33.81964-06
+1252	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P2	frecuencia	3	2025-12-25 13:25:33.81964-06
+1253	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P2	normalidad	3	2025-12-25 13:25:33.81964-06
+1254	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P2	gravedad	3	2025-12-25 13:25:33.81964-06
+1255	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P3	frecuencia	3	2025-12-25 13:25:33.81964-06
+1256	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P3	normalidad	3	2025-12-25 13:25:33.81964-06
+1257	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P3	gravedad	4	2025-12-25 13:25:33.81964-06
+1258	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P4	frecuencia	4	2025-12-25 13:25:33.81964-06
+1259	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P4	normalidad	2	2025-12-25 13:25:33.81964-06
+1260	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P4	gravedad	3	2025-12-25 13:25:33.81964-06
+1261	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P5	frecuencia	5	2025-12-25 13:25:33.81964-06
+1262	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P5	normalidad	5	2025-12-25 13:25:33.81964-06
+1263	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P5	gravedad	5	2025-12-25 13:25:33.81964-06
+1264	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P6	frecuencia	5	2025-12-25 13:25:33.81964-06
+1265	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P6	normalidad	4	2025-12-25 13:25:33.81964-06
+1266	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P6	gravedad	4	2025-12-25 13:25:33.81964-06
+1267	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P7	frecuencia	4	2025-12-25 13:25:33.81964-06
+1268	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P7	normalidad	5	2025-12-25 13:25:33.81964-06
+1269	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P7	gravedad	4	2025-12-25 13:25:33.81964-06
+1270	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P8	frecuencia	4	2025-12-25 13:25:33.81964-06
+1271	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P8	normalidad	5	2025-12-25 13:25:33.81964-06
+1272	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P8	gravedad	4	2025-12-25 13:25:33.81964-06
+1273	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P9	frecuencia	4	2025-12-25 13:25:33.81964-06
+1274	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P9	normalidad	5	2025-12-25 13:25:33.81964-06
+1275	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P9	gravedad	4	2025-12-25 13:25:33.81964-06
+1276	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P10	frecuencia	4	2025-12-25 13:25:33.81964-06
+1277	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P10	normalidad	5	2025-12-25 13:25:33.81964-06
+1278	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P10	gravedad	4	2025-12-25 13:25:33.81964-06
+1279	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P11	frecuencia	4	2025-12-25 13:25:33.81964-06
+1280	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P11	normalidad	5	2025-12-25 13:25:33.81964-06
+1281	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P11	gravedad	5	2025-12-25 13:25:33.81964-06
+1282	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P12	frecuencia	5	2025-12-25 13:25:33.81964-06
+1283	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P12	normalidad	5	2025-12-25 13:25:33.81964-06
+1284	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P12	gravedad	5	2025-12-25 13:25:33.81964-06
+1285	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P13	frecuencia	4	2025-12-25 13:25:33.81964-06
+1286	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P13	normalidad	5	2025-12-25 13:25:33.81964-06
+1287	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P13	gravedad	4	2025-12-25 13:25:33.81964-06
+1288	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P14	frecuencia	5	2025-12-25 13:25:33.81964-06
+1289	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P14	normalidad	4	2025-12-25 13:25:33.81964-06
+1290	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P14	gravedad	5	2025-12-25 13:25:33.81964-06
+1291	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P15	frecuencia	4	2025-12-25 13:25:33.81964-06
+1292	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P15	normalidad	5	2025-12-25 13:25:33.81964-06
+1293	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P15	gravedad	4	2025-12-25 13:25:33.81964-06
+1294	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P16	frecuencia	5	2025-12-25 13:25:33.81964-06
+1295	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P16	normalidad	4	2025-12-25 13:25:33.81964-06
+1296	6f4b29e2-1c0f-4a27-a958-50a691690ad0	P16	gravedad	4	2025-12-25 13:25:33.81964-06
+1297	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P1	frecuencia	2	2025-12-25 18:38:11.9906-06
+1298	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P1	normalidad	2	2025-12-25 18:38:11.9906-06
+1299	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P1	gravedad	3	2025-12-25 18:38:11.9906-06
+1300	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P2	frecuencia	4	2025-12-25 18:38:11.9906-06
+1301	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P2	normalidad	3	2025-12-25 18:38:11.9906-06
+1302	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P2	gravedad	3	2025-12-25 18:38:11.9906-06
+1303	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P3	frecuencia	3	2025-12-25 18:38:11.9906-06
+1304	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P3	normalidad	4	2025-12-25 18:38:11.9906-06
+1305	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P3	gravedad	2	2025-12-25 18:38:11.9906-06
+1306	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P4	frecuencia	4	2025-12-25 18:38:11.9906-06
+1307	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P4	normalidad	3	2025-12-25 18:38:11.9906-06
+1308	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P4	gravedad	4	2025-12-25 18:38:11.9906-06
+1309	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P5	frecuencia	3	2025-12-25 18:38:11.9906-06
+1310	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P5	normalidad	4	2025-12-25 18:38:11.9906-06
+1311	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P5	gravedad	3	2025-12-25 18:38:11.9906-06
+1312	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P6	frecuencia	3	2025-12-25 18:38:11.9906-06
+1313	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P6	normalidad	3	2025-12-25 18:38:11.9906-06
+1314	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P6	gravedad	4	2025-12-25 18:38:11.9906-06
+1315	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P7	frecuencia	3	2025-12-25 18:38:11.9906-06
+1316	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P7	normalidad	4	2025-12-25 18:38:11.9906-06
+1317	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P7	gravedad	4	2025-12-25 18:38:11.9906-06
+1318	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P8	frecuencia	3	2025-12-25 18:38:11.9906-06
+1319	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P8	normalidad	4	2025-12-25 18:38:11.9906-06
+1320	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P8	gravedad	3	2025-12-25 18:38:11.9906-06
+1321	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P9	frecuencia	3	2025-12-25 18:38:11.9906-06
+1322	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P9	normalidad	4	2025-12-25 18:38:11.9906-06
+1323	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P9	gravedad	3	2025-12-25 18:38:11.9906-06
+1324	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P10	frecuencia	4	2025-12-25 18:38:11.9906-06
+1325	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P10	normalidad	3	2025-12-25 18:38:11.9906-06
+1326	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P10	gravedad	4	2025-12-25 18:38:11.9906-06
+1327	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P11	frecuencia	3	2025-12-25 18:38:11.9906-06
+1328	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P11	normalidad	5	2025-12-25 18:38:11.9906-06
+1329	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P11	gravedad	4	2025-12-25 18:38:11.9906-06
+1330	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P12	frecuencia	3	2025-12-25 18:38:11.9906-06
+1331	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P12	normalidad	5	2025-12-25 18:38:11.9906-06
+1332	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P12	gravedad	4	2025-12-25 18:38:11.9906-06
+1333	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P13	frecuencia	4	2025-12-25 18:38:11.9906-06
+1334	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P13	normalidad	4	2025-12-25 18:38:11.9906-06
+1335	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P13	gravedad	4	2025-12-25 18:38:11.9906-06
+1336	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P14	frecuencia	5	2025-12-25 18:38:11.9906-06
+1337	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P14	normalidad	5	2025-12-25 18:38:11.9906-06
+1338	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P14	gravedad	3	2025-12-25 18:38:11.9906-06
+1339	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P15	frecuencia	3	2025-12-25 18:38:11.9906-06
+1340	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P15	normalidad	4	2025-12-25 18:38:11.9906-06
+1341	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P15	gravedad	4	2025-12-25 18:38:11.9906-06
+1342	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P16	frecuencia	4	2025-12-25 18:38:11.9906-06
+1343	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P16	normalidad	4	2025-12-25 18:38:11.9906-06
+1344	0bc88783-9ae9-4f7d-b061-ccce7302f24f	P16	gravedad	4	2025-12-25 18:38:11.9906-06
+1345	99abf3d3-f393-425d-8f38-7e35ac490475	P1	frecuencia	2	2025-12-25 18:41:26.103079-06
+1346	99abf3d3-f393-425d-8f38-7e35ac490475	P1	normalidad	2	2025-12-25 18:41:26.103079-06
+1347	99abf3d3-f393-425d-8f38-7e35ac490475	P1	gravedad	3	2025-12-25 18:41:26.103079-06
+1348	99abf3d3-f393-425d-8f38-7e35ac490475	P2	frecuencia	2	2025-12-25 18:41:26.103079-06
+1349	99abf3d3-f393-425d-8f38-7e35ac490475	P2	normalidad	2	2025-12-25 18:41:26.103079-06
+1350	99abf3d3-f393-425d-8f38-7e35ac490475	P2	gravedad	2	2025-12-25 18:41:26.103079-06
+1351	99abf3d3-f393-425d-8f38-7e35ac490475	P3	frecuencia	3	2025-12-25 18:41:26.103079-06
+1352	99abf3d3-f393-425d-8f38-7e35ac490475	P3	normalidad	2	2025-12-25 18:41:26.103079-06
+1353	99abf3d3-f393-425d-8f38-7e35ac490475	P3	gravedad	3	2025-12-25 18:41:26.103079-06
+1354	99abf3d3-f393-425d-8f38-7e35ac490475	P4	frecuencia	2	2025-12-25 18:41:26.103079-06
+1355	99abf3d3-f393-425d-8f38-7e35ac490475	P4	normalidad	3	2025-12-25 18:41:26.103079-06
+1356	99abf3d3-f393-425d-8f38-7e35ac490475	P4	gravedad	3	2025-12-25 18:41:26.103079-06
+1357	99abf3d3-f393-425d-8f38-7e35ac490475	P5	frecuencia	2	2025-12-25 18:41:26.103079-06
+1358	99abf3d3-f393-425d-8f38-7e35ac490475	P5	normalidad	3	2025-12-25 18:41:26.103079-06
+1359	99abf3d3-f393-425d-8f38-7e35ac490475	P5	gravedad	4	2025-12-25 18:41:26.103079-06
+1360	99abf3d3-f393-425d-8f38-7e35ac490475	P6	frecuencia	2	2025-12-25 18:41:26.103079-06
+1361	99abf3d3-f393-425d-8f38-7e35ac490475	P6	normalidad	4	2025-12-25 18:41:26.103079-06
+1362	99abf3d3-f393-425d-8f38-7e35ac490475	P6	gravedad	4	2025-12-25 18:41:26.103079-06
+1363	99abf3d3-f393-425d-8f38-7e35ac490475	P7	frecuencia	3	2025-12-25 18:41:26.103079-06
+1364	99abf3d3-f393-425d-8f38-7e35ac490475	P7	normalidad	2	2025-12-25 18:41:26.103079-06
+1365	99abf3d3-f393-425d-8f38-7e35ac490475	P7	gravedad	3	2025-12-25 18:41:26.103079-06
+1366	99abf3d3-f393-425d-8f38-7e35ac490475	P8	frecuencia	2	2025-12-25 18:41:26.103079-06
+1367	99abf3d3-f393-425d-8f38-7e35ac490475	P8	normalidad	3	2025-12-25 18:41:26.103079-06
+1368	99abf3d3-f393-425d-8f38-7e35ac490475	P8	gravedad	3	2025-12-25 18:41:26.103079-06
+1369	99abf3d3-f393-425d-8f38-7e35ac490475	P9	frecuencia	3	2025-12-25 18:41:26.103079-06
+1370	99abf3d3-f393-425d-8f38-7e35ac490475	P9	normalidad	3	2025-12-25 18:41:26.103079-06
+1371	99abf3d3-f393-425d-8f38-7e35ac490475	P9	gravedad	2	2025-12-25 18:41:26.103079-06
+1372	99abf3d3-f393-425d-8f38-7e35ac490475	P10	frecuencia	3	2025-12-25 18:41:26.103079-06
+1373	99abf3d3-f393-425d-8f38-7e35ac490475	P10	normalidad	4	2025-12-25 18:41:26.103079-06
+1374	99abf3d3-f393-425d-8f38-7e35ac490475	P10	gravedad	4	2025-12-25 18:41:26.103079-06
+1375	99abf3d3-f393-425d-8f38-7e35ac490475	P11	frecuencia	3	2025-12-25 18:41:26.103079-06
+1376	99abf3d3-f393-425d-8f38-7e35ac490475	P11	normalidad	4	2025-12-25 18:41:26.103079-06
+1377	99abf3d3-f393-425d-8f38-7e35ac490475	P11	gravedad	3	2025-12-25 18:41:26.103079-06
+1378	99abf3d3-f393-425d-8f38-7e35ac490475	P12	frecuencia	4	2025-12-25 18:41:26.103079-06
+1379	99abf3d3-f393-425d-8f38-7e35ac490475	P12	normalidad	3	2025-12-25 18:41:26.103079-06
+1380	99abf3d3-f393-425d-8f38-7e35ac490475	P12	gravedad	4	2025-12-25 18:41:26.103079-06
+1381	99abf3d3-f393-425d-8f38-7e35ac490475	P13	frecuencia	4	2025-12-25 18:41:26.103079-06
+1382	99abf3d3-f393-425d-8f38-7e35ac490475	P13	normalidad	4	2025-12-25 18:41:26.103079-06
+1383	99abf3d3-f393-425d-8f38-7e35ac490475	P13	gravedad	4	2025-12-25 18:41:26.103079-06
+1384	99abf3d3-f393-425d-8f38-7e35ac490475	P14	frecuencia	4	2025-12-25 18:41:26.103079-06
+1385	99abf3d3-f393-425d-8f38-7e35ac490475	P14	normalidad	4	2025-12-25 18:41:26.103079-06
+1386	99abf3d3-f393-425d-8f38-7e35ac490475	P14	gravedad	4	2025-12-25 18:41:26.103079-06
+1387	99abf3d3-f393-425d-8f38-7e35ac490475	P15	frecuencia	2	2025-12-25 18:41:26.103079-06
+1388	99abf3d3-f393-425d-8f38-7e35ac490475	P15	normalidad	3	2025-12-25 18:41:26.103079-06
+1389	99abf3d3-f393-425d-8f38-7e35ac490475	P15	gravedad	4	2025-12-25 18:41:26.103079-06
+1390	99abf3d3-f393-425d-8f38-7e35ac490475	P16	frecuencia	4	2025-12-25 18:41:26.103079-06
+1391	99abf3d3-f393-425d-8f38-7e35ac490475	P16	normalidad	2	2025-12-25 18:41:26.103079-06
+1392	99abf3d3-f393-425d-8f38-7e35ac490475	P16	gravedad	5	2025-12-25 18:41:26.103079-06
+1393	20acd552-a741-4c31-be87-f9a4949797dd	P1	frecuencia	2	2025-12-25 18:50:21.189714-06
+1394	20acd552-a741-4c31-be87-f9a4949797dd	P1	normalidad	2	2025-12-25 18:50:21.189714-06
+1395	20acd552-a741-4c31-be87-f9a4949797dd	P1	gravedad	3	2025-12-25 18:50:21.189714-06
+1396	20acd552-a741-4c31-be87-f9a4949797dd	P2	frecuencia	2	2025-12-25 18:50:21.189714-06
+1397	20acd552-a741-4c31-be87-f9a4949797dd	P2	normalidad	4	2025-12-25 18:50:21.189714-06
+1398	20acd552-a741-4c31-be87-f9a4949797dd	P2	gravedad	3	2025-12-25 18:50:21.189714-06
+1399	20acd552-a741-4c31-be87-f9a4949797dd	P3	frecuencia	2	2025-12-25 18:50:21.189714-06
+1400	20acd552-a741-4c31-be87-f9a4949797dd	P3	normalidad	4	2025-12-25 18:50:21.189714-06
+1401	20acd552-a741-4c31-be87-f9a4949797dd	P3	gravedad	3	2025-12-25 18:50:21.189714-06
+1402	20acd552-a741-4c31-be87-f9a4949797dd	P4	frecuencia	3	2025-12-25 18:50:21.189714-06
+1403	20acd552-a741-4c31-be87-f9a4949797dd	P4	normalidad	4	2025-12-25 18:50:21.189714-06
+1404	20acd552-a741-4c31-be87-f9a4949797dd	P4	gravedad	3	2025-12-25 18:50:21.189714-06
+1405	20acd552-a741-4c31-be87-f9a4949797dd	P5	frecuencia	3	2025-12-25 18:50:21.189714-06
+1406	20acd552-a741-4c31-be87-f9a4949797dd	P5	normalidad	3	2025-12-25 18:50:21.189714-06
+1407	20acd552-a741-4c31-be87-f9a4949797dd	P5	gravedad	4	2025-12-25 18:50:21.189714-06
+1408	20acd552-a741-4c31-be87-f9a4949797dd	P6	frecuencia	4	2025-12-25 18:50:21.189714-06
+1409	20acd552-a741-4c31-be87-f9a4949797dd	P6	normalidad	3	2025-12-25 18:50:21.189714-06
+1410	20acd552-a741-4c31-be87-f9a4949797dd	P6	gravedad	4	2025-12-25 18:50:21.189714-06
+1411	20acd552-a741-4c31-be87-f9a4949797dd	P7	frecuencia	2	2025-12-25 18:50:21.189714-06
+1412	20acd552-a741-4c31-be87-f9a4949797dd	P7	normalidad	4	2025-12-25 18:50:21.189714-06
+1413	20acd552-a741-4c31-be87-f9a4949797dd	P7	gravedad	3	2025-12-25 18:50:21.189714-06
+1414	20acd552-a741-4c31-be87-f9a4949797dd	P8	frecuencia	3	2025-12-25 18:50:21.189714-06
+1415	20acd552-a741-4c31-be87-f9a4949797dd	P8	normalidad	4	2025-12-25 18:50:21.189714-06
+1416	20acd552-a741-4c31-be87-f9a4949797dd	P8	gravedad	3	2025-12-25 18:50:21.189714-06
+1417	20acd552-a741-4c31-be87-f9a4949797dd	P9	frecuencia	3	2025-12-25 18:50:21.189714-06
+1418	20acd552-a741-4c31-be87-f9a4949797dd	P9	normalidad	4	2025-12-25 18:50:21.189714-06
+1419	20acd552-a741-4c31-be87-f9a4949797dd	P9	gravedad	4	2025-12-25 18:50:21.189714-06
+1420	20acd552-a741-4c31-be87-f9a4949797dd	P10	frecuencia	4	2025-12-25 18:50:21.189714-06
+1421	20acd552-a741-4c31-be87-f9a4949797dd	P10	normalidad	4	2025-12-25 18:50:21.189714-06
+1422	20acd552-a741-4c31-be87-f9a4949797dd	P10	gravedad	4	2025-12-25 18:50:21.189714-06
+1423	20acd552-a741-4c31-be87-f9a4949797dd	P11	frecuencia	3	2025-12-25 18:50:21.189714-06
+1424	20acd552-a741-4c31-be87-f9a4949797dd	P11	normalidad	4	2025-12-25 18:50:21.189714-06
+1425	20acd552-a741-4c31-be87-f9a4949797dd	P11	gravedad	4	2025-12-25 18:50:21.189714-06
+1426	20acd552-a741-4c31-be87-f9a4949797dd	P12	frecuencia	2	2025-12-25 18:50:21.189714-06
+1427	20acd552-a741-4c31-be87-f9a4949797dd	P12	normalidad	4	2025-12-25 18:50:21.189714-06
+1428	20acd552-a741-4c31-be87-f9a4949797dd	P12	gravedad	4	2025-12-25 18:50:21.189714-06
+1429	20acd552-a741-4c31-be87-f9a4949797dd	P13	frecuencia	2	2025-12-25 18:50:21.189714-06
+1430	20acd552-a741-4c31-be87-f9a4949797dd	P13	normalidad	4	2025-12-25 18:50:21.189714-06
+1431	20acd552-a741-4c31-be87-f9a4949797dd	P13	gravedad	3	2025-12-25 18:50:21.189714-06
+1432	20acd552-a741-4c31-be87-f9a4949797dd	P14	frecuencia	3	2025-12-25 18:50:21.189714-06
+1433	20acd552-a741-4c31-be87-f9a4949797dd	P14	normalidad	4	2025-12-25 18:50:21.189714-06
+1434	20acd552-a741-4c31-be87-f9a4949797dd	P14	gravedad	3	2025-12-25 18:50:21.189714-06
+1435	20acd552-a741-4c31-be87-f9a4949797dd	P15	frecuencia	4	2025-12-25 18:50:21.189714-06
+1436	20acd552-a741-4c31-be87-f9a4949797dd	P15	normalidad	3	2025-12-25 18:50:21.189714-06
+1437	20acd552-a741-4c31-be87-f9a4949797dd	P15	gravedad	5	2025-12-25 18:50:21.189714-06
+1438	20acd552-a741-4c31-be87-f9a4949797dd	P16	frecuencia	3	2025-12-25 18:50:21.189714-06
+1439	20acd552-a741-4c31-be87-f9a4949797dd	P16	normalidad	4	2025-12-25 18:50:21.189714-06
+1440	20acd552-a741-4c31-be87-f9a4949797dd	P16	gravedad	5	2025-12-25 18:50:21.189714-06
+1441	e2986526-d3ac-4115-a46d-489687e4a5b6	P1	frecuencia	3	2025-12-25 18:52:14.512869-06
+1442	e2986526-d3ac-4115-a46d-489687e4a5b6	P1	normalidad	4	2025-12-25 18:52:14.512869-06
+1443	e2986526-d3ac-4115-a46d-489687e4a5b6	P1	gravedad	3	2025-12-25 18:52:14.512869-06
+1444	e2986526-d3ac-4115-a46d-489687e4a5b6	P2	frecuencia	4	2025-12-25 18:52:14.512869-06
+1445	e2986526-d3ac-4115-a46d-489687e4a5b6	P2	normalidad	4	2025-12-25 18:52:14.512869-06
+1446	e2986526-d3ac-4115-a46d-489687e4a5b6	P2	gravedad	5	2025-12-25 18:52:14.512869-06
+1447	e2986526-d3ac-4115-a46d-489687e4a5b6	P3	frecuencia	4	2025-12-25 18:52:14.512869-06
+1448	e2986526-d3ac-4115-a46d-489687e4a5b6	P3	normalidad	4	2025-12-25 18:52:14.512869-06
+1449	e2986526-d3ac-4115-a46d-489687e4a5b6	P3	gravedad	5	2025-12-25 18:52:14.512869-06
+1450	e2986526-d3ac-4115-a46d-489687e4a5b6	P4	frecuencia	4	2025-12-25 18:52:14.512869-06
+1451	e2986526-d3ac-4115-a46d-489687e4a5b6	P4	normalidad	3	2025-12-25 18:52:14.512869-06
+1452	e2986526-d3ac-4115-a46d-489687e4a5b6	P4	gravedad	5	2025-12-25 18:52:14.512869-06
+1453	e2986526-d3ac-4115-a46d-489687e4a5b6	P5	frecuencia	3	2025-12-25 18:52:14.512869-06
+1454	e2986526-d3ac-4115-a46d-489687e4a5b6	P5	normalidad	4	2025-12-25 18:52:14.512869-06
+1455	e2986526-d3ac-4115-a46d-489687e4a5b6	P5	gravedad	5	2025-12-25 18:52:14.512869-06
+1456	e2986526-d3ac-4115-a46d-489687e4a5b6	P6	frecuencia	4	2025-12-25 18:52:14.512869-06
+1457	e2986526-d3ac-4115-a46d-489687e4a5b6	P6	normalidad	5	2025-12-25 18:52:14.512869-06
+1458	e2986526-d3ac-4115-a46d-489687e4a5b6	P6	gravedad	5	2025-12-25 18:52:14.512869-06
+1459	e2986526-d3ac-4115-a46d-489687e4a5b6	P7	frecuencia	4	2025-12-25 18:52:14.512869-06
+1460	e2986526-d3ac-4115-a46d-489687e4a5b6	P7	normalidad	5	2025-12-25 18:52:14.512869-06
+1461	e2986526-d3ac-4115-a46d-489687e4a5b6	P7	gravedad	5	2025-12-25 18:52:14.512869-06
+1462	e2986526-d3ac-4115-a46d-489687e4a5b6	P8	frecuencia	4	2025-12-25 18:52:14.512869-06
+1463	e2986526-d3ac-4115-a46d-489687e4a5b6	P8	normalidad	5	2025-12-25 18:52:14.512869-06
+1464	e2986526-d3ac-4115-a46d-489687e4a5b6	P8	gravedad	3	2025-12-25 18:52:14.512869-06
+1465	e2986526-d3ac-4115-a46d-489687e4a5b6	P9	frecuencia	2	2025-12-25 18:52:14.512869-06
+1466	e2986526-d3ac-4115-a46d-489687e4a5b6	P9	normalidad	4	2025-12-25 18:52:14.512869-06
+1467	e2986526-d3ac-4115-a46d-489687e4a5b6	P9	gravedad	2	2025-12-25 18:52:14.512869-06
+1468	e2986526-d3ac-4115-a46d-489687e4a5b6	P10	frecuencia	1	2025-12-25 18:52:14.512869-06
+1469	e2986526-d3ac-4115-a46d-489687e4a5b6	P10	normalidad	2	2025-12-25 18:52:14.512869-06
+1470	e2986526-d3ac-4115-a46d-489687e4a5b6	P10	gravedad	5	2025-12-25 18:52:14.512869-06
+1471	e2986526-d3ac-4115-a46d-489687e4a5b6	P11	frecuencia	3	2025-12-25 18:52:14.512869-06
+1472	e2986526-d3ac-4115-a46d-489687e4a5b6	P11	normalidad	4	2025-12-25 18:52:14.512869-06
+1473	e2986526-d3ac-4115-a46d-489687e4a5b6	P11	gravedad	3	2025-12-25 18:52:14.512869-06
+1474	e2986526-d3ac-4115-a46d-489687e4a5b6	P12	frecuencia	5	2025-12-25 18:52:14.512869-06
+1475	e2986526-d3ac-4115-a46d-489687e4a5b6	P12	normalidad	3	2025-12-25 18:52:14.512869-06
+1476	e2986526-d3ac-4115-a46d-489687e4a5b6	P12	gravedad	5	2025-12-25 18:52:14.512869-06
+1477	e2986526-d3ac-4115-a46d-489687e4a5b6	P13	frecuencia	4	2025-12-25 18:52:14.512869-06
+1478	e2986526-d3ac-4115-a46d-489687e4a5b6	P13	normalidad	5	2025-12-25 18:52:14.512869-06
+1479	e2986526-d3ac-4115-a46d-489687e4a5b6	P13	gravedad	4	2025-12-25 18:52:14.512869-06
+1480	e2986526-d3ac-4115-a46d-489687e4a5b6	P14	frecuencia	5	2025-12-25 18:52:14.512869-06
+1481	e2986526-d3ac-4115-a46d-489687e4a5b6	P14	normalidad	5	2025-12-25 18:52:14.512869-06
+1482	e2986526-d3ac-4115-a46d-489687e4a5b6	P14	gravedad	4	2025-12-25 18:52:14.512869-06
+1483	e2986526-d3ac-4115-a46d-489687e4a5b6	P15	frecuencia	5	2025-12-25 18:52:14.512869-06
+1484	e2986526-d3ac-4115-a46d-489687e4a5b6	P15	normalidad	4	2025-12-25 18:52:14.512869-06
+1485	e2986526-d3ac-4115-a46d-489687e4a5b6	P15	gravedad	4	2025-12-25 18:52:14.512869-06
+1486	e2986526-d3ac-4115-a46d-489687e4a5b6	P16	frecuencia	5	2025-12-25 18:52:14.512869-06
+1487	e2986526-d3ac-4115-a46d-489687e4a5b6	P16	normalidad	4	2025-12-25 18:52:14.512869-06
+1488	e2986526-d3ac-4115-a46d-489687e4a5b6	P16	gravedad	4	2025-12-25 18:52:14.512869-06
+1489	20902056-ec59-48a5-8167-6c5410281f07	P1	frecuencia	3	2025-12-25 19:34:00.068155-06
+1490	20902056-ec59-48a5-8167-6c5410281f07	P1	normalidad	3	2025-12-25 19:34:00.068155-06
+1491	20902056-ec59-48a5-8167-6c5410281f07	P1	gravedad	2	2025-12-25 19:34:00.068155-06
+1492	20902056-ec59-48a5-8167-6c5410281f07	P2	frecuencia	2	2025-12-25 19:34:00.068155-06
+1493	20902056-ec59-48a5-8167-6c5410281f07	P2	normalidad	2	2025-12-25 19:34:00.068155-06
+1494	20902056-ec59-48a5-8167-6c5410281f07	P2	gravedad	2	2025-12-25 19:34:00.068155-06
+1495	20902056-ec59-48a5-8167-6c5410281f07	P3	frecuencia	2	2025-12-25 19:34:00.068155-06
+1496	20902056-ec59-48a5-8167-6c5410281f07	P3	normalidad	2	2025-12-25 19:34:00.068155-06
+1497	20902056-ec59-48a5-8167-6c5410281f07	P3	gravedad	3	2025-12-25 19:34:00.068155-06
+1498	20902056-ec59-48a5-8167-6c5410281f07	P4	frecuencia	2	2025-12-25 19:34:00.068155-06
+1499	20902056-ec59-48a5-8167-6c5410281f07	P4	normalidad	2	2025-12-25 19:34:00.068155-06
+1500	20902056-ec59-48a5-8167-6c5410281f07	P4	gravedad	3	2025-12-25 19:34:00.068155-06
+1501	20902056-ec59-48a5-8167-6c5410281f07	P5	frecuencia	2	2025-12-25 19:34:00.068155-06
+1502	20902056-ec59-48a5-8167-6c5410281f07	P5	normalidad	3	2025-12-25 19:34:00.068155-06
+1503	20902056-ec59-48a5-8167-6c5410281f07	P5	gravedad	3	2025-12-25 19:34:00.068155-06
+1504	20902056-ec59-48a5-8167-6c5410281f07	P6	frecuencia	3	2025-12-25 19:34:00.068155-06
+1505	20902056-ec59-48a5-8167-6c5410281f07	P6	normalidad	3	2025-12-25 19:34:00.068155-06
+1506	20902056-ec59-48a5-8167-6c5410281f07	P6	gravedad	2	2025-12-25 19:34:00.068155-06
+1507	20902056-ec59-48a5-8167-6c5410281f07	P7	frecuencia	3	2025-12-25 19:34:00.068155-06
+1508	20902056-ec59-48a5-8167-6c5410281f07	P7	normalidad	3	2025-12-25 19:34:00.068155-06
+1509	20902056-ec59-48a5-8167-6c5410281f07	P7	gravedad	2	2025-12-25 19:34:00.068155-06
+1510	20902056-ec59-48a5-8167-6c5410281f07	P8	frecuencia	3	2025-12-25 19:34:00.068155-06
+1511	20902056-ec59-48a5-8167-6c5410281f07	P8	normalidad	3	2025-12-25 19:34:00.068155-06
+1512	20902056-ec59-48a5-8167-6c5410281f07	P8	gravedad	3	2025-12-25 19:34:00.068155-06
+1513	20902056-ec59-48a5-8167-6c5410281f07	P9	frecuencia	2	2025-12-25 19:34:00.068155-06
+1514	20902056-ec59-48a5-8167-6c5410281f07	P9	normalidad	4	2025-12-25 19:34:00.068155-06
+1515	20902056-ec59-48a5-8167-6c5410281f07	P9	gravedad	3	2025-12-25 19:34:00.068155-06
+1516	20902056-ec59-48a5-8167-6c5410281f07	P10	frecuencia	3	2025-12-25 19:34:00.068155-06
+1517	20902056-ec59-48a5-8167-6c5410281f07	P10	normalidad	4	2025-12-25 19:34:00.068155-06
+1518	20902056-ec59-48a5-8167-6c5410281f07	P10	gravedad	4	2025-12-25 19:34:00.068155-06
+1519	20902056-ec59-48a5-8167-6c5410281f07	P11	frecuencia	3	2025-12-25 19:34:00.068155-06
+1520	20902056-ec59-48a5-8167-6c5410281f07	P11	normalidad	4	2025-12-25 19:34:00.068155-06
+1521	20902056-ec59-48a5-8167-6c5410281f07	P11	gravedad	4	2025-12-25 19:34:00.068155-06
+1522	20902056-ec59-48a5-8167-6c5410281f07	P12	frecuencia	2	2025-12-25 19:34:00.068155-06
+1523	20902056-ec59-48a5-8167-6c5410281f07	P12	normalidad	4	2025-12-25 19:34:00.068155-06
+1524	20902056-ec59-48a5-8167-6c5410281f07	P12	gravedad	4	2025-12-25 19:34:00.068155-06
+1525	20902056-ec59-48a5-8167-6c5410281f07	P13	frecuencia	2	2025-12-25 19:34:00.068155-06
+1526	20902056-ec59-48a5-8167-6c5410281f07	P13	normalidad	4	2025-12-25 19:34:00.068155-06
+1527	20902056-ec59-48a5-8167-6c5410281f07	P13	gravedad	3	2025-12-25 19:34:00.068155-06
+1528	20902056-ec59-48a5-8167-6c5410281f07	P14	frecuencia	3	2025-12-25 19:34:00.068155-06
+1529	20902056-ec59-48a5-8167-6c5410281f07	P14	normalidad	4	2025-12-25 19:34:00.068155-06
+1530	20902056-ec59-48a5-8167-6c5410281f07	P14	gravedad	4	2025-12-25 19:34:00.068155-06
+1531	20902056-ec59-48a5-8167-6c5410281f07	P15	frecuencia	4	2025-12-25 19:34:00.068155-06
+1532	20902056-ec59-48a5-8167-6c5410281f07	P15	normalidad	3	2025-12-25 19:34:00.068155-06
+1533	20902056-ec59-48a5-8167-6c5410281f07	P15	gravedad	5	2025-12-25 19:34:00.068155-06
+1534	20902056-ec59-48a5-8167-6c5410281f07	P16	frecuencia	5	2025-12-25 19:34:00.068155-06
+1535	20902056-ec59-48a5-8167-6c5410281f07	P16	normalidad	4	2025-12-25 19:34:00.068155-06
+1536	20902056-ec59-48a5-8167-6c5410281f07	P16	gravedad	4	2025-12-25 19:34:00.068155-06
+1537	95c01992-ff5c-4e98-8901-f90d2d9825c0	P1	frecuencia	3	2025-12-26 20:24:06.237453-06
+1538	95c01992-ff5c-4e98-8901-f90d2d9825c0	P1	normalidad	2	2025-12-26 20:24:06.237453-06
+1539	95c01992-ff5c-4e98-8901-f90d2d9825c0	P1	gravedad	4	2025-12-26 20:24:06.237453-06
+1540	95c01992-ff5c-4e98-8901-f90d2d9825c0	P2	frecuencia	3	2025-12-26 20:24:06.237453-06
+1541	95c01992-ff5c-4e98-8901-f90d2d9825c0	P2	normalidad	4	2025-12-26 20:24:06.237453-06
+1542	95c01992-ff5c-4e98-8901-f90d2d9825c0	P2	gravedad	3	2025-12-26 20:24:06.237453-06
+1543	95c01992-ff5c-4e98-8901-f90d2d9825c0	P3	frecuencia	4	2025-12-26 20:24:06.237453-06
+1544	95c01992-ff5c-4e98-8901-f90d2d9825c0	P3	normalidad	1	2025-12-26 20:24:06.237453-06
+1545	95c01992-ff5c-4e98-8901-f90d2d9825c0	P3	gravedad	5	2025-12-26 20:24:06.237453-06
+1546	95c01992-ff5c-4e98-8901-f90d2d9825c0	P4	frecuencia	4	2025-12-26 20:24:06.237453-06
+1547	95c01992-ff5c-4e98-8901-f90d2d9825c0	P4	normalidad	3	2025-12-26 20:24:06.237453-06
+1548	95c01992-ff5c-4e98-8901-f90d2d9825c0	P4	gravedad	3	2025-12-26 20:24:06.237453-06
+1549	95c01992-ff5c-4e98-8901-f90d2d9825c0	P5	frecuencia	2	2025-12-26 20:24:06.237453-06
+1550	95c01992-ff5c-4e98-8901-f90d2d9825c0	P5	normalidad	4	2025-12-26 20:24:06.237453-06
+1551	95c01992-ff5c-4e98-8901-f90d2d9825c0	P5	gravedad	5	2025-12-26 20:24:06.237453-06
+1552	95c01992-ff5c-4e98-8901-f90d2d9825c0	P6	frecuencia	4	2025-12-26 20:24:06.237453-06
+1553	95c01992-ff5c-4e98-8901-f90d2d9825c0	P6	normalidad	4	2025-12-26 20:24:06.237453-06
+1554	95c01992-ff5c-4e98-8901-f90d2d9825c0	P6	gravedad	5	2025-12-26 20:24:06.237453-06
+1555	95c01992-ff5c-4e98-8901-f90d2d9825c0	P7	frecuencia	3	2025-12-26 20:24:06.237453-06
+1556	95c01992-ff5c-4e98-8901-f90d2d9825c0	P7	normalidad	4	2025-12-26 20:24:06.237453-06
+1557	95c01992-ff5c-4e98-8901-f90d2d9825c0	P7	gravedad	5	2025-12-26 20:24:06.237453-06
+1558	95c01992-ff5c-4e98-8901-f90d2d9825c0	P8	frecuencia	4	2025-12-26 20:24:06.237453-06
+1559	95c01992-ff5c-4e98-8901-f90d2d9825c0	P8	normalidad	5	2025-12-26 20:24:06.237453-06
+1560	95c01992-ff5c-4e98-8901-f90d2d9825c0	P8	gravedad	5	2025-12-26 20:24:06.237453-06
+1561	95c01992-ff5c-4e98-8901-f90d2d9825c0	P9	frecuencia	3	2025-12-26 20:24:06.237453-06
+1562	95c01992-ff5c-4e98-8901-f90d2d9825c0	P9	normalidad	4	2025-12-26 20:24:06.237453-06
+1563	95c01992-ff5c-4e98-8901-f90d2d9825c0	P9	gravedad	4	2025-12-26 20:24:06.237453-06
+1564	95c01992-ff5c-4e98-8901-f90d2d9825c0	P10	frecuencia	4	2025-12-26 20:24:06.237453-06
+1565	95c01992-ff5c-4e98-8901-f90d2d9825c0	P10	normalidad	4	2025-12-26 20:24:06.237453-06
+1566	95c01992-ff5c-4e98-8901-f90d2d9825c0	P10	gravedad	4	2025-12-26 20:24:06.237453-06
+1567	95c01992-ff5c-4e98-8901-f90d2d9825c0	P11	frecuencia	4	2025-12-26 20:24:06.237453-06
+1568	95c01992-ff5c-4e98-8901-f90d2d9825c0	P11	normalidad	5	2025-12-26 20:24:06.237453-06
+1569	95c01992-ff5c-4e98-8901-f90d2d9825c0	P11	gravedad	4	2025-12-26 20:24:06.237453-06
+1570	95c01992-ff5c-4e98-8901-f90d2d9825c0	P12	frecuencia	5	2025-12-26 20:24:06.237453-06
+1571	95c01992-ff5c-4e98-8901-f90d2d9825c0	P12	normalidad	5	2025-12-26 20:24:06.237453-06
+1572	95c01992-ff5c-4e98-8901-f90d2d9825c0	P12	gravedad	4	2025-12-26 20:24:06.237453-06
+1573	95c01992-ff5c-4e98-8901-f90d2d9825c0	P13	frecuencia	2	2025-12-26 20:24:06.237453-06
+1574	95c01992-ff5c-4e98-8901-f90d2d9825c0	P13	normalidad	3	2025-12-26 20:24:06.237453-06
+1575	95c01992-ff5c-4e98-8901-f90d2d9825c0	P13	gravedad	3	2025-12-26 20:24:06.237453-06
+1576	95c01992-ff5c-4e98-8901-f90d2d9825c0	P14	frecuencia	2	2025-12-26 20:24:06.237453-06
+1577	95c01992-ff5c-4e98-8901-f90d2d9825c0	P14	normalidad	3	2025-12-26 20:24:06.237453-06
+1578	95c01992-ff5c-4e98-8901-f90d2d9825c0	P14	gravedad	2	2025-12-26 20:24:06.237453-06
+1579	95c01992-ff5c-4e98-8901-f90d2d9825c0	P15	frecuencia	2	2025-12-26 20:24:06.237453-06
+1580	95c01992-ff5c-4e98-8901-f90d2d9825c0	P15	normalidad	2	2025-12-26 20:24:06.237453-06
+1581	95c01992-ff5c-4e98-8901-f90d2d9825c0	P15	gravedad	3	2025-12-26 20:24:06.237453-06
+1582	95c01992-ff5c-4e98-8901-f90d2d9825c0	P16	frecuencia	3	2025-12-26 20:24:06.237453-06
+1583	95c01992-ff5c-4e98-8901-f90d2d9825c0	P16	normalidad	3	2025-12-26 20:24:06.237453-06
+1584	95c01992-ff5c-4e98-8901-f90d2d9825c0	P16	gravedad	3	2025-12-26 20:24:06.237453-06
+1585	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P1	frecuencia	2	2025-12-26 20:26:26.732888-06
+1586	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P1	normalidad	3	2025-12-26 20:26:26.732888-06
+1587	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P1	gravedad	3	2025-12-26 20:26:26.732888-06
+1588	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P2	frecuencia	3	2025-12-26 20:26:26.732888-06
+1589	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P2	normalidad	4	2025-12-26 20:26:26.732888-06
+1590	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P2	gravedad	3	2025-12-26 20:26:26.732888-06
+1591	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P3	frecuencia	4	2025-12-26 20:26:26.732888-06
+1592	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P3	normalidad	3	2025-12-26 20:26:26.732888-06
+1593	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P3	gravedad	4	2025-12-26 20:26:26.732888-06
+1594	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P4	frecuencia	4	2025-12-26 20:26:26.732888-06
+1595	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P4	normalidad	3	2025-12-26 20:26:26.732888-06
+1596	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P4	gravedad	4	2025-12-26 20:26:26.732888-06
+1597	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P5	frecuencia	3	2025-12-26 20:26:26.732888-06
+1598	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P5	normalidad	4	2025-12-26 20:26:26.732888-06
+1599	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P5	gravedad	3	2025-12-26 20:26:26.732888-06
+1600	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P6	frecuencia	4	2025-12-26 20:26:26.732888-06
+1601	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P6	normalidad	3	2025-12-26 20:26:26.732888-06
+1602	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P6	gravedad	5	2025-12-26 20:26:26.732888-06
+1603	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P7	frecuencia	4	2025-12-26 20:26:26.732888-06
+1604	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P7	normalidad	4	2025-12-26 20:26:26.732888-06
+1605	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P7	gravedad	5	2025-12-26 20:26:26.732888-06
+1606	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P8	frecuencia	5	2025-12-26 20:26:26.732888-06
+1607	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P8	normalidad	4	2025-12-26 20:26:26.732888-06
+1608	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P8	gravedad	3	2025-12-26 20:26:26.732888-06
+1609	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P9	frecuencia	4	2025-12-26 20:26:26.732888-06
+1610	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P9	normalidad	4	2025-12-26 20:26:26.732888-06
+1611	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P9	gravedad	3	2025-12-26 20:26:26.732888-06
+1612	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P10	frecuencia	3	2025-12-26 20:26:26.732888-06
+1613	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P10	normalidad	5	2025-12-26 20:26:26.732888-06
+1614	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P10	gravedad	4	2025-12-26 20:26:26.732888-06
+1615	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P11	frecuencia	4	2025-12-26 20:26:26.732888-06
+1616	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P11	normalidad	4	2025-12-26 20:26:26.732888-06
+1617	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P11	gravedad	4	2025-12-26 20:26:26.732888-06
+1618	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P12	frecuencia	3	2025-12-26 20:26:26.732888-06
+1619	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P12	normalidad	5	2025-12-26 20:26:26.732888-06
+1620	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P12	gravedad	4	2025-12-26 20:26:26.732888-06
+1621	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P13	frecuencia	3	2025-12-26 20:26:26.732888-06
+1622	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P13	normalidad	4	2025-12-26 20:26:26.732888-06
+1623	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P13	gravedad	4	2025-12-26 20:26:26.732888-06
+1624	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P14	frecuencia	5	2025-12-26 20:26:26.732888-06
+1625	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P14	normalidad	4	2025-12-26 20:26:26.732888-06
+1626	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P14	gravedad	5	2025-12-26 20:26:26.732888-06
+1627	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P15	frecuencia	4	2025-12-26 20:26:26.732888-06
+1628	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P15	normalidad	5	2025-12-26 20:26:26.732888-06
+1629	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P15	gravedad	5	2025-12-26 20:26:26.732888-06
+1630	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P16	frecuencia	2	2025-12-26 20:26:26.732888-06
+1631	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P16	normalidad	4	2025-12-26 20:26:26.732888-06
+1632	80b0ba11-92ea-4765-8eae-7d411ebfef0d	P16	gravedad	3	2025-12-26 20:26:26.732888-06
+1633	8c9938e5-93ef-4641-ad3b-cd65023a8446	P1	frecuencia	4	2025-12-26 20:42:32.49386-06
+1634	8c9938e5-93ef-4641-ad3b-cd65023a8446	P1	normalidad	3	2025-12-26 20:42:32.49386-06
+1635	8c9938e5-93ef-4641-ad3b-cd65023a8446	P1	gravedad	4	2025-12-26 20:42:32.49386-06
+1636	8c9938e5-93ef-4641-ad3b-cd65023a8446	P2	frecuencia	3	2025-12-26 20:42:32.49386-06
+1637	8c9938e5-93ef-4641-ad3b-cd65023a8446	P2	normalidad	4	2025-12-26 20:42:32.49386-06
+1638	8c9938e5-93ef-4641-ad3b-cd65023a8446	P2	gravedad	4	2025-12-26 20:42:32.49386-06
+1639	8c9938e5-93ef-4641-ad3b-cd65023a8446	P3	frecuencia	4	2025-12-26 20:42:32.49386-06
+1640	8c9938e5-93ef-4641-ad3b-cd65023a8446	P3	normalidad	3	2025-12-26 20:42:32.49386-06
+1641	8c9938e5-93ef-4641-ad3b-cd65023a8446	P3	gravedad	4	2025-12-26 20:42:32.49386-06
+1642	8c9938e5-93ef-4641-ad3b-cd65023a8446	P4	frecuencia	2	2025-12-26 20:42:32.49386-06
+1643	8c9938e5-93ef-4641-ad3b-cd65023a8446	P4	normalidad	2	2025-12-26 20:42:32.49386-06
+1644	8c9938e5-93ef-4641-ad3b-cd65023a8446	P4	gravedad	3	2025-12-26 20:42:32.49386-06
+1645	8c9938e5-93ef-4641-ad3b-cd65023a8446	P5	frecuencia	4	2025-12-26 20:42:32.49386-06
+1646	8c9938e5-93ef-4641-ad3b-cd65023a8446	P5	normalidad	3	2025-12-26 20:42:32.49386-06
+1647	8c9938e5-93ef-4641-ad3b-cd65023a8446	P5	gravedad	4	2025-12-26 20:42:32.49386-06
+1648	8c9938e5-93ef-4641-ad3b-cd65023a8446	P6	frecuencia	3	2025-12-26 20:42:32.49386-06
+1649	8c9938e5-93ef-4641-ad3b-cd65023a8446	P6	normalidad	4	2025-12-26 20:42:32.49386-06
+1650	8c9938e5-93ef-4641-ad3b-cd65023a8446	P6	gravedad	4	2025-12-26 20:42:32.49386-06
+1651	8c9938e5-93ef-4641-ad3b-cd65023a8446	P7	frecuencia	4	2025-12-26 20:42:32.49386-06
+1652	8c9938e5-93ef-4641-ad3b-cd65023a8446	P7	normalidad	4	2025-12-26 20:42:32.49386-06
+1653	8c9938e5-93ef-4641-ad3b-cd65023a8446	P7	gravedad	3	2025-12-26 20:42:32.49386-06
+1654	8c9938e5-93ef-4641-ad3b-cd65023a8446	P8	frecuencia	3	2025-12-26 20:42:32.49386-06
+1655	8c9938e5-93ef-4641-ad3b-cd65023a8446	P8	normalidad	4	2025-12-26 20:42:32.49386-06
+1656	8c9938e5-93ef-4641-ad3b-cd65023a8446	P8	gravedad	3	2025-12-26 20:42:32.49386-06
+1657	8c9938e5-93ef-4641-ad3b-cd65023a8446	P9	frecuencia	5	2025-12-26 20:42:32.49386-06
+1658	8c9938e5-93ef-4641-ad3b-cd65023a8446	P9	normalidad	4	2025-12-26 20:42:32.49386-06
+1659	8c9938e5-93ef-4641-ad3b-cd65023a8446	P9	gravedad	4	2025-12-26 20:42:32.49386-06
+1660	8c9938e5-93ef-4641-ad3b-cd65023a8446	P10	frecuencia	4	2025-12-26 20:42:32.49386-06
+1661	8c9938e5-93ef-4641-ad3b-cd65023a8446	P10	normalidad	4	2025-12-26 20:42:32.49386-06
+1662	8c9938e5-93ef-4641-ad3b-cd65023a8446	P10	gravedad	4	2025-12-26 20:42:32.49386-06
+1663	8c9938e5-93ef-4641-ad3b-cd65023a8446	P11	frecuencia	3	2025-12-26 20:42:32.49386-06
+1664	8c9938e5-93ef-4641-ad3b-cd65023a8446	P11	normalidad	2	2025-12-26 20:42:32.49386-06
+1665	8c9938e5-93ef-4641-ad3b-cd65023a8446	P11	gravedad	3	2025-12-26 20:42:32.49386-06
+1666	8c9938e5-93ef-4641-ad3b-cd65023a8446	P12	frecuencia	4	2025-12-26 20:42:32.49386-06
+1667	8c9938e5-93ef-4641-ad3b-cd65023a8446	P12	normalidad	4	2025-12-26 20:42:32.49386-06
+1668	8c9938e5-93ef-4641-ad3b-cd65023a8446	P12	gravedad	4	2025-12-26 20:42:32.49386-06
+1669	8c9938e5-93ef-4641-ad3b-cd65023a8446	P13	frecuencia	3	2025-12-26 20:42:32.49386-06
+1670	8c9938e5-93ef-4641-ad3b-cd65023a8446	P13	normalidad	4	2025-12-26 20:42:32.49386-06
+1671	8c9938e5-93ef-4641-ad3b-cd65023a8446	P13	gravedad	3	2025-12-26 20:42:32.49386-06
+1672	8c9938e5-93ef-4641-ad3b-cd65023a8446	P14	frecuencia	4	2025-12-26 20:42:32.49386-06
+1673	8c9938e5-93ef-4641-ad3b-cd65023a8446	P14	normalidad	4	2025-12-26 20:42:32.49386-06
+1674	8c9938e5-93ef-4641-ad3b-cd65023a8446	P14	gravedad	4	2025-12-26 20:42:32.49386-06
+1675	8c9938e5-93ef-4641-ad3b-cd65023a8446	P15	frecuencia	5	2025-12-26 20:42:32.49386-06
+1676	8c9938e5-93ef-4641-ad3b-cd65023a8446	P15	normalidad	4	2025-12-26 20:42:32.49386-06
+1677	8c9938e5-93ef-4641-ad3b-cd65023a8446	P15	gravedad	4	2025-12-26 20:42:32.49386-06
+1678	8c9938e5-93ef-4641-ad3b-cd65023a8446	P16	frecuencia	4	2025-12-26 20:42:32.49386-06
+1679	8c9938e5-93ef-4641-ad3b-cd65023a8446	P16	normalidad	4	2025-12-26 20:42:32.49386-06
+1680	8c9938e5-93ef-4641-ad3b-cd65023a8446	P16	gravedad	4	2025-12-26 20:42:32.49386-06
 \.
 
 
 --
--- Name: centros_id_seq; Type: SEQUENCE SET; Schema: public; Owner: vsalazars
+-- Data for Name: usuario_centros; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.centros_id_seq', 1, true);
+COPY public.usuario_centros (usuario_id, centro_id, created_at) FROM stdin;
+ee0625a0-0b4b-494c-bf05-21ff2943f67a	1	2026-04-11 18:43:17.666002-06
+\.
 
 
 --
--- Name: generos_id_seq; Type: SEQUENCE SET; Schema: public; Owner: vsalazars
+-- Data for Name: usuarios; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.usuarios (id, email, nombre, rol, password_hash, activo, created_at, last_login_at) FROM stdin;
+7bc47e64-9703-419b-a803-fca5de67dfba	romi@mail.com	Vidal Salazar	admin	$2a$06$9Cxcs.O3.tUY.ks1mUQWYOrEH4ocpZyTo38.aCAV5f5J6EuS1lDm2	t	2025-12-24 01:04:53.888319-06	2026-04-11 18:42:39.920047-06
+ee0625a0-0b4b-494c-bf05-21ff2943f67a	upiita@mail.com	Romina Salazar	centro	$2a$10$2eWIVEhLWkIq0.y6SS/QJO3lMRenhWkNRdxVs.3Lp0JMzU9rIqwgq	t	2025-12-24 02:02:46.840428-06	2026-04-11 18:43:42.093066-06
+\.
+
+
+--
+-- Name: centros_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.centros_id_seq', 2, true);
+
+
+--
+-- Name: generos_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
 SELECT pg_catalog.setval('public.generos_id_seq', 8, true);
 
 
 --
--- Name: respuestas_id_seq; Type: SEQUENCE SET; Schema: public; Owner: vsalazars
+-- Name: respuestas_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.respuestas_id_seq', 1056, true);
+SELECT pg_catalog.setval('public.respuestas_id_seq', 1680, true);
 
 
 --
--- Name: centros centros_clave_key; Type: CONSTRAINT; Schema: public; Owner: vsalazars
+-- Name: centros centros_clave_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.centros
@@ -1018,7 +1709,7 @@ ALTER TABLE ONLY public.centros
 
 
 --
--- Name: centros centros_pkey; Type: CONSTRAINT; Schema: public; Owner: vsalazars
+-- Name: centros centros_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.centros
@@ -1026,7 +1717,7 @@ ALTER TABLE ONLY public.centros
 
 
 --
--- Name: encuestas encuestas_pkey; Type: CONSTRAINT; Schema: public; Owner: vsalazars
+-- Name: encuestas encuestas_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.encuestas
@@ -1034,7 +1725,7 @@ ALTER TABLE ONLY public.encuestas
 
 
 --
--- Name: generos generos_clave_key; Type: CONSTRAINT; Schema: public; Owner: vsalazars
+-- Name: generos generos_clave_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.generos
@@ -1042,7 +1733,7 @@ ALTER TABLE ONLY public.generos
 
 
 --
--- Name: generos generos_pkey; Type: CONSTRAINT; Schema: public; Owner: vsalazars
+-- Name: generos generos_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.generos
@@ -1050,7 +1741,7 @@ ALTER TABLE ONLY public.generos
 
 
 --
--- Name: respuestas respuestas_encuesta_id_pregunta_id_dimension_key; Type: CONSTRAINT; Schema: public; Owner: vsalazars
+-- Name: respuestas respuestas_encuesta_id_pregunta_id_dimension_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.respuestas
@@ -1058,7 +1749,7 @@ ALTER TABLE ONLY public.respuestas
 
 
 --
--- Name: respuestas respuestas_pkey; Type: CONSTRAINT; Schema: public; Owner: vsalazars
+-- Name: respuestas respuestas_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.respuestas
@@ -1066,56 +1757,87 @@ ALTER TABLE ONLY public.respuestas
 
 
 --
--- Name: idx_centros_nombre; Type: INDEX; Schema: public; Owner: vsalazars
+-- Name: usuario_centros usuario_centros_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.usuario_centros
+    ADD CONSTRAINT usuario_centros_pkey PRIMARY KEY (usuario_id, centro_id);
+
+
+--
+-- Name: usuarios usuarios_email_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.usuarios
+    ADD CONSTRAINT usuarios_email_key UNIQUE (email);
+
+
+--
+-- Name: usuarios usuarios_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.usuarios
+    ADD CONSTRAINT usuarios_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: idx_centros_nombre; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_centros_nombre ON public.centros USING gin (to_tsvector('spanish'::regconfig, nombre));
 
 
 --
--- Name: idx_centros_tipo; Type: INDEX; Schema: public; Owner: vsalazars
+-- Name: idx_centros_tipo; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_centros_tipo ON public.centros USING btree (tipo);
 
 
 --
--- Name: idx_encuestas_centro; Type: INDEX; Schema: public; Owner: vsalazars
+-- Name: idx_encuestas_centro; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_encuestas_centro ON public.encuestas USING btree (centro_id);
 
 
 --
--- Name: idx_encuestas_email_hash; Type: INDEX; Schema: public; Owner: vsalazars
+-- Name: idx_encuestas_email_hash; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_encuestas_email_hash ON public.encuestas USING btree (email_hash);
 
 
 --
--- Name: idx_encuestas_instrumento; Type: INDEX; Schema: public; Owner: vsalazars
+-- Name: idx_encuestas_instrumento; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_encuestas_instrumento ON public.encuestas USING btree (instrumento_id);
 
 
 --
--- Name: idx_respuestas_encuesta; Type: INDEX; Schema: public; Owner: vsalazars
+-- Name: idx_respuestas_encuesta; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_respuestas_encuesta ON public.respuestas USING btree (encuesta_id);
 
 
 --
--- Name: idx_respuestas_preg_dim; Type: INDEX; Schema: public; Owner: vsalazars
+-- Name: idx_respuestas_preg_dim; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_respuestas_preg_dim ON public.respuestas USING btree (pregunta_id, dimension);
 
 
 --
--- Name: encuestas encuestas_centro_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: vsalazars
+-- Name: idx_usuario_centros_centro_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_usuario_centros_centro_id ON public.usuario_centros USING btree (centro_id);
+
+
+--
+-- Name: encuestas encuestas_centro_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.encuestas
@@ -1123,7 +1845,7 @@ ALTER TABLE ONLY public.encuestas
 
 
 --
--- Name: encuestas encuestas_genero_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: vsalazars
+-- Name: encuestas encuestas_genero_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.encuestas
@@ -1131,7 +1853,7 @@ ALTER TABLE ONLY public.encuestas
 
 
 --
--- Name: respuestas respuestas_encuesta_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: vsalazars
+-- Name: respuestas respuestas_encuesta_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.respuestas
@@ -1139,6 +1861,24 @@ ALTER TABLE ONLY public.respuestas
 
 
 --
+-- Name: usuario_centros usuario_centros_centro_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.usuario_centros
+    ADD CONSTRAINT usuario_centros_centro_id_fkey FOREIGN KEY (centro_id) REFERENCES public.centros(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: usuario_centros usuario_centros_usuario_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.usuario_centros
+    ADD CONSTRAINT usuario_centros_usuario_id_fkey FOREIGN KEY (usuario_id) REFERENCES public.usuarios(id) ON DELETE CASCADE;
+
+
+--
 -- PostgreSQL database dump complete
 --
+
+\unrestrict J0NSxVx4uDkB0BHzXLINFztvx9aLTxpQT24VJzlVLP518F9AsMjuef8TZcbQysn
 

@@ -13,6 +13,8 @@ import {
   Grid3X3,
   ArrowUpRight,
   Calendar,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 import { api } from "@/lib/api";
@@ -306,6 +308,7 @@ export default function CentroPage() {
   const [data, setData] = useState<CentroResumenResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [comentariosPage, setComentariosPage] = useState(1);
 
   const [showSemantic, setShowSemantic] = useState(true);
 
@@ -539,6 +542,23 @@ export default function CentroPage() {
   }, [data]);
 
   const comentariosCount = comentarios.length;
+  const COMMENTS_PER_PAGE = 9;
+  const comentariosTotalPages = Math.max(1, Math.ceil(comentariosCount / COMMENTS_PER_PAGE));
+  const comentariosPageSafe = Math.min(comentariosPage, comentariosTotalPages);
+  const comentariosPageItems = useMemo(() => {
+    const start = (comentariosPageSafe - 1) * COMMENTS_PER_PAGE;
+    return comentarios.slice(start, start + COMMENTS_PER_PAGE);
+  }, [comentarios, comentariosPageSafe]);
+
+  useEffect(() => {
+    setComentariosPage(1);
+  }, [year, comentariosCount]);
+
+  useEffect(() => {
+    if (comentariosPage > comentariosTotalPages) {
+      setComentariosPage(comentariosTotalPages);
+    }
+  }, [comentariosPage, comentariosTotalPages]);
 
   if (loading) {
     return (
@@ -1917,111 +1937,147 @@ export default function CentroPage() {
                 para el periodo seleccionado.
               </div>
             ) : (
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {comentarios.map((c, idx) => (
-                  <div
-                    key={`${c.encuesta_id}-${idx}`}
-                    className="group relative overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.06)]"
-                  >
+              <>
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {comentariosPageItems.map((c, idx) => (
                     <div
-                      className="pointer-events-none absolute -top-24 -right-24 h-[220px] w-[220px] rounded-full blur-3xl opacity-0 transition-opacity duration-300 group-hover:opacity-30"
-                      style={{ background: PURPLE }}
-                    />
+                      key={`${c.encuesta_id}-${idx}`}
+                      className="group relative overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.06)]"
+                    >
+                      <div
+                        className="pointer-events-none absolute -top-24 -right-24 h-[220px] w-[220px] rounded-full blur-3xl opacity-0 transition-opacity duration-300 group-hover:opacity-30"
+                        style={{ background: PURPLE }}
+                      />
 
-                    <div className="relative">
-                      <div className="flex flex-wrap items-center gap-2">
-                        {c.genero ? (
-                          <Badge
-                            variant="secondary"
-                            className="rounded-full font-black text-[10px] uppercase tracking-widest"
-                            style={{
-                              background: "rgba(127,1,127,0.10)",
-                              color: PURPLE,
-                            }}
-                          >
-                            {c.genero}
-                          </Badge>
-                        ) : null}
-
-                        {Number.isFinite(c.edad) && c.edad > 0 ? (
-                          <Badge
-                            variant="secondary"
-                            className="rounded-full font-black text-[10px] uppercase tracking-widest"
-                            style={{ background: "rgba(2,6,23,0.04)", color: "#0f172a" }}
-                          >
-                            {c.edad} años
-                          </Badge>
-                        ) : null}
-
-                        {c.fecha ? (
-                          <span className="ml-auto text-[11px] font-black text-slate-400">
-                            {formatFechaES(c.fecha)}
-                          </span>
-                        ) : null}
-                      </div>
-
-                      <p className="mt-3 text-sm leading-6 text-slate-700 font-semibold">
-                        {truncate(c.texto, 180)}
-                      </p>
-
-                      {c.texto.length > 180 && (
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <button
-                              className="mt-3 text-xs font-black uppercase tracking-widest"
-                              style={{ color: PURPLE }}
+                      <div className="relative">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {c.genero ? (
+                            <Badge
+                              variant="secondary"
+                              className="rounded-full font-black text-[10px] uppercase tracking-widest"
+                              style={{
+                                background: "rgba(127,1,127,0.10)",
+                                color: PURPLE,
+                              }}
                             >
-                              Ver comentario completo
-                            </button>
-                          </DialogTrigger>
+                              {c.genero}
+                            </Badge>
+                          ) : null}
 
-                          <DialogContent className="max-w-xl rounded-[1.75rem]">
-                            <DialogHeader>
-                              <DialogTitle className="text-sm font-black tracking-wide">
-                                Comentario completo
-                              </DialogTitle>
-                            </DialogHeader>
+                          {Number.isFinite(c.edad) && c.edad > 0 ? (
+                            <Badge
+                              variant="secondary"
+                              className="rounded-full font-black text-[10px] uppercase tracking-widest"
+                              style={{ background: "rgba(2,6,23,0.04)", color: "#0f172a" }}
+                            >
+                              {c.edad} años
+                            </Badge>
+                          ) : null}
 
-                            <div className="flex flex-wrap items-center gap-2 mb-3">
-                              {c.genero && (
-                                <Badge
-                                  variant="secondary"
-                                  className="rounded-full font-black text-[10px] uppercase tracking-widest"
-                                  style={{
-                                    background: "rgba(127,1,127,0.10)",
-                                    color: PURPLE,
-                                  }}
-                                >
-                                  {c.genero}
-                                </Badge>
-                              )}
+                          {c.fecha ? (
+                            <span className="ml-auto text-[11px] font-black text-slate-400">
+                              {formatFechaES(c.fecha)}
+                            </span>
+                          ) : null}
+                        </div>
 
-                              {Number.isFinite(c.edad) && c.edad > 0 && (
-                                <Badge
-                                  variant="secondary"
-                                  className="rounded-full font-black text-[10px] uppercase tracking-widest"
-                                >
-                                  {c.edad} años
-                                </Badge>
-                              )}
+                        <p className="mt-3 text-sm leading-6 text-slate-700 font-semibold">
+                          {truncate(c.texto, 180)}
+                        </p>
 
-                              {c.fecha && (
-                                <span className="ml-auto text-[11px] font-black text-slate-400">
-                                  {formatFechaES(c.fecha)}
-                                </span>
-                              )}
-                            </div>
+                        {c.texto.length > 180 && (
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <button
+                                className="mt-3 text-xs font-black uppercase tracking-widest"
+                                style={{ color: PURPLE }}
+                              >
+                                Ver comentario completo
+                              </button>
+                            </DialogTrigger>
 
-                            <p className="text-sm leading-6 text-slate-700 font-semibold whitespace-pre-wrap">
-                              {c.texto}
-                            </p>
-                          </DialogContent>
-                        </Dialog>
-                      )}
+                            <DialogContent className="max-w-xl rounded-[1.75rem]">
+                              <DialogHeader>
+                                <DialogTitle className="text-sm font-black tracking-wide">
+                                  Comentario completo
+                                </DialogTitle>
+                              </DialogHeader>
+
+                              <div className="flex flex-wrap items-center gap-2 mb-3">
+                                {c.genero && (
+                                  <Badge
+                                    variant="secondary"
+                                    className="rounded-full font-black text-[10px] uppercase tracking-widest"
+                                    style={{
+                                      background: "rgba(127,1,127,0.10)",
+                                      color: PURPLE,
+                                    }}
+                                  >
+                                    {c.genero}
+                                  </Badge>
+                                )}
+
+                                {Number.isFinite(c.edad) && c.edad > 0 && (
+                                  <Badge
+                                    variant="secondary"
+                                    className="rounded-full font-black text-[10px] uppercase tracking-widest"
+                                  >
+                                    {c.edad} años
+                                  </Badge>
+                                )}
+
+                                {c.fecha && (
+                                  <span className="ml-auto text-[11px] font-black text-slate-400">
+                                    {formatFechaES(c.fecha)}
+                                  </span>
+                                )}
+                              </div>
+
+                              <p className="text-sm leading-6 text-slate-700 font-semibold whitespace-pre-wrap">
+                                {c.texto}
+                              </p>
+                            </DialogContent>
+                          </Dialog>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {comentariosTotalPages > 1 && (
+                  <div className="mt-5 flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+                      Página {comentariosPageSafe} de {comentariosTotalPages}
+                    </p>
+
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-full"
+                        disabled={comentariosPageSafe <= 1}
+                        onClick={() => setComentariosPage((p) => Math.max(1, p - 1))}
+                      >
+                        <ChevronLeft className="mr-1 h-4 w-4" />
+                        Anterior
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-full"
+                        disabled={comentariosPageSafe >= comentariosTotalPages}
+                        onClick={() =>
+                          setComentariosPage((p) => Math.min(comentariosTotalPages, p + 1))
+                        }
+                      >
+                        Siguiente
+                        <ChevronRight className="ml-1 h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
