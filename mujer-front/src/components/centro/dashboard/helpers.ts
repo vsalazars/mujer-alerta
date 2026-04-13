@@ -188,6 +188,43 @@ export function emotionTone(emocion?: string) {
   }
 }
 
+export function emotionLabelES(emocion?: string) {
+  switch ((emocion || "").trim().toLowerCase()) {
+    case "anger":
+      return "Enojo";
+    case "fear":
+      return "Miedo";
+    case "sadness":
+      return "Tristeza";
+    case "disgust":
+      return "Disgusto";
+    case "joy":
+      return "Alegria";
+    case "others":
+      return "Otros";
+    case "neutral":
+      return "Neutral";
+    case "neutralidad":
+      return "Neutralidad";
+    case "indignacion":
+      return "Indignacion";
+    case "miedo":
+      return "Miedo";
+    case "tristeza":
+      return "Tristeza";
+    case "disgusto":
+      return "Disgusto";
+    case "impotencia":
+      return "Impotencia";
+    case "esperanza":
+      return "Esperanza";
+    case "sin_clasificar":
+      return "Sin clasificar";
+    default:
+      return capitalizeWord(emocion);
+  }
+}
+
 export function truncate(s: string, n = 180) {
   const t = (s || "").trim();
   if (t.length <= n) return t;

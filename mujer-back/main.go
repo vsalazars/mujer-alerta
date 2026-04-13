@@ -45,6 +45,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	nlpRunner := services.NewNLPRunner(dsn)
+	nlpJobs := services.NewNLPJobManager(nlpRunner)
 
 	// ======================
 	// Health
@@ -297,7 +298,25 @@ func main() {
 	// Centro: Ejecutar pipeline NLP
 	// POST /api/centro/nlp/procesar
 	// ======================
-	cnlp := handlers.CentroNLPHandler{Runner: nlpRunner}
+	cnlp := handlers.CentroNLPHandler{Runner: nlpRunner, Jobs: nlpJobs}
+	mux.HandleFunc("/api/centro/nlp/overview", func(w http.ResponseWriter, r *http.Request) {
+		handlers.RequireJWT(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodGet {
+				cnlp.Overview(w, r)
+				return
+			}
+			http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+		})).ServeHTTP(w, r)
+	})
+	mux.HandleFunc("/api/centro/nlp/status", func(w http.ResponseWriter, r *http.Request) {
+		handlers.RequireJWT(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodGet {
+				cnlp.Status(w, r)
+				return
+			}
+			http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+		})).ServeHTTP(w, r)
+	})
 	mux.HandleFunc("/api/centro/nlp/procesar", func(w http.ResponseWriter, r *http.Request) {
 		handlers.RequireJWT(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodPost {

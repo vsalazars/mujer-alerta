@@ -53,6 +53,72 @@ export type NLPStats = {
   por_tema: CountItem[];
 };
 
+export type NLPCatalogItem = {
+  clave: string;
+  etiqueta: string;
+};
+
+export type NLPRunEvent = {
+  event: string;
+  current?: number;
+  total?: number;
+  encuesta_id?: string;
+  status?: string;
+  error?: string;
+};
+
+export type NLPRunResult = {
+  command: string[];
+  events: NLPRunEvent[];
+  stderr: string[];
+};
+
+export type CentroNLPOverviewResponse = {
+  centros: number[];
+  year?: number;
+  total_comentarios: number;
+  total_procesados: number;
+  total_pendientes: number;
+  total_error: number;
+  avance_porcentaje: number;
+  por_sentimiento: CountItem[];
+  por_emocion: CountItem[];
+  por_tema: CountItem[];
+  catalogo_temas: NLPCatalogItem[];
+};
+
+export type CentroNLPProcessResponse = {
+  centros: number[];
+  started: boolean;
+  status: NLPJobStatus;
+  result?: NLPRunResult;
+};
+
+export type NLPJobStatus = {
+  key: string;
+  centros: number[];
+  year?: number;
+  running: boolean;
+  status: string;
+  current: number;
+  total: number;
+  processed: number;
+  errors: number;
+  last_encuesta_id?: string;
+  last_event?: string;
+  last_error?: string;
+  started_at?: string;
+  finished_at?: string;
+  updated_at: string;
+  result?: NLPRunResult;
+};
+
+export type CentroNLPStatusResponse = {
+  centros: number[];
+  year?: number;
+  status: NLPJobStatus;
+};
+
 export type CentroStats = {
   total_participantes: number;
   total_encuestas: number;

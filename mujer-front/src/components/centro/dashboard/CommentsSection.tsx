@@ -1,16 +1,17 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import type { CSSProperties } from "react";
+import {
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 
 import {
   capitalizeWord,
+  emotionLabelES,
   emotionTone,
-  formatFechaES,
-  fmtInt,
   PURPLE,
-  safeArr,
   sentimentTone,
-  truncate,
 } from "@/components/centro/dashboard/helpers";
-import type { ComentarioItem, NLPStats } from "@/components/centro/dashboard/types";
+import type { ComentarioItem } from "@/components/centro/dashboard/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,13 +23,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 type CommentsSectionProps = {
   year: string;
@@ -38,15 +32,13 @@ type CommentsSectionProps = {
   comentariosPageSafe: number;
   comentariosTotalPages: number;
   sentimientoFilter: string;
-  emocionFilter: string;
   sentimientoOptions: string[];
-  emocionOptions: string[];
-  nlp: NLPStats;
   onSentimientoChange: (value: string) => void;
-  onEmocionChange: (value: string) => void;
   onPrevPage: () => void;
   onNextPage: () => void;
 };
+
+const COMMENT_PREVIEW_LIMIT = 210;
 
 export function CommentsSection({
   year,
@@ -56,12 +48,8 @@ export function CommentsSection({
   comentariosPageSafe,
   comentariosTotalPages,
   sentimientoFilter,
-  emocionFilter,
   sentimientoOptions,
-  emocionOptions,
-  nlp,
   onSentimientoChange,
-  onEmocionChange,
   onPrevPage,
   onNextPage,
 }: CommentsSectionProps) {
@@ -109,67 +97,28 @@ export function CommentsSection({
           </div>
         ) : (
           <>
-            <div className="mb-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <StatCard label="Comentarios" value={fmtInt(nlp.total_comentarios)} />
-              <StatCard label="Procesados" value={fmtInt(nlp.total_procesados)} color={PURPLE} />
-              <StatCard label="Pendientes" value={fmtInt(nlp.total_pendientes)} color="#d97706" />
-              <StatCard label="Error" value={fmtInt(nlp.total_error)} color="#dc2626" />
-            </div>
-
-            <div className="mb-5 grid gap-3 md:grid-cols-2">
+            <div className="mb-6">
               <div className="space-y-2">
                 <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">
                   Filtrar por sentimiento
                 </p>
-                <Select value={sentimientoFilter} onValueChange={onSentimientoChange}>
-                  <SelectTrigger className="rounded-2xl bg-white">
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {sentimientoOptions.map((sentimiento) => (
-                      <SelectItem key={sentimiento} value={sentimiento}>
-                        {capitalizeWord(sentimiento)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">
-                  Filtrar por emocion
-                </p>
-                <Select value={emocionFilter} onValueChange={onEmocionChange}>
-                  <SelectTrigger className="rounded-2xl bg-white">
-                    <SelectValue placeholder="Todas" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas</SelectItem>
-                    {emocionOptions.map((emocion) => (
-                      <SelectItem key={emocion} value={emocion}>
-                        {capitalizeWord(emocion)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex flex-wrap gap-2">
+                  <FilterPill
+                    active={sentimientoFilter === "all"}
+                    label="Todos"
+                    onClick={() => onSentimientoChange("all")}
+                  />
+                  {sentimientoOptions.map((sentimiento) => (
+                    <FilterPill
+                      key={sentimiento}
+                      active={sentimientoFilter === sentimiento}
+                      label={capitalizeWord(sentimiento)}
+                      onClick={() => onSentimientoChange(sentimiento)}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
-
-            {safeArr(nlp.por_tema).length > 0 && (
-              <div className="mb-5 flex flex-wrap gap-2">
-                {safeArr(nlp.por_tema).slice(0, 6).map((tema) => (
-                  <Badge
-                    key={tema.clave}
-                    variant="secondary"
-                    className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest"
-                    style={{ background: "rgba(15,23,42,0.05)", color: "#334155" }}
-                  >
-                    {tema.label}: {fmtInt(tema.total)}
-                  </Badge>
-                ))}
-              </div>
-            )}
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {comentariosPageItems.map((comentario, index) => (
@@ -215,223 +164,178 @@ export function CommentsSection({
   );
 }
 
-function StatCard({
+function FilterPill({
+  active,
   label,
-  value,
-  color = "#0f172a",
+  onClick,
 }: {
+  active: boolean;
   label: string;
-  value: string;
-  color?: string;
+  onClick: () => void;
 }) {
   return (
-    <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4">
-      <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">{label}</p>
-      <p className="mt-2 text-2xl font-black" style={{ color }}>
-        {value}
-      </p>
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        "rounded-full border px-4 py-2 text-sm font-semibold transition-all",
+        active
+          ? "border-[rgba(127,1,127,0.28)] bg-[rgba(127,1,127,0.12)] text-[rgba(127,1,127,1)] shadow-[0_10px_30px_rgba(127,1,127,0.12)]"
+          : "border-slate-200 bg-white text-slate-600 hover:border-[rgba(127,1,127,0.22)] hover:text-[rgba(127,1,127,1)]",
+      ].join(" ")}
+    >
+      {label}
+    </button>
   );
 }
 
 function CommentCard({ comentario }: { comentario: ComentarioItem }) {
+  const preview = buildPreview(comentario.texto, COMMENT_PREVIEW_LIMIT);
+  const showModal = preview.truncated;
+
   return (
-    <div className="group relative overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
+    <div className="group relative h-full min-h-[220px] overflow-hidden rounded-[1.45rem] border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)] transition-all duration-300 hover:shadow-[0_18px_45px_rgba(15,23,42,0.08)]">
       <div
-        className="pointer-events-none absolute -top-24 -right-24 h-[220px] w-[220px] rounded-full blur-3xl opacity-0 transition-opacity duration-300 group-hover:opacity-30"
-        style={{ background: PURPLE }}
+        className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+        style={{
+          background:
+            "radial-gradient(360px circle at 100% 0%, rgba(127,1,127,0.08), transparent 52%)",
+        }}
       />
 
-      <div className="relative">
-        <div className="flex flex-wrap items-center gap-2">
-          {comentario.genero ? (
-            <Badge
-              variant="secondary"
-              className="rounded-full font-black text-[10px] uppercase tracking-widest"
-              style={{ background: "rgba(127,1,127,0.10)", color: PURPLE }}
-            >
-              {comentario.genero}
-            </Badge>
-          ) : null}
+      <div className="relative flex h-full flex-col">
+        <div className="mb-4 overflow-hidden">
+          <div className="flex flex-nowrap items-center gap-1.5 overflow-hidden whitespace-nowrap">
+            {comentario.genero ? (
+              <MetaPill
+                label={comentario.genero}
+                className="border-[rgba(127,1,127,0.10)] bg-[rgba(127,1,127,0.08)] text-[rgba(127,1,127,1)]"
+              />
+            ) : null}
 
-          {comentario.sentimiento_label ? (
-            <Badge
-              variant="secondary"
-              className="rounded-full font-black text-[10px] uppercase tracking-widest"
-              style={sentimentTone(comentario.sentimiento_label)}
-            >
-              {capitalizeWord(comentario.sentimiento_label)}
-            </Badge>
-          ) : null}
+            {Number.isFinite(comentario.edad) && comentario.edad > 0 ? (
+              <MetaPill
+                label={`${comentario.edad} años`}
+                className="border-slate-200 bg-slate-50 text-slate-700"
+              />
+            ) : null}
 
-          {comentario.emocion_label ? (
-            <Badge
-              variant="secondary"
-              className="rounded-full font-black text-[10px] uppercase tracking-widest"
-              style={emotionTone(comentario.emocion_label)}
-            >
-              {capitalizeWord(comentario.emocion_label)}
-            </Badge>
-          ) : null}
+            {comentario.sentimiento_label ? (
+              <MetaPill
+                label={capitalizeWord(comentario.sentimiento_label)}
+                className="border-[rgba(239,68,68,0.12)]"
+                style={sentimentTone(comentario.sentimiento_label)}
+              />
+            ) : null}
 
-          {Number.isFinite(comentario.edad) && comentario.edad > 0 ? (
-            <Badge
-              variant="secondary"
-              className="rounded-full font-black text-[10px] uppercase tracking-widest"
-              style={{ background: "rgba(2,6,23,0.04)", color: "#0f172a" }}
-            >
-              {comentario.edad} años
-            </Badge>
-          ) : null}
-
-          {comentario.fecha ? (
-            <span className="ml-auto text-[11px] font-black text-slate-400">
-              {formatFechaES(comentario.fecha)}
-            </span>
-          ) : null}
+            {comentario.emocion_label ? (
+              <MetaPill
+                label={emotionLabelES(comentario.emocion_label)}
+                className="border-transparent"
+                style={emotionTone(comentario.emocion_label)}
+              />
+            ) : null}
+          </div>
         </div>
 
-        <p className="mt-3 text-sm leading-6 text-slate-700 font-semibold">
-          {truncate(comentario.texto, 180)}
+        <p className="text-[13px] leading-7 text-slate-700 font-semibold whitespace-pre-wrap">
+          {preview.text}
         </p>
 
-        {comentario.resumen ? (
-          <p className="mt-3 text-xs leading-5 text-slate-500 font-semibold">
-            {truncate(comentario.resumen, 130)}
-          </p>
-        ) : null}
+        <div className="mt-auto pt-4">
+          {showModal ? (
+            <Dialog>
+              <DialogTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-[rgba(127,1,127,1)] transition-opacity hover:opacity-80"
+                >
+                  Ver más
+                </button>
+              </DialogTrigger>
 
-        <div className="mt-3 flex flex-wrap gap-2">
-          {comentario.tema_etiqueta ? (
-            <Badge
-              variant="secondary"
-              className="rounded-full text-[10px] font-black uppercase tracking-widest"
-              style={{ background: "rgba(127,1,127,0.10)", color: PURPLE }}
-            >
-              {comentario.tema_etiqueta}
-            </Badge>
-          ) : null}
+              <DialogContent className="max-w-2xl rounded-[1.75rem]">
+                <DialogHeader>
+                  <DialogTitle className="text-sm font-black tracking-wide">
+                    Comentario completo
+                  </DialogTitle>
+                </DialogHeader>
 
-          {safeArr(comentario.keywords).slice(0, 3).map((keyword) => (
-            <Badge
-              key={`${comentario.analisis_id}-${keyword}`}
-              variant="secondary"
-              className="rounded-full text-[10px] font-bold"
-              style={{ background: "rgba(15,23,42,0.05)", color: "#334155" }}
-            >
-              {keyword}
-            </Badge>
-          ))}
+                <div className="mb-4 overflow-hidden">
+                  <div className="flex flex-nowrap items-center gap-1.5 overflow-hidden whitespace-nowrap">
+                    {comentario.genero ? (
+                      <MetaPill
+                        label={comentario.genero}
+                        className="border-[rgba(127,1,127,0.10)] bg-[rgba(127,1,127,0.08)] text-[rgba(127,1,127,1)]"
+                      />
+                    ) : null}
+
+                    {Number.isFinite(comentario.edad) && comentario.edad > 0 ? (
+                      <MetaPill
+                        label={`${comentario.edad} años`}
+                        className="border-slate-200 bg-slate-50 text-slate-700"
+                      />
+                    ) : null}
+
+                    {comentario.sentimiento_label ? (
+                      <MetaPill
+                        label={capitalizeWord(comentario.sentimiento_label)}
+                        className="border-[rgba(239,68,68,0.12)]"
+                        style={sentimentTone(comentario.sentimiento_label)}
+                      />
+                    ) : null}
+
+                    {comentario.emocion_label ? (
+                      <MetaPill
+                        label={emotionLabelES(comentario.emocion_label)}
+                        className="border-transparent"
+                        style={emotionTone(comentario.emocion_label)}
+                      />
+                    ) : null}
+                  </div>
+                </div>
+
+                <p className="text-[15px] leading-8 text-slate-700 font-semibold whitespace-pre-wrap">
+                  {comentario.texto}
+                </p>
+              </DialogContent>
+            </Dialog>
+          ) : (
+            <div className="h-4" />
+          )}
         </div>
-
-        {comentario.texto.length > 180 ? <CommentDialog comentario={comentario} /> : null}
       </div>
     </div>
   );
 }
 
-function CommentDialog({ comentario }: { comentario: ComentarioItem }) {
+function MetaPill({
+  label,
+  className,
+  style,
+}: {
+  label: string;
+  className?: string;
+  style?: CSSProperties;
+}) {
   return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <button className="mt-3 text-xs font-black uppercase tracking-widest" style={{ color: PURPLE }}>
-          Ver comentario completo
-        </button>
-      </DialogTrigger>
-
-      <DialogContent className="max-w-xl rounded-[1.75rem]">
-        <DialogHeader>
-          <DialogTitle className="text-sm font-black tracking-wide">
-            Comentario completo
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="flex flex-wrap items-center gap-2 mb-3">
-          {comentario.genero ? (
-            <Badge
-              variant="secondary"
-              className="rounded-full font-black text-[10px] uppercase tracking-widest"
-              style={{ background: "rgba(127,1,127,0.10)", color: PURPLE }}
-            >
-              {comentario.genero}
-            </Badge>
-          ) : null}
-
-          {comentario.sentimiento_label ? (
-            <Badge
-              variant="secondary"
-              className="rounded-full font-black text-[10px] uppercase tracking-widest"
-              style={sentimentTone(comentario.sentimiento_label)}
-            >
-              {capitalizeWord(comentario.sentimiento_label)}
-            </Badge>
-          ) : null}
-
-          {comentario.emocion_label ? (
-            <Badge
-              variant="secondary"
-              className="rounded-full font-black text-[10px] uppercase tracking-widest"
-              style={emotionTone(comentario.emocion_label)}
-            >
-              {capitalizeWord(comentario.emocion_label)}
-            </Badge>
-          ) : null}
-
-          {Number.isFinite(comentario.edad) && comentario.edad > 0 ? (
-            <Badge
-              variant="secondary"
-              className="rounded-full font-black text-[10px] uppercase tracking-widest"
-            >
-              {comentario.edad} años
-            </Badge>
-          ) : null}
-
-          {comentario.fecha ? (
-            <span className="ml-auto text-[11px] font-black text-slate-400">
-              {formatFechaES(comentario.fecha)}
-            </span>
-          ) : null}
-        </div>
-
-        <p className="text-sm leading-6 text-slate-700 font-semibold whitespace-pre-wrap">
-          {comentario.texto}
-        </p>
-
-        {comentario.resumen ? (
-          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">
-              Resumen PNL
-            </p>
-            <p className="mt-2 text-sm leading-6 text-slate-700 font-semibold">
-              {comentario.resumen}
-            </p>
-          </div>
-        ) : null}
-
-        {comentario.tema_etiqueta || safeArr(comentario.keywords).length > 0 ? (
-          <div className="mt-4 flex flex-wrap gap-2">
-            {comentario.tema_etiqueta ? (
-              <Badge
-                variant="secondary"
-                className="rounded-full text-[10px] font-black uppercase tracking-widest"
-                style={{ background: "rgba(127,1,127,0.10)", color: PURPLE }}
-              >
-                {comentario.tema_etiqueta}
-              </Badge>
-            ) : null}
-
-            {safeArr(comentario.keywords).map((keyword) => (
-              <Badge
-                key={`modal-${comentario.analisis_id}-${keyword}`}
-                variant="secondary"
-                className="rounded-full text-[10px] font-bold"
-              >
-                {keyword}
-              </Badge>
-            ))}
-          </div>
-        ) : null}
-      </DialogContent>
-    </Dialog>
+    <span
+      className={`inline-flex h-5 shrink-0 items-center rounded-full border px-2 py-0 text-[8px] font-black uppercase tracking-[0.08em] leading-none ${className || ""}`}
+      style={style}
+    >
+      <span className="truncate">{label}</span>
+    </span>
   );
+}
+
+function buildPreview(text: string, limit: number) {
+  const clean = (text || "").trim();
+  if (clean.length <= limit) {
+    return { text: clean, truncated: false };
+  }
+
+  return {
+    text: clean.slice(0, limit).trimEnd() + "…",
+    truncated: true,
+  };
 }

@@ -32,15 +32,17 @@ type NLPRunResult struct {
 	Stderr  []string         `json:"stderr"`
 }
 
-func NewNLPRunner(dbURL string) NLPRunner {
-	pythonBin := os.Getenv("NLP_PYTHON_BIN")
-	if pythonBin == "" {
-		pythonBin = "python3"
-	}
+type NLPEventHandler func(event map[string]any)
 
+func NewNLPRunner(dbURL string) NLPRunner {
 	workDir := os.Getenv("NLP_WORKDIR")
 	if workDir == "" {
 		workDir = filepath.Join("..", "mujer-nlp")
+	}
+
+	pythonBin := os.Getenv("NLP_PYTHON_BIN")
+	if pythonBin == "" {
+		pythonBin = filepath.Join(workDir, "venv", "bin", "python")
 	}
 
 	module := os.Getenv("NLP_MODULE")
@@ -57,6 +59,14 @@ func NewNLPRunner(dbURL string) NLPRunner {
 }
 
 func (r NLPRunner) RunAnalyzeComments(ctx context.Context, opts NLPRunOptions) (NLPRunResult, error) {
+	return r.RunAnalyzeCommentsWithProgress(ctx, opts, nil)
+}
+
+func (r NLPRunner) RunAnalyzeCommentsWithProgress(
+	ctx context.Context,
+	opts NLPRunOptions,
+	onEvent NLPEventHandler,
+) (NLPRunResult, error) {
 	args := []string{"-m", r.Module, "--json-progress"}
 
 	if opts.Limit != nil {
@@ -119,6 +129,9 @@ func (r NLPRunner) RunAnalyzeComments(ctx context.Context, opts NLPRunOptions) (
 		var event map[string]any
 		if err := json.Unmarshal(line, &event); err == nil {
 			result.Events = append(result.Events, event)
+			if onEvent != nil {
+				onEvent(event)
+			}
 		}
 	}
 	if err := scanner.Err(); err != nil {

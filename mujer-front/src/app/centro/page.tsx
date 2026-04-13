@@ -10,6 +10,7 @@ import { DashboardHero } from "@/components/centro/dashboard/DashboardHero";
 import { DistributionSection } from "@/components/centro/dashboard/DistributionSection";
 import { ExecutiveSummarySection } from "@/components/centro/dashboard/ExecutiveSummarySection";
 import { HeatmapSection } from "@/components/centro/dashboard/HeatmapSection";
+import { NLPProcessingSection } from "@/components/centro/dashboard/NLPProcessingSection";
 import {
   clamp5,
   fallbackYears,
@@ -18,10 +19,13 @@ import {
 import { OverviewSection } from "@/components/centro/dashboard/OverviewSection";
 import type {
   AdvRow,
+  CentroNLPOverviewResponse,
+  CentroNLPProcessResponse,
+  CentroNLPStatusResponse,
   CentroEstadisticaAvanzadaResponse,
   CentroResumenResponse,
   MatrizItem,
-  NLPStats,
+  NLPJobStatus,
   YearOption,
 } from "@/components/centro/dashboard/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,7 +41,6 @@ export default function CentroPage() {
   const [err, setErr] = useState("");
   const [comentariosPage, setComentariosPage] = useState(1);
   const [sentimientoFilter, setSentimientoFilter] = useState<string>("all");
-  const [emocionFilter, setEmocionFilter] = useState<string>("all");
   const [showSemantic] = useState(true);
   const [trendsOpen, setTrendsOpen] = useState(false);
   const [yearOptions, setYearOptions] = useState<YearOption[]>(fallbackYears());
@@ -45,6 +48,10 @@ export default function CentroPage() {
   const [advRows, setAdvRows] = useState<AdvRow[]>([]);
   const [advLoading, setAdvLoading] = useState(false);
   const [advErr, setAdvErr] = useState("");
+  const [nlpOverview, setNLPOverview] = useState<CentroNLPOverviewResponse | null>(null);
+  const [nlpOverviewLoading, setNLPOverviewLoading] = useState(false);
+  const [nlpStatus, setNLPStatus] = useState<NLPJobStatus | null>(null);
+  const [nlpProcessError, setNLPProcessError] = useState("");
 
   async function load(selectedYear?: string) {
     const targetYear = selectedYear ?? year;
@@ -93,6 +100,42 @@ export default function CentroPage() {
     }
   }
 
+  async function loadNLPOverview(selectedYear?: string, options?: { silent?: boolean }) {
+    const targetYear = selectedYear ?? year;
+    const shouldShowLoading = !options?.silent;
+    if (shouldShowLoading) {
+      setNLPOverviewLoading(true);
+    }
+    try {
+      const qs =
+        targetYear && targetYear !== "all" ? `?year=${encodeURIComponent(targetYear)}` : "";
+      const response = await api<CentroNLPOverviewResponse>(`/api/centro/nlp/overview${qs}`);
+      setNLPOverview(response);
+    } catch {
+      setNLPOverview(null);
+    } finally {
+      if (shouldShowLoading) {
+        setNLPOverviewLoading(false);
+      }
+    }
+  }
+
+  async function loadNLPStatus(selectedYear?: string) {
+    const targetYear = selectedYear ?? year;
+    const qs =
+      targetYear && targetYear !== "all" ? `?year=${encodeURIComponent(targetYear)}` : "";
+
+    try {
+      const response = await api<CentroNLPStatusResponse>(`/api/centro/nlp/status${qs}`);
+      setNLPStatus(response.status);
+      if (response.status.last_error && response.status.status === "failed") {
+        setNLPProcessError(response.status.last_error);
+      }
+    } catch {
+      setNLPStatus(null);
+    }
+  }
+
   useEffect(() => {
     (async () => {
       let saved: string | null = null;
@@ -125,6 +168,8 @@ export default function CentroPage() {
           setYear(initialYear);
           await load(initialYear);
           await loadAdvanced(initialYear);
+          await loadNLPOverview(initialYear);
+          await loadNLPStatus(initialYear);
           return;
         }
       } catch {}
@@ -135,6 +180,8 @@ export default function CentroPage() {
       setYear(initialYear);
       await load(initialYear);
       await loadAdvanced(initialYear);
+      await loadNLPOverview(initialYear);
+      await loadNLPStatus(initialYear);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -143,8 +190,54 @@ export default function CentroPage() {
     if (!data && loading) return;
     load(year);
     loadAdvanced(year);
+    loadNLPOverview(year);
+    loadNLPStatus(year);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year]);
+
+  useEffect(() => {
+    if (!nlpStatus?.running) return;
+
+    const timer = window.setInterval(() => {
+      void loadNLPStatus(year);
+      void loadNLPOverview(year, { silent: true });
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nlpStatus?.running, year]);
+
+  useEffect(() => {
+    if (!nlpStatus || nlpStatus.running) return;
+    if (nlpStatus.status === "completed" || nlpStatus.status === "failed") {
+      void load(year);
+      void loadNLPOverview(year, { silent: true });
+    }
+    if (nlpStatus.status === "failed" && nlpStatus.last_error) {
+      setNLPProcessError(nlpStatus.last_error);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nlpStatus?.running, nlpStatus?.status, year]);
+
+  async function processNLPComments() {
+    if (nlpStatus?.running) return;
+
+    setNLPProcessError("");
+
+    try {
+      const response = await api<CentroNLPProcessResponse>("/api/centro/nlp/procesar", {
+        method: "POST",
+        body: JSON.stringify({
+          year: year !== "all" ? Number(year) : undefined,
+        }),
+      });
+      setNLPStatus(response.status);
+      await loadNLPOverview(year, { silent: true });
+      await loadNLPStatus(year);
+    } catch (error: unknown) {
+      setNLPProcessError(getErrorMessage(error, "No se pudo ejecutar el procesamiento NLP"));
+    }
+  }
 
   const heatmap = useMemo(() => {
     if (!data) return null;
@@ -238,26 +331,14 @@ export default function CentroPage() {
     ).sort();
   }, [comentarios]);
 
-  const emocionOptions = useMemo(() => {
-    return Array.from(
-      new Set(
-        comentarios
-          .map((item) => (item.emocion_label || "").trim().toLowerCase())
-          .filter((value) => value.length > 0)
-      )
-    ).sort();
-  }, [comentarios]);
-
   const comentariosFiltrados = useMemo(() => {
     return comentarios.filter((item) => {
       const sentimiento = (item.sentimiento_label || "").trim().toLowerCase();
-      const emocion = (item.emocion_label || "").trim().toLowerCase();
       const matchesSentimiento =
         sentimientoFilter === "all" || sentimiento === sentimientoFilter;
-      const matchesEmocion = emocionFilter === "all" || emocion === emocionFilter;
-      return matchesSentimiento && matchesEmocion;
+      return matchesSentimiento;
     });
-  }, [comentarios, sentimientoFilter, emocionFilter]);
+  }, [comentarios, sentimientoFilter]);
 
   const comentariosCount = comentariosFiltrados.length;
   const commentsPerPage = 9;
@@ -270,7 +351,7 @@ export default function CentroPage() {
 
   useEffect(() => {
     setComentariosPage(1);
-  }, [year, comentariosCount, sentimientoFilter, emocionFilter]);
+  }, [year, comentariosCount, sentimientoFilter]);
 
   useEffect(() => {
     if (comentariosPage > comentariosTotalPages) {
@@ -301,16 +382,6 @@ export default function CentroPage() {
       </div>
     );
   }
-
-  const nlp: NLPStats = data.stats.nlp || {
-    total_comentarios: 0,
-    total_procesados: 0,
-    total_pendientes: 0,
-    total_error: 0,
-    por_sentimiento: [],
-    por_emocion: [],
-    por_tema: [],
-  };
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] px-6 py-10 lg:px-12 text-slate-900">
@@ -343,6 +414,14 @@ export default function CentroPage() {
           advLoading={advLoading}
           advErr={advErr}
         />
+        <NLPProcessingSection
+          year={year}
+          overview={nlpOverview}
+          loading={nlpOverviewLoading}
+          status={nlpStatus}
+          processError={nlpProcessError}
+          onProcess={processNLPComments}
+        />
         <CommentsSection
           year={year}
           comentarios={comentarios}
@@ -351,12 +430,8 @@ export default function CentroPage() {
           comentariosPageSafe={comentariosPageSafe}
           comentariosTotalPages={comentariosTotalPages}
           sentimientoFilter={sentimientoFilter}
-          emocionFilter={emocionFilter}
           sentimientoOptions={sentimientoOptions}
-          emocionOptions={emocionOptions}
-          nlp={nlp}
           onSentimientoChange={setSentimientoFilter}
-          onEmocionChange={setEmocionFilter}
           onPrevPage={() => setComentariosPage((page) => Math.max(1, page - 1))}
           onNextPage={() =>
             setComentariosPage((page) => Math.min(comentariosTotalPages, page + 1))
