@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { isAdminRole, type UserRole } from "@/lib/auth";
+import { extractInstitutionSlug, withInstitutionSlug } from "@/lib/routing";
 
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -19,7 +21,7 @@ type AuthUser = {
   user_id: string;
   email: string;
   nombre: string;
-  rol: "admin" | "centro";
+  rol: UserRole;
   centros: number[];
   expires_at: number;
 };
@@ -58,19 +60,20 @@ function cx(...v: Array<string | false | null | undefined>) {
 }
 
 function headerFor(pathname: string) {
-  if (pathname.startsWith("/admin/centros")) {
+  const clean = pathname.replace(/^\/[^/]+/, "");
+  if (clean.startsWith("/admin/centros")) {
     return {
       title: "Centros",
       desc: "Alta, edición y desactivación de centros.",
     };
   }
-  if (pathname.startsWith("/admin/usuarios")) {
+  if (clean.startsWith("/admin/usuarios")) {
     return {
       title: "Usuarios",
       desc: "Gestión de usuarios, roles y asignación a centros.",
     };
   }
-  if (pathname.startsWith("/admin/config")) {
+  if (clean.startsWith("/admin/config")) {
     return {
       title: "Configuración",
       desc: "Parámetros del sistema y ajustes generales.",
@@ -89,43 +92,40 @@ export default function AdminLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const institucionSlug = extractInstitutionSlug(pathname);
 
-  const [user, setUser] = useState<AuthUser | null>(null);
-
-  const expiresText = useMemo(() => {
-    if (!user?.expires_at) return "";
-    const d = new Date(user.expires_at * 1000);
-    return d.toLocaleString();
-  }, [user?.expires_at]);
+  const { user } = readAuth();
+  const expiresText = user?.expires_at
+    ? new Date(user.expires_at * 1000).toLocaleString()
+    : "";
 
   useEffect(() => {
     const { user } = readAuth();
     if (!user) {
-      router.replace("/");
+      router.replace(withInstitutionSlug(institucionSlug, "/"));
       return;
     }
-    if (user.rol !== "admin") {
-      router.replace("/centro");
+    if (!isAdminRole(user.rol)) {
+      router.replace(withInstitutionSlug(institucionSlug, "/centro"));
       return;
     }
-    setUser(user);
-  }, [router]);
+  }, [institucionSlug, router, user]);
 
   function onLogout() {
     clearAuth();
-    router.replace("/");
+    router.replace(withInstitutionSlug(institucionSlug, "/"));
   }
 
   if (!user) return null;
 
   const nav = [
-    { label: "Dashboard", href: "/admin", icon: LayoutDashboard },
-    { label: "Centros", href: "/admin/centros", icon: Building2 },
-    { label: "Usuarios", href: "/admin/usuarios", icon: Users },
-    { label: "Configuración", href: "/admin/config", icon: Settings },
+    { label: "Dashboard", href: withInstitutionSlug(institucionSlug, "/admin"), icon: LayoutDashboard },
+    { label: "Centros", href: withInstitutionSlug(institucionSlug, "/admin/centros"), icon: Building2 },
+    { label: "Usuarios", href: withInstitutionSlug(institucionSlug, "/admin/usuarios"), icon: Users },
+    { label: "Configuración", href: withInstitutionSlug(institucionSlug, "/admin/config"), icon: Settings },
   ];
 
-  const hdr = headerFor(pathname || "/admin");
+  const hdr = headerFor(pathname || withInstitutionSlug(institucionSlug, "/admin"));
 
   return (
     <main className="min-h-dvh bg-white">

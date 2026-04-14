@@ -12,10 +12,12 @@ import (
 type ctxKey string
 
 const (
-	ctxUserID   ctxKey = "user_id"
-	ctxUserRol  ctxKey = "user_rol"
-	ctxCentros  ctxKey = "user_centros"
-	ctxUserMail ctxKey = "user_email"
+	ctxUserID         ctxKey = "user_id"
+	ctxUserRol        ctxKey = "user_rol"
+	ctxCentros        ctxKey = "user_centros"
+	ctxUserMail       ctxKey = "user_email"
+	ctxInstitucionID  ctxKey = "institucion_id"
+	ctxIsSuperAdmin   ctxKey = "is_super_admin"
 )
 
 func UserIDFromCtx(ctx context.Context) string {
@@ -32,6 +34,14 @@ func UserCentrosFromCtx(ctx context.Context) []int64 {
 }
 func UserEmailFromCtx(ctx context.Context) string {
 	v, _ := ctx.Value(ctxUserMail).(string)
+	return v
+}
+func UserInstitucionIDFromCtx(ctx context.Context) (int64, bool) {
+	v, ok := ctx.Value(ctxInstitucionID).(int64)
+	return v, ok
+}
+func UserIsSuperAdminFromCtx(ctx context.Context) bool {
+	v, _ := ctx.Value(ctxIsSuperAdmin).(bool)
 	return v
 }
 
@@ -80,6 +90,18 @@ func RequireJWT(next http.Handler) http.Handler {
 		sub, _ := claims["sub"].(string)
 		rol, _ := claims["rol"].(string)
 		email, _ := claims["email"].(string)
+		isSuperAdmin := strings.TrimSpace(rol) == "super_admin"
+
+		var institucionID int64
+		var hasInstitucionID bool
+		switch v := claims["institucion_id"].(type) {
+		case float64:
+			institucionID = int64(v)
+			hasInstitucionID = true
+		case int64:
+			institucionID = v
+			hasInstitucionID = true
+		}
 
 		centros := []int64{}
 		if arr, ok := claims["centros"].([]any); ok {
@@ -102,6 +124,10 @@ func RequireJWT(next http.Handler) http.Handler {
 		ctx = context.WithValue(ctx, ctxUserRol, rol)
 		ctx = context.WithValue(ctx, ctxCentros, centros)
 		ctx = context.WithValue(ctx, ctxUserMail, email)
+		if hasInstitucionID {
+			ctx = context.WithValue(ctx, ctxInstitucionID, institucionID)
+		}
+		ctx = context.WithValue(ctx, ctxIsSuperAdmin, isSuperAdmin)
 
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -109,7 +135,9 @@ func RequireJWT(next http.Handler) http.Handler {
 
 func RequireAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if UserRolFromCtx(r.Context()) != "admin" {
+		switch UserRolFromCtx(r.Context()) {
+		case "admin", "admin_institucion", "owner_institucion", "super_admin":
+		default:
 			http.Error(w, "forbidden", http.StatusForbidden)
 			return
 		}

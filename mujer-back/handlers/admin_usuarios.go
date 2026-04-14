@@ -97,7 +97,7 @@ func (h AdminUsuariosHandler) List(w http.ResponseWriter, r *http.Request) {
 		args = []any{rolQ}
 	}
 
-	rows, err := h.DB.Query(r.Context(), q, args...)
+	rows, err := query(r.Context(), h.DB, q, args...)
 	if err != nil {
 		http.Error(w, "db_error", http.StatusInternalServerError)
 		return
@@ -114,7 +114,7 @@ func (h AdminUsuariosHandler) List(w http.ResponseWriter, r *http.Request) {
 
 		// Para UI: si tiene 1 centro, agrega su nombre
 		if it.Rol == "centro" && len(it.Centros) == 1 {
-			_ = h.DB.QueryRow(r.Context(), `select nombre from centros where id = $1`, it.Centros[0]).Scan(&it.CentroNombre)
+			_ = queryRow(r.Context(), h.DB, `select nombre from centros where id = $1`, it.Centros[0]).Scan(&it.CentroNombre)
 		}
 
 		out = append(out, it)
@@ -179,7 +179,13 @@ func (h AdminUsuariosHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tx, err := h.DB.Begin(r.Context())
+	institucionID, ok := UserInstitucionIDFromCtx(r.Context())
+	if !ok {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	tx, err := begin(r.Context(), h.DB)
 	if err != nil {
 		http.Error(w, "db_error", http.StatusInternalServerError)
 		return
@@ -188,10 +194,10 @@ func (h AdminUsuariosHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	var id string
 	err = tx.QueryRow(r.Context(), `
-		insert into usuarios (email, nombre, rol, password_hash, activo)
-		values ($1,$2,$3,$4,true)
+		insert into usuarios (email, nombre, rol, password_hash, activo, institucion_id)
+		values ($1,$2,$3,$4,true,$5)
 		returning id::text
-	`, email, nombre, rol, string(hash)).Scan(&id)
+	`, email, nombre, rol, string(hash), institucionID).Scan(&id)
 	if err != nil {
 		// unique email, etc
 		http.Error(w, "email_exists", http.StatusConflict)
@@ -201,10 +207,10 @@ func (h AdminUsuariosHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if rol == "centro" {
 		for _, cid := range centros {
 			_, err := tx.Exec(r.Context(), `
-				insert into usuario_centros (usuario_id, centro_id)
-				values ($1::uuid, $2)
+				insert into usuario_centros (usuario_id, centro_id, institucion_id)
+				values ($1::uuid, $2, $3)
 				on conflict do nothing
-			`, id, cid)
+			`, id, cid, institucionID)
 			if err != nil {
 				http.Error(w, "db_error", http.StatusInternalServerError)
 				return
@@ -226,7 +232,7 @@ func (h AdminUsuariosHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Centros: centros,
 	}
 	if resp.Rol == "centro" && len(resp.Centros) == 1 {
-		_ = h.DB.QueryRow(r.Context(), `select nombre from centros where id = $1`, resp.Centros[0]).Scan(&resp.CentroNombre)
+		_ = queryRow(r.Context(), h.DB, `select nombre from centros where id = $1`, resp.Centros[0]).Scan(&resp.CentroNombre)
 	}
 
 	writeJSON(w, http.StatusCreated, resp)
@@ -246,7 +252,13 @@ func (h AdminUsuariosHandler) Update(w http.ResponseWriter, r *http.Request, id 
 		return
 	}
 
-	tx, err := h.DB.Begin(r.Context())
+	institucionID, ok := UserInstitucionIDFromCtx(r.Context())
+	if !ok {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	tx, err := begin(r.Context(), h.DB)
 	if err != nil {
 		http.Error(w, "db_error", http.StatusInternalServerError)
 		return
@@ -349,10 +361,10 @@ func (h AdminUsuariosHandler) Update(w http.ResponseWriter, r *http.Request, id 
 		}
 		for _, cid := range centros {
 			_, err := tx.Exec(r.Context(), `
-				insert into usuario_centros (usuario_id, centro_id)
-				values ($1::uuid, $2)
+				insert into usuario_centros (usuario_id, centro_id, institucion_id)
+				values ($1::uuid, $2, $3)
 				on conflict do nothing
-			`, id, cid)
+			`, id, cid, institucionID)
 			if err != nil {
 				http.Error(w, "db_error", http.StatusInternalServerError)
 				return
@@ -367,7 +379,7 @@ func (h AdminUsuariosHandler) Update(w http.ResponseWriter, r *http.Request, id 
 
 	// devolver actualizado
 	var out AdminUsuarioDTO
-	err = h.DB.QueryRow(r.Context(), `
+	err = queryRow(r.Context(), h.DB, `
 		select
 			u.id::text, u.email, u.nombre, u.rol::text, u.activo,
 			coalesce(array_agg(uc.centro_id order by uc.centro_id) filter (where uc.centro_id is not null), '{}') as centros,
@@ -383,7 +395,7 @@ func (h AdminUsuariosHandler) Update(w http.ResponseWriter, r *http.Request, id 
 	}
 
 	if out.Rol == "centro" && len(out.Centros) == 1 {
-		_ = h.DB.QueryRow(r.Context(), `select nombre from centros where id = $1`, out.Centros[0]).Scan(&out.CentroNombre)
+		_ = queryRow(r.Context(), h.DB, `select nombre from centros where id = $1`, out.Centros[0]).Scan(&out.CentroNombre)
 	}
 
 	writeJSON(w, http.StatusOK, out)
@@ -397,7 +409,7 @@ func (h AdminUsuariosHandler) Disable(w http.ResponseWriter, r *http.Request, id
 		return
 	}
 
-	tag, err := h.DB.Exec(r.Context(), `update usuarios set activo = false where id = $1::uuid`, id)
+	tag, err := exec(r.Context(), h.DB, `update usuarios set activo = false where id = $1::uuid`, id)
 	if err != nil {
 		http.Error(w, "db_error", http.StatusInternalServerError)
 		return

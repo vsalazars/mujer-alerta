@@ -20,7 +20,7 @@ func (h CentroResultadosHandler) GetCentroEstadisticaAvanzada(w http.ResponseWri
 		return
 	}
 
-	rows, err := h.DB.Query(r.Context(), `
+	rows, err := query(r.Context(), h.DB, `
 		with base as (
 			select
 				r.dimension::text as dimension,

@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { isAdminRole, type UserRole } from "@/lib/auth";
+import { extractInstitutionSlug, withInstitutionSlug } from "@/lib/routing";
 
 import { Button } from "@/components/ui/button";
 import { LogOut, ShieldCheck } from "lucide-react";
@@ -10,7 +12,7 @@ type AuthUser = {
   user_id: string;
   email: string;
   nombre: string;
-  rol: "admin" | "centro";
+  rol: UserRole;
   centros: number[];
   expires_at: number;
 };
@@ -45,31 +47,26 @@ function initials(name: string) {
 
 export default function CentroLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const [user, setUser] = useState<AuthUser | null>(null);
-
-  const expiresText = useMemo(() => {
-    if (!user?.expires_at) return "";
-    const d = new Date(user.expires_at * 1000);
-    return d.toLocaleString();
-  }, [user?.expires_at]);
+  const pathname = usePathname();
+  const institucionSlug = extractInstitutionSlug(pathname);
+  const { user } = readAuth();
 
   useEffect(() => {
     const { user } = readAuth();
     if (!user) {
-      router.replace("/");
+      router.replace(withInstitutionSlug(institucionSlug, "/"));
       return;
     }
     if (user.rol !== "centro") {
       // si es admin, mándalo a admin
-      router.replace("/admin");
+      router.replace(withInstitutionSlug(institucionSlug, isAdminRole(user.rol) ? "/admin" : "/"));
       return;
     }
-    setUser(user);
-  }, [router]);
+  }, [institucionSlug, router, user]);
 
   function onLogout() {
     clearAuth();
-    router.replace("/");
+    router.replace(withInstitutionSlug(institucionSlug, "/"));
   }
 
   if (!user) return null;

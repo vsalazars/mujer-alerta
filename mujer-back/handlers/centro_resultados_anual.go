@@ -21,7 +21,7 @@ func (h CentroResultadosHandler) GetResumenCentroAnual(w http.ResponseWriter, r 
 	}
 
 	if len(years) == 0 {
-		rows, err := h.DB.Query(ctx, `
+		rows, err := query(ctx, h.DB, `
 			select distinct extract(year from e.finished_at)::int as year
 			from encuestas e
 			where e.centro_id = any($1::bigint[])
@@ -44,7 +44,7 @@ func (h CentroResultadosHandler) GetResumenCentroAnual(w http.ResponseWriter, r 
 		rows.Close()
 	}
 
-	rows, err := h.DB.Query(ctx, `
+	rows, err := query(ctx, h.DB, `
 		with base as (
 			select
 				extract(year from e.finished_at)::int as year,

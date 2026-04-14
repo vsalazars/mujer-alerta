@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 import ReactECharts from "echarts-for-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +20,7 @@ import {
 
 import { ArrowLeft, Home, RefreshCw } from "lucide-react";
 import { api } from "@/lib/api";
+import { extractInstitutionSlug, withInstitutionSlug } from "@/lib/routing";
 import { CheckCircle } from "lucide-react";
 
 
@@ -215,6 +216,8 @@ type TipoAgg = {
 export default function ResultadosEncuestaPage() {
   const router = useRouter();
   const params = useParams();
+  const pathname = usePathname();
+  const institucionSlug = extractInstitutionSlug(pathname);
   const isMobile = useIsMobile();
 
   const encuestaId =
@@ -629,7 +632,7 @@ export default function ResultadosEncuestaPage() {
                 size="lg"
                 className="h-14 rounded-full text-base font-semibold text-white"
                 style={{ backgroundColor: "#7F017F" }}
-                onClick={() => router.push("/")}
+                onClick={() => router.push(withInstitutionSlug(institucionSlug, "/"))}
               >
                 <CheckCircle className="mr-3 h-5 w-5" />
 

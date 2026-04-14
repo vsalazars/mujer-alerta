@@ -41,9 +41,16 @@ func (h EncuestasHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var id string
-	err := h.DB.QueryRow(r.Context(), `
-		insert into encuestas (centro_id, email, genero_id, edad)
-		values ($1, nullif($2,''), $3, $4)
+	err := queryRow(r.Context(), h.DB, `
+		insert into encuestas (centro_id, email, genero_id, edad, institucion_id)
+		select
+			$1,
+			nullif($2,''),
+			$3,
+			$4,
+			c.institucion_id
+		from centros c
+		where c.id = $1
 		returning id::text
 	`, req.CentroID, email, req.GeneroID, req.Edad).Scan(&id)
 

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -106,8 +107,9 @@ func parseYearsCSV(raw string) ([]int, error) {
 }
 
 func (h CentroResultadosHandler) queryCentroYears(centros []int64, order string) ([]int, error) {
-	rows, err := h.DB.Query(
-		nil,
+	rows, err := query(
+		context.Background(),
+		h.DB,
 		`
 		select distinct extract(year from e.finished_at)::int as year
 		from encuestas e

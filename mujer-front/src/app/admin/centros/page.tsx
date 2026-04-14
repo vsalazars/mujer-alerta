@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { isAdminRole, type UserRole } from "@/lib/auth";
+import { extractInstitutionSlug, withInstitutionSlug } from "@/lib/routing";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +26,7 @@ type AuthUser = {
   user_id: string;
   email: string;
   nombre: string;
-  rol: "admin" | "centro";
+  rol: UserRole;
   centros: number[];
   expires_at: number;
 };
@@ -65,6 +67,8 @@ function cx(...v: Array<string | false | null | undefined>) {
 
 export default function AdminCentrosPage() {
   const router = useRouter();
+  const pathname = usePathname();
+  const institucionSlug = extractInstitutionSlug(pathname);
 
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState("");
@@ -92,16 +96,16 @@ export default function AdminCentrosPage() {
   useEffect(() => {
     const { user, token } = readAuth();
     if (!user || !token) {
-      router.replace("/");
+      router.replace(withInstitutionSlug(institucionSlug, "/"));
       return;
     }
-    if (user.rol !== "admin") {
-      router.replace("/centro");
+    if (!isAdminRole(user.rol)) {
+      router.replace(withInstitutionSlug(institucionSlug, "/centro"));
       return;
     }
     setUser(user);
     setToken(token);
-  }, [router]);
+  }, [institucionSlug, router]);
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();

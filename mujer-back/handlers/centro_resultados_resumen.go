@@ -22,7 +22,7 @@ func (h CentroResultadosHandler) GetResumenCentro(w http.ResponseWriter, r *http
 	var totalParticipantes int64
 	var totalRespuestas int64
 
-	if err := h.DB.QueryRow(ctx, `
+	if err := queryRow(ctx, h.DB, `
 		select count(distinct e.id)
 		from encuestas e
 		join respuestas r on r.encuesta_id = e.id
@@ -34,7 +34,7 @@ func (h CentroResultadosHandler) GetResumenCentro(w http.ResponseWriter, r *http
 		return
 	}
 
-	if err := h.DB.QueryRow(ctx, `
+	if err := queryRow(ctx, h.DB, `
 		select count(*)
 		from respuestas r
 		join encuestas e on e.id = r.encuesta_id
@@ -53,7 +53,7 @@ func (h CentroResultadosHandler) GetResumenCentro(w http.ResponseWriter, r *http
 
 	stats := newCentroStats(totalParticipantes, totalRespuestas)
 
-	if err := h.DB.QueryRow(ctx, `
+	if err := queryRow(ctx, h.DB, `
 		select
 			count(*)::bigint as total_comentarios,
 			count(*) filter (where ca.estado = 'procesado')::bigint as total_procesados,
@@ -77,7 +77,7 @@ func (h CentroResultadosHandler) GetResumenCentro(w http.ResponseWriter, r *http
 	}
 
 	var global ResumenGlobal
-	rows, err := h.DB.Query(ctx, `
+	rows, err := query(ctx, h.DB, `
 		select r.dimension::text, avg(r.valor)::float8
 		from respuestas r
 		join encuestas e on e.id = r.encuesta_id
@@ -109,7 +109,7 @@ func (h CentroResultadosHandler) GetResumenCentro(w http.ResponseWriter, r *http
 		}
 	}
 
-	if err := h.DB.QueryRow(ctx, `
+	if err := queryRow(ctx, h.DB, `
 		select avg(r.valor)::float8
 		from respuestas r
 		join encuestas e on e.id = r.encuesta_id
@@ -121,7 +121,7 @@ func (h CentroResultadosHandler) GetResumenCentro(w http.ResponseWriter, r *http
 		return
 	}
 
-	matrizRows, err := h.DB.Query(ctx, `
+	matrizRows, err := query(ctx, h.DB, `
 		with mapa as (
 			select * from (values
 				('P1',1),('P2',1),
@@ -177,7 +177,7 @@ func (h CentroResultadosHandler) GetResumenCentro(w http.ResponseWriter, r *http
 		matriz = append(matriz, item)
 	}
 
-	generoEncuestasRows, _ := h.DB.Query(ctx, `
+	generoEncuestasRows, _ := query(ctx, h.DB, `
 		select g.clave, g.etiqueta, count(distinct e.id)
 		from encuestas e
 		join respuestas r on r.encuesta_id = e.id
@@ -195,7 +195,7 @@ func (h CentroResultadosHandler) GetResumenCentro(w http.ResponseWriter, r *http
 	}
 	generoEncuestasRows.Close()
 
-	generoRespuestasRows, _ := h.DB.Query(ctx, `
+	generoRespuestasRows, _ := query(ctx, h.DB, `
 		select g.clave, g.etiqueta, count(*)
 		from respuestas r
 		join encuestas e on e.id = r.encuesta_id
@@ -213,7 +213,7 @@ func (h CentroResultadosHandler) GetResumenCentro(w http.ResponseWriter, r *http
 	}
 	generoRespuestasRows.Close()
 
-	generoResumenRows, err := h.DB.Query(ctx, `
+	generoResumenRows, err := query(ctx, h.DB, `
 		select
 			g.clave,
 			g.etiqueta,
@@ -257,7 +257,7 @@ func (h CentroResultadosHandler) GetResumenCentro(w http.ResponseWriter, r *http
 		order by count(*) desc
 	`, edadKey, edadKey)
 
-	edadEncuestasRows, _ := h.DB.Query(ctx, queryEdadEncuestas, centros, year)
+	edadEncuestasRows, _ := query(ctx, h.DB, queryEdadEncuestas, centros, year)
 	for edadEncuestasRows.Next() {
 		var item CountItem
 		edadEncuestasRows.Scan(&item.Clave, &item.Label, &item.Total)
@@ -276,7 +276,7 @@ func (h CentroResultadosHandler) GetResumenCentro(w http.ResponseWriter, r *http
 		order by count(*) desc
 	`, edadKey, edadKey)
 
-	edadRespuestasRows, _ := h.DB.Query(ctx, queryEdadRespuestas, centros, year)
+	edadRespuestasRows, _ := query(ctx, h.DB, queryEdadRespuestas, centros, year)
 	for edadRespuestasRows.Next() {
 		var item CountItem
 		edadRespuestasRows.Scan(&item.Clave, &item.Label, &item.Total)
@@ -284,7 +284,7 @@ func (h CentroResultadosHandler) GetResumenCentro(w http.ResponseWriter, r *http
 	}
 	edadRespuestasRows.Close()
 
-	sentimientoRows, err := h.DB.Query(ctx, `
+	sentimientoRows, err := query(ctx, h.DB, `
 		select
 			coalesce(sentimiento_label, 'sin_clasificar') as clave,
 			coalesce(sentimiento_label, 'Sin clasificar') as label,
@@ -310,7 +310,7 @@ func (h CentroResultadosHandler) GetResumenCentro(w http.ResponseWriter, r *http
 	}
 	sentimientoRows.Close()
 
-	emocionRows, err := h.DB.Query(ctx, `
+	emocionRows, err := query(ctx, h.DB, `
 		select
 			coalesce(emocion_label, 'sin_clasificar') as clave,
 			coalesce(emocion_label, 'Sin clasificar') as label,
@@ -336,7 +336,7 @@ func (h CentroResultadosHandler) GetResumenCentro(w http.ResponseWriter, r *http
 	}
 	emocionRows.Close()
 
-	temaRows, err := h.DB.Query(ctx, `
+	temaRows, err := query(ctx, h.DB, `
 		select
 			ct.tema_clave,
 			ct.tema_etiqueta,
@@ -367,7 +367,7 @@ func (h CentroResultadosHandler) GetResumenCentro(w http.ResponseWriter, r *http
 	}
 	temaRows.Close()
 
-	comentariosRows, err := h.DB.Query(ctx, `
+	comentariosRows, err := query(ctx, h.DB, `
 		select
 			v.encuesta_id::text,
 			v.id,

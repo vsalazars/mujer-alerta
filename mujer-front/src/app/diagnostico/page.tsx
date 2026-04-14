@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 
 import { api } from "../../lib/api";
+import { extractInstitutionSlug, withInstitutionSlug } from "../../lib/routing";
 
 type Centro = {
   id: number;
@@ -236,6 +237,8 @@ function remainingDoneMs(done_at: number) {
 
 export default function DiagnosticoInicioPage() {
   const router = useRouter();
+  const pathname = usePathname();
+  const institucionSlug = extractInstitutionSlug(pathname);
 
   const [centros, setCentros] = useState<Centro[]>([]);
   const [generos, setGeneros] = useState<Genero[]>([]);
@@ -392,7 +395,7 @@ export default function DiagnosticoInicioPage() {
       });
 
       writeLock(centroId, resp.encuesta_id);
-      router.push(`/diagnostico/${resp.encuesta_id}`);
+      router.push(withInstitutionSlug(institucionSlug, `/diagnostico/${resp.encuesta_id}`));
     } catch (err: any) {
       alert(err?.message || "No se pudo crear la encuesta.");
     } finally {
@@ -402,7 +405,7 @@ export default function DiagnosticoInicioPage() {
 
   function onContinue() {
     if (!resume?.encuestaId) return;
-    router.push(`/diagnostico/${resume.encuestaId}`);
+    router.push(withInstitutionSlug(institucionSlug, `/diagnostico/${resume.encuestaId}`));
   }
 
   // ✅ AJUSTADO: borrar progreso también borra el lock amarrado a esa encuesta

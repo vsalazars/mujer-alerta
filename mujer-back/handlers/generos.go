@@ -19,7 +19,7 @@ type GeneroDTO struct {
 }
 
 func (h GenerosHandler) List(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.DB.Query(r.Context(), `
+	rows, err := query(r.Context(), h.DB, `
 		select id, clave, etiqueta, descripcion
 		from generos
 		where activo = true

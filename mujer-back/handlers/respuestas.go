@@ -73,7 +73,7 @@ func (h RespuestasHandler) Save(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var exists bool
-	if err := h.DB.QueryRow(ctx, `select exists(select 1 from encuestas where id = $1)`, req.EncuestaID).Scan(&exists); err != nil {
+	if err := queryRow(ctx, h.DB, `select exists(select 1 from encuestas where id = $1)`, req.EncuestaID).Scan(&exists); err != nil {
 		http.Error(w, "db_error", http.StatusInternalServerError)
 		return
 	}
@@ -84,7 +84,7 @@ func (h RespuestasHandler) Save(w http.ResponseWriter, r *http.Request) {
 
 	seen := make(map[string]struct{}, 64)
 
-	tx, err := h.DB.Begin(ctx)
+	tx, err := begin(ctx, h.DB)
 	if err != nil {
 		http.Error(w, "db_error", http.StatusInternalServerError)
 		return

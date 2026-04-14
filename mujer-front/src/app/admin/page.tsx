@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import type { UserRole } from "@/lib/auth";
+import { extractInstitutionSlug, withInstitutionSlug } from "@/lib/routing";
 
 import { Button } from "@/components/ui/button";
 
@@ -11,7 +13,7 @@ type AuthUser = {
   user_id: string;
   email: string;
   nombre: string;
-  rol: "admin" | "centro";
+  rol: UserRole;
   centros: number[];
   expires_at: number;
 };
@@ -31,6 +33,8 @@ function readAuth(): { token: string; user: AuthUser | null } {
 
 export default function AdminPage() {
   const router = useRouter();
+  const pathname = usePathname();
+  const institucionSlug = extractInstitutionSlug(pathname);
 
   // Nota: el guard de auth/admin ya vive en /admin/layout.tsx
   const { user } = useMemo(() => readAuth(), []);
@@ -61,7 +65,7 @@ export default function AdminPage() {
           <Button
             className="mt-4 w-full rounded-full font-semibold shadow-sm"
             style={{ backgroundColor: "#7F017F" }}
-            onClick={() => router.push("/admin/centros")}
+            onClick={() => router.push(withInstitutionSlug(institucionSlug, "/admin/centros"))}
           >
             <Building2 className="mr-2 h-5 w-5" />
             Ir a centros
@@ -77,7 +81,7 @@ export default function AdminPage() {
             variant="outline"
             className="mt-4 w-full rounded-full font-semibold"
             style={{ borderColor: "#7F017F", color: "#7F017F" }}
-            onClick={() => router.push("/admin/usuarios")}
+            onClick={() => router.push(withInstitutionSlug(institucionSlug, "/admin/usuarios"))}
           >
             <Users className="mr-2 h-5 w-5" />
             Ir a usuarios

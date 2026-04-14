@@ -8,7 +8,7 @@ func (h CentroResultadosHandler) GetCentroYears(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	rows, err := h.DB.Query(r.Context(), `
+	rows, err := query(r.Context(), h.DB, `
 		select distinct extract(year from e.finished_at)::int as year
 		from encuestas e
 		where e.centro_id = any($1::bigint[])

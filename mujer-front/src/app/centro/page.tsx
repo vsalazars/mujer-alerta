@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 import { RefreshCw } from "lucide-react";
 
 import { TrendsModal } from "@/components/centro/TrendsModal";
@@ -30,12 +31,15 @@ import type {
 } from "@/components/centro/dashboard/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api } from "@/lib/api";
+import { extractInstitutionSlug } from "@/lib/routing";
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
 }
 
 export default function CentroPage() {
+  const pathname = usePathname();
+  const institucionSlug = extractInstitutionSlug(pathname);
   const [data, setData] = useState<CentroResumenResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -65,7 +69,7 @@ export default function CentroPage() {
       setData(response);
 
       try {
-        localStorage.setItem("centro_dashboard_year", targetYear || "all");
+        localStorage.setItem(`centro_dashboard_year:${institucionSlug || "default"}`, targetYear || "all");
       } catch {}
     } catch (error: unknown) {
       setErr(getErrorMessage(error, "No se pudo cargar el resumen"));
@@ -140,7 +144,7 @@ export default function CentroPage() {
     (async () => {
       let saved: string | null = null;
       try {
-        saved = localStorage.getItem("centro_dashboard_year");
+        saved = localStorage.getItem(`centro_dashboard_year:${institucionSlug || "default"}`);
       } catch {}
 
       try {
@@ -184,7 +188,7 @@ export default function CentroPage() {
       await loadNLPStatus(initialYear);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [institucionSlug]);
 
   useEffect(() => {
     if (!data && loading) return;

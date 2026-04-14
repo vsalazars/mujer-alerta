@@ -67,11 +67,13 @@ func main() {
 	// ======================
 	eh := handlers.EncuestasHandler{DB: pool}
 	mux.HandleFunc("/api/encuestas", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost {
-			eh.Create(w, r)
-			return
-		}
-		http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+		handlers.WithPublicTenantSession(pool, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost {
+				eh.Create(w, r)
+				return
+			}
+			http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+		})).ServeHTTP(w, r)
 	})
 
 	// ======================
@@ -79,11 +81,13 @@ func main() {
 	// ======================
 	rh := handlers.RespuestasHandler{DB: pool}
 	mux.HandleFunc("/api/respuestas", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost {
-			rh.Save(w, r)
-			return
-		}
-		http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+		handlers.WithPublicTenantSession(pool, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost {
+				rh.Save(w, r)
+				return
+			}
+			http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+		})).ServeHTTP(w, r)
 	})
 
 	// ======================
@@ -91,11 +95,13 @@ func main() {
 	// ======================
 	rhResumen := handlers.ResumenHandler{DB: pool}
 	mux.HandleFunc("/api/encuestas/", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet {
-			rhResumen.GetByPath(w, r)
-			return
-		}
-		http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+		handlers.WithPublicTenantSession(pool, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodGet {
+				rhResumen.GetByPath(w, r)
+				return
+			}
+			http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+		})).ServeHTTP(w, r)
 	})
 
 	// ======================
@@ -108,14 +114,18 @@ func main() {
 		switch r.Method {
 
 		case http.MethodGet:
-			ch.List(w, r)
+			handlers.WithPublicTenantSession(pool, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				ch.List(w, r)
+			})).ServeHTTP(w, r)
 			return
 
 		case http.MethodPost:
 			handlers.RequireJWT(
-				handlers.RequireAdmin(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					ch.Create(w, r)
-				})),
+				handlers.WithTenantSession(pool,
+					handlers.RequireAdmin(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						ch.Create(w, r)
+					})),
+				),
 			).ServeHTTP(w, r)
 			return
 
@@ -128,7 +138,8 @@ func main() {
 	// /api/centros/{id} → GET / PUT / DELETE (admin)
 	mux.HandleFunc("/api/centros/", func(w http.ResponseWriter, r *http.Request) {
 		handlers.RequireJWT(
-			handlers.RequireAdmin(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			handlers.WithTenantSession(pool,
+				handlers.RequireAdmin(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 				idStr := strings.TrimPrefix(r.URL.Path, "/api/centros/")
 				idStr = strings.Trim(idStr, "/")
@@ -157,7 +168,8 @@ func main() {
 					http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
 					return
 				}
-			})),
+				})),
+			),
 		).ServeHTTP(w, r)
 	})
 
@@ -178,11 +190,13 @@ func main() {
 	// ======================
 	ah := handlers.AuthHandler{DB: pool}
 	mux.HandleFunc("/api/auth/login", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost {
-			ah.Login(w, r)
-			return
-		}
-		http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+		handlers.WithPublicTenantSession(pool, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost {
+				ah.Login(w, r)
+				return
+			}
+			http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+		})).ServeHTTP(w, r)
 	})
 
 	// ======================
@@ -193,7 +207,8 @@ func main() {
 	// /api/admin/usuarios → GET, POST (admin)
 	mux.HandleFunc("/api/admin/usuarios", func(w http.ResponseWriter, r *http.Request) {
 		handlers.RequireJWT(
-			handlers.RequireAdmin(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			handlers.WithTenantSession(pool,
+				handlers.RequireAdmin(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 				switch r.Method {
 				case http.MethodGet:
@@ -207,14 +222,16 @@ func main() {
 					return
 				}
 
-			})),
+				})),
+			),
 		).ServeHTTP(w, r)
 	})
 
 	// /api/admin/usuarios/{uuid} → PUT / DELETE (admin)
 	mux.HandleFunc("/api/admin/usuarios/", func(w http.ResponseWriter, r *http.Request) {
 		handlers.RequireJWT(
-			handlers.RequireAdmin(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			handlers.WithTenantSession(pool,
+				handlers.RequireAdmin(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 				id := strings.TrimPrefix(r.URL.Path, "/api/admin/usuarios/")
 				id = strings.Trim(id, "/")
@@ -235,7 +252,8 @@ func main() {
 					return
 				}
 
-			})),
+				})),
+			),
 		).ServeHTTP(w, r)
 	})
 
@@ -244,26 +262,26 @@ func main() {
 	// ======================
 	crh := handlers.CentroResultadosHandler{DB: pool}
 	mux.HandleFunc("/api/centro/resumen", func(w http.ResponseWriter, r *http.Request) {
-		handlers.RequireJWT(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handlers.RequireJWT(handlers.WithTenantSession(pool, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodGet {
 				crh.GetResumenCentro(w, r)
 				return
 			}
 			http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
-		})).ServeHTTP(w, r)
+		}))).ServeHTTP(w, r)
 	})
 
 	// ======================
 	// Centro: Años disponibles (solo años con datos)
 	// ======================
 	mux.HandleFunc("/api/centro/years", func(w http.ResponseWriter, r *http.Request) {
-		handlers.RequireJWT(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handlers.RequireJWT(handlers.WithTenantSession(pool, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodGet {
 				crh.GetCentroYears(w, r)
 				return
 			}
 			http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
-		})).ServeHTTP(w, r)
+		}))).ServeHTTP(w, r)
 	})
 
 	// ======================
@@ -271,13 +289,13 @@ func main() {
 	// GET /api/centro/resumen-anual?years=2022,2023,2024
 	// ======================
 	mux.HandleFunc("/api/centro/resumen-anual", func(w http.ResponseWriter, r *http.Request) {
-		handlers.RequireJWT(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handlers.RequireJWT(handlers.WithTenantSession(pool, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodGet {
 				crh.GetResumenCentroAnual(w, r)
 				return
 			}
 			http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
-		})).ServeHTTP(w, r)
+		}))).ServeHTTP(w, r)
 	})
 
 	// ======================
@@ -285,13 +303,13 @@ func main() {
 	// GET /api/centro/estadistica-avanzada?year=2025
 	// ======================
 	mux.HandleFunc("/api/centro/estadistica-avanzada", func(w http.ResponseWriter, r *http.Request) {
-		handlers.RequireJWT(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handlers.RequireJWT(handlers.WithTenantSession(pool, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodGet {
 				crh.GetCentroEstadisticaAvanzada(w, r)
 				return
 			}
 			http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
-		})).ServeHTTP(w, r)
+		}))).ServeHTTP(w, r)
 	})
 
 	// ======================
@@ -300,31 +318,31 @@ func main() {
 	// ======================
 	cnlp := handlers.CentroNLPHandler{Runner: nlpRunner, Jobs: nlpJobs}
 	mux.HandleFunc("/api/centro/nlp/overview", func(w http.ResponseWriter, r *http.Request) {
-		handlers.RequireJWT(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handlers.RequireJWT(handlers.WithTenantSession(pool, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodGet {
 				cnlp.Overview(w, r)
 				return
 			}
 			http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
-		})).ServeHTTP(w, r)
+		}))).ServeHTTP(w, r)
 	})
 	mux.HandleFunc("/api/centro/nlp/status", func(w http.ResponseWriter, r *http.Request) {
-		handlers.RequireJWT(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handlers.RequireJWT(handlers.WithTenantSession(pool, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodGet {
 				cnlp.Status(w, r)
 				return
 			}
 			http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
-		})).ServeHTTP(w, r)
+		}))).ServeHTTP(w, r)
 	})
 	mux.HandleFunc("/api/centro/nlp/procesar", func(w http.ResponseWriter, r *http.Request) {
-		handlers.RequireJWT(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handlers.RequireJWT(handlers.WithTenantSession(pool, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodPost {
 				cnlp.Process(w, r)
 				return
 			}
 			http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
-		})).ServeHTTP(w, r)
+		}))).ServeHTTP(w, r)
 	})
 
 	// ======================

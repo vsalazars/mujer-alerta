@@ -44,7 +44,7 @@ func (h ResumenHandler) GetByPath(w http.ResponseWriter, r *http.Request) {
 	encuestaID := parts[0]
 
 	var exists bool
-	if err := h.DB.QueryRow(r.Context(), `select exists(select 1 from encuestas where id = $1)`, encuestaID).Scan(&exists); err != nil {
+	if err := queryRow(r.Context(), h.DB, `select exists(select 1 from encuestas where id = $1)`, encuestaID).Scan(&exists); err != nil {
 		http.Error(w, "db_error", http.StatusInternalServerError)
 		return
 	}
@@ -55,7 +55,7 @@ func (h ResumenHandler) GetByPath(w http.ResponseWriter, r *http.Request) {
 
 	var g ResumenGlobal
 
-	rows, err := h.DB.Query(r.Context(), `
+	rows, err := query(r.Context(), h.DB, `
 		select dimension::text, avg(valor)::float8
 		from respuestas
 		where encuesta_id = $1
@@ -88,7 +88,7 @@ func (h ResumenHandler) GetByPath(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.DB.QueryRow(r.Context(), `
+	if err := queryRow(r.Context(), h.DB, `
 		select avg(valor)::float8
 		from respuestas
 		where encuesta_id = $1
@@ -97,7 +97,7 @@ func (h ResumenHandler) GetByPath(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	mrows, err := h.DB.Query(r.Context(), `
+	mrows, err := query(r.Context(), h.DB, `
 		select tipo_num, tipo_nombre, dimension::text, promedio::float8
 		from v_matriz_tipo_dimension
 		where encuesta_id = $1

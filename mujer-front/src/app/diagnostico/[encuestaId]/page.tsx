@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 
 import {
   Card,
@@ -14,6 +14,7 @@ import { Separator } from "../../../components/ui/separator";
 import { Textarea } from "../../../components/ui/textarea";
 
 import { api } from "../../../lib/api";
+import { extractInstitutionSlug, withInstitutionSlug } from "../../../lib/routing";
 
 type LikertOption = { value: number; label: string };
 type DimensionKey = "frecuencia" | "normalidad" | "gravedad";
@@ -183,6 +184,8 @@ export default function DiagnosticoEncuestaPage() {
   const params = useParams<{ encuestaId: string }>();
   const encuestaId = params?.encuestaId || "";
   const router = useRouter();
+  const pathname = usePathname();
+  const institucionSlug = extractInstitutionSlug(pathname);
 
   const [inst, setInst] = useState<Instrumento | null>(null);
   const [rawKeys, setRawKeys] = useState<string[]>([]);
@@ -448,7 +451,7 @@ export default function DiagnosticoEncuestaPage() {
       });
 
       safeRemoveProgress(storageKey(encuestaId));
-      router.push(`/resumen/${encuestaId}`);
+      router.push(withInstitutionSlug(institucionSlug, `/resumen/${encuestaId}`));
     } catch (err: any) {
       console.error("save error:", err);
       alert(err?.message || "No se pudieron guardar las respuestas.");
@@ -491,7 +494,7 @@ export default function DiagnosticoEncuestaPage() {
           <Button
             className="h-12 w-full rounded-full"
             style={{ backgroundColor: BRAND }}
-            onClick={() => router.push("/diagnostico")}
+            onClick={() => router.push(withInstitutionSlug(institucionSlug, "/diagnostico"))}
           >
             Volver
           </Button>
@@ -508,7 +511,7 @@ export default function DiagnosticoEncuestaPage() {
           <Button
             className="mt-4 h-12 w-full rounded-full"
             style={{ backgroundColor: BRAND }}
-            onClick={() => router.push("/diagnostico")}
+            onClick={() => router.push(withInstitutionSlug(institucionSlug, "/diagnostico"))}
           >
             Volver
           </Button>

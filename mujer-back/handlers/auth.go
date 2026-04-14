@@ -22,13 +22,14 @@ type LoginRequest struct {
 }
 
 type LoginResponse struct {
-	Token     string  `json:"token"`
-	UserID    string  `json:"user_id"`
-	Email     string  `json:"email"`
-	Nombre    string  `json:"nombre"`
-	Rol       string  `json:"rol"`
-	Centros   []int64 `json:"centros"`
-	ExpiresAt int64   `json:"expires_at"`
+	Token         string  `json:"token"`
+	UserID        string  `json:"user_id"`
+	Email         string  `json:"email"`
+	Nombre        string  `json:"nombre"`
+	Rol           string  `json:"rol"`
+	InstitucionID int64   `json:"institucion_id"`
+	Centros       []int64 `json:"centros"`
+	ExpiresAt     int64   `json:"expires_at"`
 }
 
 func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
@@ -46,13 +47,16 @@ func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var userID, nombre, rol, passwordHash string
+	var institucionID int64
 	var activo bool
 
-	err := h.DB.QueryRow(r.Context(), `
-		select id::text, nombre, rol::text, password_hash, activo
+	err := queryRow(r.Context(), h.DB, `
+		select id::text, nombre, rol::text, password_hash, activo, institucion_id
 		from usuarios
 		where lower(email) = $1
-	`, email).Scan(&userID, &nombre, &rol, &passwordHash, &activo)
+		order by created_at asc
+		limit 1
+	`, email).Scan(&userID, &nombre, &rol, &passwordHash, &activo, &institucionID)
 	if err != nil {
 		http.Error(w, "invalid_credentials", http.StatusUnauthorized)
 		return
@@ -73,7 +77,7 @@ func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// Postgres crypt fallback (para tu seed actual si lo hiciste con crypt())
 		var match bool
-		_ = h.DB.QueryRow(r.Context(), `select ($1 = crypt($2, $1))`, passwordHash, pass).Scan(&match)
+		_ = queryRow(r.Context(), h.DB, `select ($1 = crypt($2, $1))`, passwordHash, pass).Scan(&match)
 		ok = match
 	}
 
@@ -83,7 +87,7 @@ func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	centros := make([]int64, 0, 8)
-	rows, err := h.DB.Query(r.Context(), `
+	rows, err := query(r.Context(), h.DB, `
 		select centro_id
 		from usuario_centros
 		where usuario_id = $1::uuid
@@ -118,13 +122,14 @@ func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	exp := now.Add(7 * 24 * time.Hour)
 
 	claims := jwt.MapClaims{
-		"sub":     userID,
-		"email":   email,
-		"nombre":  nombre,
-		"rol":     rol,
-		"centros": centros,
-		"iat":     now.Unix(),
-		"exp":     exp.Unix(),
+		"sub":            userID,
+		"email":          email,
+		"nombre":         nombre,
+		"rol":            rol,
+		"institucion_id": institucionID,
+		"centros":        centros,
+		"iat":            now.Unix(),
+		"exp":            exp.Unix(),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -134,16 +139,17 @@ func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, _ = h.DB.Exec(r.Context(), `update usuarios set last_login_at = now() where id = $1::uuid`, userID)
+	_, _ = exec(r.Context(), h.DB, `update usuarios set last_login_at = now() where id = $1::uuid`, userID)
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	_ = json.NewEncoder(w).Encode(LoginResponse{
-		Token:     signed,
-		UserID:    userID,
-		Email:     email,
-		Nombre:    nombre,
-		Rol:       rol,
-		Centros:   centros,
-		ExpiresAt: exp.Unix(),
+		Token:         signed,
+		UserID:        userID,
+		Email:         email,
+		Nombre:        nombre,
+		Rol:           rol,
+		InstitucionID: institucionID,
+		Centros:       centros,
+		ExpiresAt:     exp.Unix(),
 	})
 }

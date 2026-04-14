@@ -2,7 +2,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 
 import { Button } from "../components/ui/button";
@@ -31,6 +31,8 @@ import {
 } from "lucide-react";
 
 import { api } from "../lib/api";
+import { isAdminRole, type UserRole } from "../lib/auth";
+import { extractInstitutionSlug, withInstitutionSlug } from "../lib/routing";
 import { PrivacyNotice } from "../components/legal/PrivacyNotice";
 
 type LoginResponse = {
@@ -38,7 +40,8 @@ type LoginResponse = {
   user_id: string;
   email: string;
   nombre: string;
-  rol: "admin" | "centro";
+  rol: UserRole;
+  institucion_id: number;
   centros: number[];
   expires_at: number;
 };
@@ -48,6 +51,8 @@ const BRAND_DARK = "#4C1D95";
 
 export default function HomePage() {
   const router = useRouter();
+  const pathname = usePathname();
+  const institucionSlug = extractInstitutionSlug(pathname);
 
   const [open, setOpen] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
@@ -86,6 +91,7 @@ export default function HomePage() {
           email: data.email,
           nombre: data.nombre,
           rol: data.rol,
+          institucion_id: data.institucion_id,
           centros: data.centros,
           expires_at: data.expires_at,
         })
@@ -94,7 +100,7 @@ export default function HomePage() {
       setOpen(false);
       setPassword("");
 
-      router.push(data.rol === "admin" ? "/admin" : "/centro");
+      router.push(withInstitutionSlug(institucionSlug, isAdminRole(data.rol) ? "/admin" : "/centro"));
     } catch (e: any) {
       const msg = typeof e?.message === "string" ? e.message : "";
       if (msg.includes("invalid_credentials")) setErr("Correo o contraseña incorrectos.");
@@ -323,13 +329,13 @@ export default function HomePage() {
               <div className="flex-1 min-w-0">
                 <p className="mt-1 text-xs leading-5 text-slate-600 break-words">
                   Verás tres señales del entorno:{" "}
-                  <span className="font-extrabold text-slate-800">qué tan seguido pasa</span>,{" "}
+                  <span className="font-extrabold text-slate-800">¿qué tan seguido pasa?</span>,{" "}
                   <span className="font-extrabold text-slate-800">
-                    qué tan normalizado se siente
+                    ¿qué tan normalizado se siente?
                   </span>{" "}
                   y{" "}
                   <span className="font-extrabold text-slate-800">
-                    qué tan grave se percibe
+                    ¿qué tan grave se percibe?
                   </span>
                   .
                 </p>
@@ -347,7 +353,7 @@ export default function HomePage() {
               background: "linear-gradient(135deg, rgba(127,1,127,1), rgba(190,24,93,0.92))",
             }}
           >
-            <Link href="/diagnostico" aria-label="Iniciar diagnóstico" className="min-w-0">
+            <Link href={withInstitutionSlug(institucionSlug, "/diagnostico")} aria-label="Iniciar diagnóstico" className="min-w-0">
               <HeartHandshake className="mr-2 h-5 w-5 shrink-0" />
               <span className="truncate">Iniciar diagnóstico</span>
               <ChevronRight className="ml-2 h-5 w-5 opacity-90 shrink-0" />

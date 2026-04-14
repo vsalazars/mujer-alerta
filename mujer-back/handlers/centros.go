@@ -91,7 +91,7 @@ func (h CentrosHandler) List(w http.ResponseWriter, r *http.Request) {
 		order by nombre asc
 		limit $` + strconv.Itoa(len(args))
 
-	rows, err := h.DB.Query(r.Context(), sql, args...)
+	rows, err := query(r.Context(), h.DB, sql, args...)
 	if err != nil {
 		http.Error(w, "db_error", http.StatusInternalServerError)
 		return
@@ -131,11 +131,17 @@ func (h CentrosHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var id int64
-	err := h.DB.QueryRow(r.Context(), `
-		insert into centros (tipo, nombre, clave, ciudad, estado, activo)
-		values ($1, $2, nullif($3,''), nullif($4,''), nullif($5,''), true)
+	institucionID, ok := UserInstitucionIDFromCtx(r.Context())
+	if !ok {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	err := queryRow(r.Context(), h.DB, `
+		insert into centros (tipo, nombre, clave, ciudad, estado, activo, institucion_id)
+		values ($1, $2, nullif($3,''), nullif($4,''), nullif($5,''), true, $6)
 		returning id
-	`, tipo, nombre, clave, ciudad, estado).Scan(&id)
+	`, tipo, nombre, clave, ciudad, estado, institucionID).Scan(&id)
 	if err != nil {
 		http.Error(w, "db_error", http.StatusInternalServerError)
 		return
@@ -157,7 +163,7 @@ func (h CentrosHandler) Create(w http.ResponseWriter, r *http.Request) {
 // ADMIN: obtener por id (incluye activo/inactivo)
 func (h CentrosHandler) GetByID(w http.ResponseWriter, r *http.Request, id int64) {
 	var c CentroDTO
-	err := h.DB.QueryRow(r.Context(), `
+	err := queryRow(r.Context(), h.DB, `
 		select id, tipo, nombre, coalesce(clave,''), coalesce(ciudad,''), coalesce(estado,''), activo
 		from centros
 		where id = $1
@@ -186,7 +192,7 @@ func (h CentrosHandler) Update(w http.ResponseWriter, r *http.Request, id int64)
 		return
 	}
 
-	ct, err := h.DB.Exec(r.Context(), `
+	ct, err := exec(r.Context(), h.DB, `
 		update centros
 		set tipo = $2,
 		    nombre = $3,
@@ -217,7 +223,7 @@ func (h CentrosHandler) Update(w http.ResponseWriter, r *http.Request, id int64)
 
 // ADMIN: delete lógico
 func (h CentrosHandler) Delete(w http.ResponseWriter, r *http.Request, id int64) {
-	ct, err := h.DB.Exec(r.Context(), `
+	ct, err := exec(r.Context(), h.DB, `
 		update centros
 		set activo = false
 		where id = $1
