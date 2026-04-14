@@ -63,6 +63,30 @@ func main() {
 	mux.HandleFunc("/api/instrumento", ih.Get)
 
 	// ======================
+	// Instituciones
+	// ======================
+	insh := handlers.InstitucionesHandler{DB: pool}
+	mux.HandleFunc("/api/instituciones/resolve", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			insh.ResolveBySlug(w, r)
+			return
+		}
+		http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+	})
+
+	// ======================
+	// Acceso publico por slug
+	// ======================
+	accessh := handlers.AccessHandler{DB: pool}
+	mux.HandleFunc("/api/access/resolve", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			accessh.Resolve(w, r)
+			return
+		}
+		http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+	})
+
+	// ======================
 	// Encuestas
 	// ======================
 	eh := handlers.EncuestasHandler{DB: pool}
@@ -141,33 +165,33 @@ func main() {
 			handlers.WithTenantSession(pool,
 				handlers.RequireAdmin(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-				idStr := strings.TrimPrefix(r.URL.Path, "/api/centros/")
-				idStr = strings.Trim(idStr, "/")
-				if idStr == "" {
-					http.NotFound(w, r)
-					return
-				}
+					idStr := strings.TrimPrefix(r.URL.Path, "/api/centros/")
+					idStr = strings.Trim(idStr, "/")
+					if idStr == "" {
+						http.NotFound(w, r)
+						return
+					}
 
-				id, err := strconv.ParseInt(idStr, 10, 64)
-				if err != nil || id <= 0 {
-					http.Error(w, "bad_id", http.StatusBadRequest)
-					return
-				}
+					id, err := strconv.ParseInt(idStr, 10, 64)
+					if err != nil || id <= 0 {
+						http.Error(w, "bad_id", http.StatusBadRequest)
+						return
+					}
 
-				switch r.Method {
-				case http.MethodGet:
-					ch.GetByID(w, r, id)
-					return
-				case http.MethodPut:
-					ch.Update(w, r, id)
-					return
-				case http.MethodDelete:
-					ch.Delete(w, r, id)
-					return
-				default:
-					http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
-					return
-				}
+					switch r.Method {
+					case http.MethodGet:
+						ch.GetByID(w, r, id)
+						return
+					case http.MethodPut:
+						ch.Update(w, r, id)
+						return
+					case http.MethodDelete:
+						ch.Delete(w, r, id)
+						return
+					default:
+						http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+						return
+					}
 				})),
 			),
 		).ServeHTTP(w, r)
@@ -198,6 +222,13 @@ func main() {
 			http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
 		})).ServeHTTP(w, r)
 	})
+	mux.HandleFunc("/api/auth/login-global", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			ah.LoginGlobal(w, r)
+			return
+		}
+		http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+	})
 
 	// ======================
 	// Admin: Usuarios (CRUD)
@@ -210,17 +241,17 @@ func main() {
 			handlers.WithTenantSession(pool,
 				handlers.RequireAdmin(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-				switch r.Method {
-				case http.MethodGet:
-					auh.List(w, r)
-					return
-				case http.MethodPost:
-					auh.Create(w, r)
-					return
-				default:
-					http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
-					return
-				}
+					switch r.Method {
+					case http.MethodGet:
+						auh.List(w, r)
+						return
+					case http.MethodPost:
+						auh.Create(w, r)
+						return
+					default:
+						http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+						return
+					}
 
 				})),
 			),
@@ -233,24 +264,24 @@ func main() {
 			handlers.WithTenantSession(pool,
 				handlers.RequireAdmin(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-				id := strings.TrimPrefix(r.URL.Path, "/api/admin/usuarios/")
-				id = strings.Trim(id, "/")
-				if id == "" {
-					http.NotFound(w, r)
-					return
-				}
+					id := strings.TrimPrefix(r.URL.Path, "/api/admin/usuarios/")
+					id = strings.Trim(id, "/")
+					if id == "" {
+						http.NotFound(w, r)
+						return
+					}
 
-				switch r.Method {
-				case http.MethodPut:
-					auh.Update(w, r, id)
-					return
-				case http.MethodDelete:
-					auh.Disable(w, r, id)
-					return
-				default:
-					http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
-					return
-				}
+					switch r.Method {
+					case http.MethodPut:
+						auh.Update(w, r, id)
+						return
+					case http.MethodDelete:
+						auh.Disable(w, r, id)
+						return
+					default:
+						http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+						return
+					}
 
 				})),
 			),
@@ -359,7 +390,7 @@ func main() {
 			"https://mujer-alerta-92958pdcf-vidal-salazars-projects.vercel.app",
 		},
 		AllowedMethods: "GET, POST, PUT, DELETE, OPTIONS",
-		AllowedHeaders: "Content-Type, Authorization",
+		AllowedHeaders: "Content-Type, Authorization, X-Institucion-Slug",
 	})
 
 	addr := os.Getenv("ADDR")

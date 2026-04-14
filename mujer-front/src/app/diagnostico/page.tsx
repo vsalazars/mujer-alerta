@@ -36,6 +36,7 @@ type Centro = {
   id: number;
   tipo: string;
   nombre: string;
+  slug: string;
   clave?: string;
   ciudad?: string;
   estado?: string;
@@ -239,6 +240,7 @@ export default function DiagnosticoInicioPage() {
   const router = useRouter();
   const pathname = usePathname();
   const institucionSlug = extractInstitutionSlug(pathname);
+  const accessSlug = institucionSlug.trim().toLowerCase();
 
   const [centros, setCentros] = useState<Centro[]>([]);
   const [generos, setGeneros] = useState<Genero[]>([]);
@@ -273,6 +275,15 @@ export default function DiagnosticoInicioPage() {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    if (!accessSlug || centros.length === 0) return;
+
+    const matched = centros.find((centro) => String(centro.slug || "").trim().toLowerCase() === accessSlug);
+    if (matched) {
+      setCentroId(String(matched.id));
+    }
+  }, [accessSlug, centros]);
 
   useEffect(() => {
     const best = findLatestInProgress();
@@ -357,6 +368,11 @@ export default function DiagnosticoInicioPage() {
   const blockedByLock = Boolean(lock && lock.remainingMs > 0);
   const blockedByResume = Boolean(resume); // ✅ si hay progreso, no permitir nueva
   const blockedByDoneBrowser = Boolean(doneBlocked); // ✅ si ya finalizó, no permitir nueva
+  const selectedCentro = useMemo(
+    () => centros.find((centro) => String(centro.id) === centroId) || null,
+    [centros, centroId],
+  );
+  const isCentroFixedBySlug = Boolean(accessSlug && selectedCentro?.slug?.toLowerCase() === accessSlug);
 
   async function onSubmit() {
     if (!canSubmit) return;
@@ -543,24 +559,40 @@ export default function DiagnosticoInicioPage() {
               ) : (
                 <>
                   <div className="space-y-2">
-                    <Label className="text-sm">Centro escolar o laboral</Label>
-                    <div className="relative">
-                      <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
-                        <Building2 className="h-4 w-4 text-neutral-500" />
+                    <Label className="text-sm">
+                      {isCentroFixedBySlug ? "Centro asociado al acceso" : "Centro escolar o laboral"}
+                    </Label>
+                    {isCentroFixedBySlug && selectedCentro ? (
+                      <div className="rounded-xl border border-black/5 bg-white/80 px-4 py-3 shadow-sm">
+                        <div className="flex items-center gap-3">
+                          <div className="grid h-9 w-9 place-items-center rounded-xl bg-[#faf5ff]">
+                            <Building2 className="h-4 w-4" style={{ color: PRIMARY }} />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-neutral-900">{selectedCentro.nombre}</p>
+                            
+                          </div>
+                        </div>
                       </div>
-                      <Select value={centroId} onValueChange={setCentroId}>
-                        <SelectTrigger className="h-12 rounded-xl pl-10 shadow-sm">
-                          <SelectValue placeholder="Selecciona un centro" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {centros.map((c) => (
-                            <SelectItem key={c.id} value={String(c.id)}>
-                              {c.nombre}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    ) : (
+                      <div className="relative">
+                        <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
+                          <Building2 className="h-4 w-4 text-neutral-500" />
+                        </div>
+                        <Select value={centroId} onValueChange={setCentroId}>
+                          <SelectTrigger className="h-12 rounded-xl pl-10 shadow-sm">
+                            <SelectValue placeholder="Selecciona un centro" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {centros.map((c) => (
+                              <SelectItem key={c.id} value={String(c.id)}>
+                                {c.nombre}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
 
                     {/* aviso de lock suave */}
                     {blockedByLock ? (

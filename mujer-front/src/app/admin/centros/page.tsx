@@ -35,6 +35,7 @@ type Centro = {
   id: number;
   tipo: "escolar" | "laboral";
   nombre: string;
+  slug: string;
   clave?: string;
   ciudad?: string;
   estado?: string;
@@ -63,6 +64,17 @@ function readAuth(): { token: string; user: AuthUser | null } {
 
 function cx(...v: Array<string | false | null | undefined>) {
   return v.filter(Boolean).join(" ");
+}
+
+function slugifyCentroNombre(nombre: string) {
+  return String(nombre || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80) || "centro";
 }
 
 export default function AdminCentrosPage() {
@@ -111,12 +123,14 @@ export default function AdminCentrosPage() {
     const s = q.trim().toLowerCase();
     if (!s) return items;
     return items.filter((c) => {
-      const hay = `${c.nombre} ${c.tipo} ${c.clave || ""} ${c.ciudad || ""} ${
+      const hay = `${c.nombre} ${c.slug || ""} ${c.tipo} ${c.clave || ""} ${c.ciudad || ""} ${
         c.estado || ""
       }`.toLowerCase();
       return hay.includes(s);
     });
   }, [items, q]);
+
+  const suggestedSlug = useMemo(() => slugifyCentroNombre(form.nombre), [form.nombre]);
 
   async function load() {
     setErr("");
@@ -273,7 +287,7 @@ export default function AdminCentrosPage() {
                   {mode === "create" ? "Nuevo centro" : "Editar centro"}
                 </DialogTitle>
                 <DialogDescription className="text-sm text-neutral-600">
-                  Captura la información básica del centro.
+                  Captura la información básica del centro. El slug se genera automáticamente a partir del nombre.
                 </DialogDescription>
               </DialogHeader>
 
@@ -330,6 +344,19 @@ export default function AdminCentrosPage() {
                     placeholder="Ej. IPN UPIITA"
                     disabled={saving}
                   />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="slug-sugerido">Slug sugerido</Label>
+                  <Input
+                    id="slug-sugerido"
+                    value={suggestedSlug}
+                    readOnly
+                    disabled
+                  />
+                  <p className="text-xs text-neutral-500">
+                    Se ajusta automáticamente si ya existe otro centro con el mismo slug dentro de la institución.
+                  </p>
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
@@ -429,6 +456,7 @@ export default function AdminCentrosPage() {
               <tr>
                 <th className="px-5 py-3 text-left font-semibold">Nombre</th>
                 <th className="px-5 py-3 text-left font-semibold">Tipo</th>
+                <th className="px-5 py-3 text-left font-semibold">Slug</th>
                 <th className="px-5 py-3 text-left font-semibold">Clave</th>
                 <th className="px-5 py-3 text-left font-semibold">Ciudad</th>
                 <th className="px-5 py-3 text-left font-semibold">Estado</th>
@@ -439,13 +467,13 @@ export default function AdminCentrosPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td className="px-5 py-6 text-neutral-500" colSpan={6}>
+                  <td className="px-5 py-6 text-neutral-500" colSpan={7}>
                     Cargando…
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td className="px-5 py-6 text-neutral-500" colSpan={6}>
+                  <td className="px-5 py-6 text-neutral-500" colSpan={7}>
                     Sin centros.
                   </td>
                 </tr>
@@ -457,6 +485,7 @@ export default function AdminCentrosPage() {
                         {c.nombre}
                       </div>
                       <div className="text-xs text-neutral-500">ID: {c.id}</div>
+                      <div className="text-xs text-neutral-500">Slug: {c.slug}</div>
                     </td>
                     <td className="px-5 py-4">
                       <span
@@ -468,6 +497,9 @@ export default function AdminCentrosPage() {
                       >
                         {c.tipo}
                       </span>
+                    </td>
+                    <td className="px-5 py-4 font-mono text-neutral-700">
+                      {c.slug}
                     </td>
                     <td className="px-5 py-4 text-neutral-700">
                       {c.clave || "—"}

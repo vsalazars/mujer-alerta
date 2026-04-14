@@ -632,7 +632,7 @@ export default function ResultadosEncuestaPage() {
                 size="lg"
                 className="h-14 rounded-full text-base font-semibold text-white"
                 style={{ backgroundColor: "#7F017F" }}
-                onClick={() => router.push(withInstitutionSlug(institucionSlug, "/"))}
+                onClick={() => router.push("/")}
               >
                 <CheckCircle className="mr-3 h-5 w-5" />
 

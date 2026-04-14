@@ -111,15 +111,23 @@ func WithPublicTenantSession(pool *pgxpool.Pool, next http.Handler) http.Handler
 			return
 		}
 
+		var kind string
 		var institucionID sql.NullInt64
+		var institucionSlugResolved sql.NullString
+		var centroID sql.NullInt64
+		var centroSlug sql.NullString
 		if err := tx.QueryRow(
 			ctx,
-			"select public.app_resolve_institucion_id_by_slug($1)",
+			"select kind, institucion_id, institucion_slug, centro_id, centro_slug from public.app_resolve_public_access_slug($1)",
 			institucionSlug,
-		).Scan(&institucionID); err != nil {
+		).Scan(&kind, &institucionID, &institucionSlugResolved, &centroID, &centroSlug); err != nil {
 			http.Error(w, "db_error", http.StatusInternalServerError)
 			return
 		}
+		_ = kind
+		_ = institucionSlugResolved
+		_ = centroID
+		_ = centroSlug
 		if !institucionID.Valid || institucionID.Int64 <= 0 {
 			http.Error(w, "institucion_not_found", http.StatusNotFound)
 			return

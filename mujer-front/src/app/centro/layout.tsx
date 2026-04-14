@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { isAdminRole, type UserRole } from "@/lib/auth";
 import { extractInstitutionSlug, withInstitutionSlug } from "@/lib/routing";
@@ -49,9 +49,11 @@ export default function CentroLayout({ children }: { children: React.ReactNode }
   const router = useRouter();
   const pathname = usePathname();
   const institucionSlug = extractInstitutionSlug(pathname);
-  const { user } = readAuth();
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    setHydrated(true);
     const { user } = readAuth();
     if (!user) {
       router.replace(withInstitutionSlug(institucionSlug, "/"));
@@ -62,14 +64,15 @@ export default function CentroLayout({ children }: { children: React.ReactNode }
       router.replace(withInstitutionSlug(institucionSlug, isAdminRole(user.rol) ? "/admin" : "/"));
       return;
     }
-  }, [institucionSlug, router, user]);
+    setUser(user);
+  }, [institucionSlug, router]);
 
   function onLogout() {
     clearAuth();
     router.replace(withInstitutionSlug(institucionSlug, "/"));
   }
 
-  if (!user) return null;
+  if (!hydrated || !user) return null;
 
   return (
     <main className="min-h-dvh bg-white">

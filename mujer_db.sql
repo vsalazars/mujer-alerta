@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 7CHBQzmnl06QvAo0CJZY28JE3pJk6GTdV2dKbKWxd07UdJyrzmJuOVUrLKrvUuP
+\restrict q75RWMvSbFVPlZn5SuobGiP8vnZjt902THlogBxInVKWugtwFr5JnpHe02FweL8
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -57,6 +57,7 @@ DROP TRIGGER IF EXISTS trg_set_updated_at_configuracion_institucion ON public.co
 DROP TRIGGER IF EXISTS trg_set_updated_at_comentario_analisis ON public.comentario_analisis;
 DROP TRIGGER IF EXISTS trg_set_updated_at_centros ON public.centros;
 DROP INDEX IF EXISTS public.uq_un_owner_por_institucion;
+DROP INDEX IF EXISTS public.uq_centros_institucion_slug;
 DROP INDEX IF EXISTS public.uq_centros_institucion_clave;
 DROP INDEX IF EXISTS public.idx_usuarios_institucion;
 DROP INDEX IF EXISTS public.idx_usuario_centros_institucion;
@@ -138,6 +139,10 @@ DROP FUNCTION IF EXISTS public.validar_encuesta_mismo_tenant();
 DROP FUNCTION IF EXISTS public.validar_comentario_analisis_mismo_tenant();
 DROP FUNCTION IF EXISTS public.validar_auditoria_mismo_tenant();
 DROP FUNCTION IF EXISTS public.set_updated_at();
+DROP FUNCTION IF EXISTS public.app_slugify_text(p_value text);
+DROP FUNCTION IF EXISTS public.app_resolve_public_access_slug(p_slug text);
+DROP FUNCTION IF EXISTS public.app_resolve_institucion_id_by_slug(p_slug text);
+DROP FUNCTION IF EXISTS public.app_login_candidates_by_email(p_email text);
 DROP FUNCTION IF EXISTS public.app_current_is_super_admin();
 DROP FUNCTION IF EXISTS public.app_current_institucion_id();
 DROP TYPE IF EXISTS public.rol_usuario_enum;
@@ -236,6 +241,169 @@ CREATE FUNCTION public.app_current_is_super_admin() RETURNS boolean
     AS $$
   SELECT COALESCE(NULLIF(current_setting('app.current_is_super_admin', true), '')::BOOLEAN, FALSE)
 $$;
+
+
+--
+-- Name: app_login_candidates_by_email(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.app_login_candidates_by_email(p_email text) RETURNS TABLE(user_id uuid, email text, nombre text, rol text, password_hash text, activo boolean, institucion_id bigint, institucion_slug text)
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  SELECT
+    u.id,
+    u.email,
+    u.nombre,
+    u.rol::text,
+    u.password_hash,
+    u.activo,
+    u.institucion_id,
+    i.slug
+  FROM public.usuarios u
+  JOIN public.instituciones i
+    ON i.id = u.institucion_id
+  WHERE lower(u.email) = lower(trim(p_email))
+  ORDER BY u.created_at ASC;
+$$;
+
+
+--
+-- Name: app_resolve_institucion_id_by_slug(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.app_resolve_institucion_id_by_slug(p_slug text) RETURNS bigint
+    LANGUAGE plpgsql STABLE SECURITY DEFINER
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+DECLARE
+  v_slug TEXT;
+  v_institucion_id BIGINT;
+BEGIN
+  v_slug := lower(btrim(COALESCE(p_slug, '')));
+
+  IF v_slug = '' THEN
+    RETURN NULL;
+  END IF;
+
+  SELECT i.id
+  INTO v_institucion_id
+  FROM public.instituciones i
+  WHERE lower(i.slug) = v_slug
+    AND i.activo = TRUE
+    AND i.estatus_validacion = 'activa'
+  ORDER BY i.id
+  LIMIT 1;
+
+  RETURN v_institucion_id;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION app_resolve_institucion_id_by_slug(p_slug text); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.app_resolve_institucion_id_by_slug(p_slug text) IS 'Resuelve institucion_id desde slug para requests publicos multitenant con RLS activo.';
+
+
+--
+-- Name: app_resolve_public_access_slug(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.app_resolve_public_access_slug(p_slug text) RETURNS TABLE(kind text, institucion_id bigint, institucion_slug text, centro_id bigint, centro_slug text)
+    LANGUAGE plpgsql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+DECLARE
+  v_slug TEXT;
+  v_center_matches INTEGER;
+BEGIN
+  v_slug := lower(btrim(COALESCE(p_slug, '')));
+
+  IF v_slug = '' THEN
+    RETURN;
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    'institucion'::TEXT,
+    i.id,
+    i.slug,
+    NULL::BIGINT,
+    NULL::TEXT
+  FROM public.instituciones i
+  WHERE lower(i.slug) = v_slug
+    AND i.activo = TRUE
+    AND i.estatus_validacion = 'activa'
+  LIMIT 1;
+
+  IF FOUND THEN
+    RETURN;
+  END IF;
+
+  SELECT COUNT(*)
+  INTO v_center_matches
+  FROM public.centros c
+  JOIN public.instituciones i ON i.id = c.institucion_id
+  WHERE lower(c.slug) = v_slug
+    AND c.activo = TRUE
+    AND i.activo = TRUE
+    AND i.estatus_validacion = 'activa';
+
+  IF v_center_matches = 1 THEN
+    RETURN QUERY
+    SELECT
+      'centro'::TEXT,
+      i.id,
+      i.slug,
+      c.id,
+      c.slug
+    FROM public.centros c
+    JOIN public.instituciones i ON i.id = c.institucion_id
+    WHERE lower(c.slug) = v_slug
+      AND c.activo = TRUE
+      AND i.activo = TRUE
+      AND i.estatus_validacion = 'activa'
+    LIMIT 1;
+  END IF;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION app_resolve_public_access_slug(p_slug text); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.app_resolve_public_access_slug(p_slug text) IS 'Resuelve un slug publico a una institucion activa o a un centro activo para redireccionar la entrada a la encuesta.';
+
+
+--
+-- Name: app_slugify_text(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.app_slugify_text(p_value text) RETURNS text
+    LANGUAGE plpgsql IMMUTABLE
+    AS $_$
+DECLARE
+  v_slug text;
+BEGIN
+  v_slug := lower(coalesce(p_value, ''));
+  v_slug := translate(
+    v_slug,
+    'áàäâãéèëêíìïîóòöôõúùüûñç',
+    'aaaaaeeeeiiiiooooouuuunc'
+  );
+  v_slug := regexp_replace(v_slug, '[^a-z0-9]+', '-', 'g');
+  v_slug := regexp_replace(v_slug, '(^-+|-+$)', '', 'g');
+
+  IF v_slug = '' THEN
+    v_slug := 'centro';
+  END IF;
+
+  RETURN left(v_slug, 80);
+END;
+$_$;
 
 
 --
@@ -478,6 +646,7 @@ CREATE TABLE public.centros (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     institucion_id bigint NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    slug text NOT NULL,
     CONSTRAINT centros_tipo_check CHECK ((tipo = ANY (ARRAY['escolar'::text, 'laboral'::text])))
 );
 
@@ -1328,6 +1497,13 @@ CREATE UNIQUE INDEX uq_centros_institucion_clave ON public.centros USING btree (
 
 
 --
+-- Name: uq_centros_institucion_slug; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_centros_institucion_slug ON public.centros USING btree (institucion_id, slug);
+
+
+--
 -- Name: uq_un_owner_por_institucion; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1682,5 +1858,5 @@ ALTER TABLE public.usuarios ENABLE ROW LEVEL SECURITY;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 7CHBQzmnl06QvAo0CJZY28JE3pJk6GTdV2dKbKWxd07UdJyrzmJuOVUrLKrvUuP
+\unrestrict q75RWMvSbFVPlZn5SuobGiP8vnZjt902THlogBxInVKWugtwFr5JnpHe02FweL8
 
