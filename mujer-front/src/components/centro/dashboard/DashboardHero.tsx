@@ -14,6 +14,7 @@ import {
 
 type DashboardHeroProps = {
   data: CentroResumenResponse;
+  centerLabel?: string;
   showSemantic: boolean;
   year: string;
   yearOptions: YearOption[];
@@ -23,6 +24,7 @@ type DashboardHeroProps = {
 
 export function DashboardHero({
   data,
+  centerLabel,
   showSemantic,
   year,
   yearOptions,
@@ -56,6 +58,16 @@ export function DashboardHero({
               </h1>
 
               <div className="flex flex-wrap items-center gap-3">
+                {centerLabel ? (
+                  <Badge
+                    variant="secondary"
+                    className="rounded-full px-3 py-1 font-black tracking-wide"
+                    style={{ background: "rgba(127,1,127,0.08)", color: PURPLE }}
+                  >
+                    Centro: {centerLabel}
+                  </Badge>
+                ) : null}
+
                 <span className="text-sm font-semibold text-slate-600">
                   Total de percepción de violencia contra la mujer
                 </span>

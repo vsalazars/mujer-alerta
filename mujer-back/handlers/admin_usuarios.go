@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -14,14 +16,15 @@ type AdminUsuariosHandler struct {
 }
 
 type AdminUsuarioDTO struct {
-	ID           string  `json:"id"`
-	Email        string  `json:"email"`
-	Nombre       string  `json:"nombre"`
-	Rol          string  `json:"rol"` // admin|centro
-	Activo       bool    `json:"activo"`
-	Centros      []int64 `json:"centros"`
-	CentroNombre string  `json:"centro_nombre,omitempty"` // útil para UI si solo 1 centro
-	CreatedAt    string  `json:"created_at,omitempty"`
+	ID                string  `json:"id"`
+	Email             string  `json:"email"`
+	Nombre            string  `json:"nombre"`
+	Rol               string  `json:"rol"` // admin|centro
+	Activo            bool    `json:"activo"`
+	Centros           []int64 `json:"centros"`
+	CentroNombre      string  `json:"centro_nombre,omitempty"` // útil para UI si solo 1 centro
+	CreatedAt         string  `json:"created_at,omitempty"`
+	GeneratedPassword string  `json:"generated_password,omitempty"`
 }
 
 type CreateUsuarioReq struct {
@@ -53,6 +56,35 @@ func normEmail(s string) string {
 	return strings.ToLower(strings.TrimSpace(s))
 }
 
+func generateTemporaryPassword() (string, error) {
+	buf := make([]byte, 9)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(buf), nil
+}
+
+func validateCentrosForInstitucion(r *http.Request, db *pgxpool.Pool, institucionID int64, centros []int64) error {
+	if len(centros) == 0 {
+		return nil
+	}
+
+	var total int64
+	if err := queryRow(
+		r.Context(),
+		db,
+		`select count(*) from centros where institucion_id = $1 and id = any($2::bigint[])`,
+		institucionID,
+		centros,
+	).Scan(&total); err != nil {
+		return err
+	}
+	if total != int64(len(centros)) {
+		return http.ErrMissingFile
+	}
+	return nil
+}
+
 // GET /api/admin/usuarios?rol=centro|admin|all (default: centro)
 func (h AdminUsuariosHandler) List(w http.ResponseWriter, r *http.Request) {
 	rolQ := strings.TrimSpace(r.URL.Query().Get("rol"))
@@ -61,6 +93,11 @@ func (h AdminUsuariosHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	if rolQ != "centro" && rolQ != "admin" && rolQ != "all" {
 		http.Error(w, "bad_request", http.StatusBadRequest)
+		return
+	}
+	institucionID, ok := UserInstitucionIDFromCtx(r.Context())
+	if !ok {
+		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
 
@@ -72,9 +109,12 @@ func (h AdminUsuariosHandler) List(w http.ResponseWriter, r *http.Request) {
 			u.rol::text,
 			u.activo,
 			coalesce(array_agg(uc.centro_id order by uc.centro_id) filter (where uc.centro_id is not null), '{}') as centros,
+			coalesce(case when count(uc.centro_id) = 1 then max(c.nombre) else '' end, '') as centro_nombre,
 			u.created_at::text
 		from usuarios u
 		left join usuario_centros uc on uc.usuario_id = u.id
+		left join centros c on c.id = uc.centro_id
+		where u.institucion_id = $1
 	`
 
 	var (
@@ -87,14 +127,14 @@ func (h AdminUsuariosHandler) List(w http.ResponseWriter, r *http.Request) {
 			group by u.id
 			order by u.created_at desc
 		`
-		args = []any{}
+		args = []any{institucionID}
 	} else {
 		q = base + `
-			where u.rol = $1
+			and u.rol = $2
 			group by u.id
 			order by u.created_at desc
 		`
-		args = []any{rolQ}
+		args = []any{institucionID, rolQ}
 	}
 
 	rows, err := query(r.Context(), h.DB, q, args...)
@@ -107,14 +147,9 @@ func (h AdminUsuariosHandler) List(w http.ResponseWriter, r *http.Request) {
 	out := make([]AdminUsuarioDTO, 0, 32)
 	for rows.Next() {
 		var it AdminUsuarioDTO
-		if err := rows.Scan(&it.ID, &it.Email, &it.Nombre, &it.Rol, &it.Activo, &it.Centros, &it.CreatedAt); err != nil {
+		if err := rows.Scan(&it.ID, &it.Email, &it.Nombre, &it.Rol, &it.Activo, &it.Centros, &it.CentroNombre, &it.CreatedAt); err != nil {
 			http.Error(w, "db_error", http.StatusInternalServerError)
 			return
-		}
-
-		// Para UI: si tiene 1 centro, agrega su nombre
-		if it.Rol == "centro" && len(it.Centros) == 1 {
-			_ = queryRow(r.Context(), h.DB, `select nombre from centros where id = $1`, it.Centros[0]).Scan(&it.CentroNombre)
 		}
 
 		out = append(out, it)
@@ -139,6 +174,7 @@ func (h AdminUsuariosHandler) Create(w http.ResponseWriter, r *http.Request) {
 	nombre := strings.TrimSpace(req.Nombre)
 	rol := strings.TrimSpace(req.Rol)
 	pass := strings.TrimSpace(req.Password)
+	generatedPassword := ""
 
 	if rol == "" {
 		rol = "centro"
@@ -152,8 +188,13 @@ func (h AdminUsuariosHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if pass == "" {
-		http.Error(w, "password_required", http.StatusBadRequest)
-		return
+		tmp, err := generateTemporaryPassword()
+		if err != nil {
+			http.Error(w, "password_generation_failed", http.StatusInternalServerError)
+			return
+		}
+		pass = tmp
+		generatedPassword = tmp
 	}
 	if len(pass) < 8 {
 		http.Error(w, "weak_password", http.StatusBadRequest)
@@ -182,6 +223,14 @@ func (h AdminUsuariosHandler) Create(w http.ResponseWriter, r *http.Request) {
 	institucionID, ok := UserInstitucionIDFromCtx(r.Context())
 	if !ok {
 		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	if err := validateCentrosForInstitucion(r, h.DB, institucionID, centros); err != nil {
+		if err == http.ErrMissingFile {
+			http.Error(w, "centro_invalid", http.StatusBadRequest)
+			return
+		}
+		http.Error(w, "db_error", http.StatusInternalServerError)
 		return
 	}
 
@@ -224,12 +273,13 @@ func (h AdminUsuariosHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := AdminUsuarioDTO{
-		ID:      id,
-		Email:   email,
-		Nombre:  nombre,
-		Rol:     rol,
-		Activo:  true,
-		Centros: centros,
+		ID:                id,
+		Email:             email,
+		Nombre:            nombre,
+		Rol:               rol,
+		Activo:            true,
+		Centros:           centros,
+		GeneratedPassword: generatedPassword,
 	}
 	if resp.Rol == "centro" && len(resp.Centros) == 1 {
 		_ = queryRow(r.Context(), h.DB, `select nombre from centros where id = $1`, resp.Centros[0]).Scan(&resp.CentroNombre)
@@ -267,7 +317,7 @@ func (h AdminUsuariosHandler) Update(w http.ResponseWriter, r *http.Request, id 
 
 	// leer rol actual (y validar existencia)
 	var curRol string
-	err = tx.QueryRow(r.Context(), `select rol::text from usuarios where id = $1::uuid`, id).Scan(&curRol)
+	err = tx.QueryRow(r.Context(), `select rol::text from usuarios where id = $1::uuid and institucion_id = $2`, id, institucionID).Scan(&curRol)
 	if err != nil {
 		http.Error(w, "not_found", http.StatusNotFound)
 		return
@@ -354,6 +404,14 @@ func (h AdminUsuariosHandler) Update(w http.ResponseWriter, r *http.Request, id 
 			http.Error(w, "centro_required", http.StatusBadRequest)
 			return
 		}
+		if err := validateCentrosForInstitucion(r, h.DB, institucionID, centros); err != nil {
+			if err == http.ErrMissingFile {
+				http.Error(w, "centro_invalid", http.StatusBadRequest)
+				return
+			}
+			http.Error(w, "db_error", http.StatusInternalServerError)
+			return
+		}
 		_, err := tx.Exec(r.Context(), `delete from usuario_centros where usuario_id = $1::uuid`, id)
 		if err != nil {
 			http.Error(w, "db_error", http.StatusInternalServerError)
@@ -383,19 +441,18 @@ func (h AdminUsuariosHandler) Update(w http.ResponseWriter, r *http.Request, id 
 		select
 			u.id::text, u.email, u.nombre, u.rol::text, u.activo,
 			coalesce(array_agg(uc.centro_id order by uc.centro_id) filter (where uc.centro_id is not null), '{}') as centros,
+			coalesce(case when count(uc.centro_id) = 1 then max(c.nombre) else '' end, '') as centro_nombre,
 			u.created_at::text
 		from usuarios u
 		left join usuario_centros uc on uc.usuario_id = u.id
+		left join centros c on c.id = uc.centro_id
 		where u.id = $1::uuid
+		  and u.institucion_id = $2
 		group by u.id
-	`, id).Scan(&out.ID, &out.Email, &out.Nombre, &out.Rol, &out.Activo, &out.Centros, &out.CreatedAt)
+	`, id, institucionID).Scan(&out.ID, &out.Email, &out.Nombre, &out.Rol, &out.Activo, &out.Centros, &out.CentroNombre, &out.CreatedAt)
 	if err != nil {
 		http.Error(w, "db_error", http.StatusInternalServerError)
 		return
-	}
-
-	if out.Rol == "centro" && len(out.Centros) == 1 {
-		_ = queryRow(r.Context(), h.DB, `select nombre from centros where id = $1`, out.Centros[0]).Scan(&out.CentroNombre)
 	}
 
 	writeJSON(w, http.StatusOK, out)
@@ -409,7 +466,13 @@ func (h AdminUsuariosHandler) Disable(w http.ResponseWriter, r *http.Request, id
 		return
 	}
 
-	tag, err := exec(r.Context(), h.DB, `update usuarios set activo = false where id = $1::uuid`, id)
+	institucionID, ok := UserInstitucionIDFromCtx(r.Context())
+	if !ok {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	tag, err := exec(r.Context(), h.DB, `update usuarios set activo = false where id = $1::uuid and institucion_id = $2`, id, institucionID)
 	if err != nil {
 		http.Error(w, "db_error", http.StatusInternalServerError)
 		return

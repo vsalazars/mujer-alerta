@@ -66,6 +66,10 @@ function cx(...v: Array<string | false | null | undefined>) {
   return v.filter(Boolean).join(" ");
 }
 
+function errorMessage(e: unknown, fallback: string) {
+  return e instanceof Error ? e.message || fallback : fallback;
+}
+
 function slugifyCentroNombre(nombre: string) {
   return String(nombre || "")
     .trim()
@@ -136,11 +140,12 @@ export default function AdminCentrosPage() {
     setErr("");
     setLoading(true);
     try {
-      // Lista pública: solo activos (por ahora)
-      const data = await api<Centro[]>("/api/centros");
+      const data = await api<Centro[]>("/api/admin/centros", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       setItems(data || []);
-    } catch (e: any) {
-      setErr(e?.message || "No se pudo cargar centros");
+    } catch (e: unknown) {
+      setErr(errorMessage(e, "No se pudo cargar centros"));
     } finally {
       setLoading(false);
     }
@@ -218,15 +223,15 @@ export default function AdminCentrosPage() {
 
       setOpen(false);
       await load();
-    } catch (e: any) {
-      setErr(e?.message || "No se pudo guardar");
+    } catch (e: unknown) {
+      setErr(errorMessage(e, "No se pudo guardar"));
     } finally {
       setSaving(false);
     }
   }
 
   async function onDelete(c: Centro) {
-    const ok = confirm(`¿Eliminar (desactivar) el centro "${c.nombre}"?`);
+    const ok = confirm(`¿Eliminar permanentemente el centro "${c.nombre}"? Esta acción solo se permite si no tiene usuarios ni encuestas asociadas.`);
     if (!ok) return;
 
     setErr("");
@@ -236,8 +241,13 @@ export default function AdminCentrosPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       await load();
-    } catch (e: any) {
-      setErr(e?.message || "No se pudo eliminar");
+    } catch (e: unknown) {
+      const msg = errorMessage(e, "No se pudo eliminar");
+      if (msg.includes("centro_has_data")) {
+        setErr("No se puede eliminar este centro porque ya tiene usuarios o encuestas asociadas.");
+        return;
+      }
+      setErr(msg);
     }
   }
 

@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -18,6 +17,7 @@ import { Button } from "../components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
+import { RegistrationRequestForm } from "../components/landing/RegistrationRequestForm";
 import { api } from "../lib/api";
 import { isAdminRole, type UserRole } from "../lib/auth";
 import { withInstitutionSlug } from "../lib/routing";
@@ -33,6 +33,7 @@ type LoginResponse = {
   institucion_id: number;
   institucion_slug: string;
   centros: number[];
+  centro_nombres?: string[];
   expires_at: number;
 };
 
@@ -49,15 +50,11 @@ export default function LandingPage() {
   const [slugAccessOpen, setSlugAccessOpen] = useState(false);
   const [slugError, setSlugError] = useState("");
   const [globalLoginOpen, setGlobalLoginOpen] = useState(false);
+  const [registrationOpen, setRegistrationOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
-
-  const tenantHref = useMemo(() => {
-    const clean = slug.trim().replace(/^\/+|\/+$/g, "");
-    return clean ? `/${clean}` : "/institucion-demo-inicial";
-  }, [slug]);
 
   function onOpenSlugAccess() {
     setSlugError("");
@@ -115,18 +112,23 @@ export default function LandingPage() {
           institucion_id: data.institucion_id,
           institucion_slug: data.institucion_slug,
           centros: data.centros,
+          centro_nombres: data.centro_nombres || [],
           expires_at: data.expires_at,
         }),
       );
 
       setGlobalLoginOpen(false);
       setPassword("");
-      router.push(
-        withInstitutionSlug(
-          data.institucion_slug,
-          isAdminRole(data.rol) ? "/admin" : "/centro",
-        ),
-      );
+      if (data.rol === "super_admin") {
+        router.push("/super-admin");
+      } else {
+        router.push(
+          withInstitutionSlug(
+            data.institucion_slug,
+            isAdminRole(data.rol) ? "/admin" : "/centro",
+          ),
+        );
+      }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "";
       if (msg.includes("invalid_credentials")) setLoginError("Correo o contraseña incorrectos.");
@@ -271,9 +273,22 @@ export default function LandingPage() {
                 </DialogContent>
               </Dialog>
 
-              <Button asChild variant="outline" className="h-13 rounded-full border-slate-300 bg-white/70 px-6 text-base font-semibold">
-                <Link href="/registro">Solicitar registro</Link>
-              </Button>
+              <Dialog open={registrationOpen} onOpenChange={setRegistrationOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="h-13 rounded-full border-slate-300 bg-white/70 px-6 text-base font-semibold">
+                    Solicitar registro
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-h-[90dvh] max-w-3xl overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle style={{ color: BRAND }}>Registro de nueva institución</DialogTitle>
+                    <DialogDescription>
+                      Déjanos tus datos y levantamos la solicitud para configurar tenant, branding y acceso administrativo.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <RegistrationRequestForm mode="modal" onSuccess={() => setRegistrationOpen(false)} />
+                </DialogContent>
+              </Dialog>
             </div>
 
             <div className="mt-10 grid gap-4 lg:grid-cols-3">
@@ -417,12 +432,23 @@ export default function LandingPage() {
                 </p>
 
                 <div className="mt-5">
-                  <Button asChild variant="outline" className="w-full rounded-full border-slate-300 bg-white font-semibold">
-                    <Link href="/registro">
-                      Iniciar registro
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Link>
-                  </Button>
+                  <Dialog open={registrationOpen} onOpenChange={setRegistrationOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="w-full rounded-full border-slate-300 bg-white font-semibold">
+                        Iniciar registro
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-h-[90dvh] max-w-3xl overflow-y-auto">
+                      <DialogHeader>
+                        <DialogTitle style={{ color: BRAND }}>Alta de organización</DialogTitle>
+                        <DialogDescription>
+                          Capturamos la solicitud, revisamos el slug y te acompañamos con la activación del tenant.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <RegistrationRequestForm mode="modal" onSuccess={() => setRegistrationOpen(false)} />
+                    </DialogContent>
+                  </Dialog>
                 </div>
               </article>
             </div>

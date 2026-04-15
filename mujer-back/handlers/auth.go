@@ -23,15 +23,16 @@ type LoginRequest struct {
 }
 
 type LoginResponse struct {
-	Token           string  `json:"token"`
-	UserID          string  `json:"user_id"`
-	Email           string  `json:"email"`
-	Nombre          string  `json:"nombre"`
-	Rol             string  `json:"rol"`
-	InstitucionID   int64   `json:"institucion_id"`
-	InstitucionSlug string  `json:"institucion_slug"`
-	Centros         []int64 `json:"centros"`
-	ExpiresAt       int64   `json:"expires_at"`
+	Token           string   `json:"token"`
+	UserID          string   `json:"user_id"`
+	Email           string   `json:"email"`
+	Nombre          string   `json:"nombre"`
+	Rol             string   `json:"rol"`
+	InstitucionID   int64    `json:"institucion_id"`
+	InstitucionSlug string   `json:"institucion_slug"`
+	Centros         []int64  `json:"centros"`
+	CentroNombres   []string `json:"centro_nombres,omitempty"`
+	ExpiresAt       int64    `json:"expires_at"`
 }
 
 type loginCandidate struct {
@@ -215,11 +216,13 @@ func (h AuthHandler) respondLoginSuccess(w http.ResponseWriter, r *http.Request,
 	institucionID := candidate.InstitucionID
 
 	centros := make([]int64, 0, 8)
+	centroNombres := make([]string, 0, 8)
 	rows, err := query(r.Context(), h.DB, `
-		select centro_id
-		from usuario_centros
+		select uc.centro_id, coalesce(c.nombre, '')
+		from usuario_centros uc
+		left join centros c on c.id = uc.centro_id
 		where usuario_id = $1::uuid
-		order by centro_id asc
+		order by uc.centro_id asc
 	`, userID)
 	if err != nil {
 		http.Error(w, "db_error", http.StatusInternalServerError)
@@ -229,11 +232,13 @@ func (h AuthHandler) respondLoginSuccess(w http.ResponseWriter, r *http.Request,
 
 	for rows.Next() {
 		var cid int64
-		if err := rows.Scan(&cid); err != nil {
+		var centroNombre string
+		if err := rows.Scan(&cid, &centroNombre); err != nil {
 			http.Error(w, "db_error", http.StatusInternalServerError)
 			return
 		}
 		centros = append(centros, cid)
+		centroNombres = append(centroNombres, centroNombre)
 	}
 	if rows.Err() != nil {
 		http.Error(w, "db_error", http.StatusInternalServerError)
@@ -257,6 +262,7 @@ func (h AuthHandler) respondLoginSuccess(w http.ResponseWriter, r *http.Request,
 		"institucion_id":   institucionID,
 		"institucion_slug": candidate.InstitucionSlug,
 		"centros":          centros,
+		"centro_nombres":   centroNombres,
 		"iat":              now.Unix(),
 		"exp":              exp.Unix(),
 	}
@@ -280,6 +286,7 @@ func (h AuthHandler) respondLoginSuccess(w http.ResponseWriter, r *http.Request,
 		InstitucionID:   institucionID,
 		InstitucionSlug: candidate.InstitucionSlug,
 		Centros:         centros,
+		CentroNombres:   centroNombres,
 		ExpiresAt:       exp.Unix(),
 	})
 }

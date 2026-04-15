@@ -49,6 +49,12 @@ type Genero = {
   descripcion?: string | null;
 };
 
+type TenantBranding = {
+  institucion_id: number;
+  nombre_publico?: string;
+  logo_url?: string;
+};
+
 const PRIMARY = "#7F017F";
 
 // === Detectar “encuesta en progreso” ===
@@ -244,6 +250,7 @@ export default function DiagnosticoInicioPage() {
 
   const [centros, setCentros] = useState<Centro[]>([]);
   const [generos, setGeneros] = useState<Genero[]>([]);
+  const [branding, setBranding] = useState<TenantBranding | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -270,6 +277,9 @@ export default function DiagnosticoInicioPage() {
         ]);
         setCentros(c);
         setGeneros(g);
+        void api<TenantBranding>("/api/tenant/branding")
+          .then((payload) => setBranding(payload))
+          .catch(() => setBranding(null));
       } finally {
         setLoading(false);
       }
@@ -457,14 +467,39 @@ export default function DiagnosticoInicioPage() {
         <div className="absolute inset-0 bg-gradient-to-b from-white via-[#faf7fb] to-white" />
 
         <div className="relative mx-auto w-full max-w-md px-5 pb-10 pt-7">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h1 className="mt-3 text-3xl font-extrabold tracking-tight" style={{ color: PRIMARY }}>
-                Diagnóstico
-              </h1>
-            </div>
-            <div className="mt-1 shrink-0 rounded-2xl border border-black/5 bg-white/70 p-3 shadow-sm backdrop-blur">
-              <ShieldCheck className="h-5 w-5" style={{ color: PRIMARY }} />
+          <div className="sticky top-0 z-20 -mx-5 mb-5 bg-white/92 px-5 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                {branding?.logo_url ? (
+                  <div className="mb-3 flex items-center gap-3">
+                    <img
+                      src={branding.logo_url}
+                      alt={branding.nombre_publico || "Logo institucional"}
+                      className="h-16 w-auto max-w-[104px] shrink-0 object-contain"
+                    />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-neutral-500">
+                        Institución
+                      </p>
+                      <p className="truncate text-sm font-semibold text-neutral-700">
+                        {branding.nombre_publico || "Institución participante"}
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
+                <h1 className="mt-3 text-3xl font-extrabold tracking-tight" style={{ color: PRIMARY }}>
+                  {branding?.nombre_publico?.trim()
+                    ? `Diagnóstico ${branding.nombre_publico.trim()}`
+                    : "Diagnóstico"}
+                </h1>
+              </div>
+              <div className="mt-1 shrink-0">
+                {!branding?.logo_url ? (
+                  <div className="rounded-2xl border border-black/5 bg-white/70 p-3 shadow-sm backdrop-blur">
+                    <ShieldCheck className="h-5 w-5" style={{ color: PRIMARY }} />
+                  </div>
+                ) : null}
+              </div>
             </div>
           </div>
 

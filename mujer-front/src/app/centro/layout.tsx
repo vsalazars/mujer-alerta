@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { isAdminRole, type UserRole } from "@/lib/auth";
+import { api } from "@/lib/api";
 import { extractInstitutionSlug, withInstitutionSlug } from "@/lib/routing";
 
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,14 @@ type AuthUser = {
   nombre: string;
   rol: UserRole;
   centros: number[];
+  centro_nombres?: string[];
   expires_at: number;
+};
+
+type ConfiguracionInstitucion = {
+  institucion_id: number;
+  nombre_publico?: string;
+  logo_url?: string;
 };
 
 function readAuth(): { token: string; user: AuthUser | null } {
@@ -49,30 +57,60 @@ export default function CentroLayout({ children }: { children: React.ReactNode }
   const router = useRouter();
   const pathname = usePathname();
   const institucionSlug = extractInstitutionSlug(pathname);
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [hydrated, setHydrated] = useState(false);
+  const [user] = useState<AuthUser | null>(() => readAuth().user);
+  const [config, setConfig] = useState<ConfiguracionInstitucion | null>(null);
+  const centroLabel =
+    user?.centro_nombres?.filter(Boolean).join(" / ") ||
+    (user?.centros?.length ? `Centro #${user.centros.join(", #")}` : "");
 
   useEffect(() => {
-    setHydrated(true);
-    const { user } = readAuth();
-    if (!user) {
-      router.replace(withInstitutionSlug(institucionSlug, "/"));
+    async function loadConfig() {
+      try {
+        const payload = await api<ConfiguracionInstitucion>("/api/tenant/branding");
+        setConfig(payload);
+      } catch {
+        setConfig(null);
+      }
+    }
+
+    function onConfigUpdated(event: Event) {
+      const customEvent = event as CustomEvent<ConfiguracionInstitucion>;
+      if (customEvent.detail) {
+        setConfig(customEvent.detail);
+        return;
+      }
+      void loadConfig();
+    }
+
+    const { user: sessionUser } = readAuth();
+    if (!sessionUser) {
+      router.replace("/");
       return;
     }
-    if (user.rol !== "centro") {
+    if (sessionUser.rol !== "centro") {
       // si es admin, mándalo a admin
-      router.replace(withInstitutionSlug(institucionSlug, isAdminRole(user.rol) ? "/admin" : "/"));
+      router.replace(
+        withInstitutionSlug(institucionSlug, isAdminRole(sessionUser.rol) ? "/admin" : "/")
+      );
       return;
     }
-    setUser(user);
+    void loadConfig();
+    window.addEventListener("institucion-config-updated", onConfigUpdated);
+
+    return () => {
+      window.removeEventListener(
+        "institucion-config-updated",
+        onConfigUpdated
+      );
+    };
   }, [institucionSlug, router]);
 
   function onLogout() {
     clearAuth();
-    router.replace(withInstitutionSlug(institucionSlug, "/"));
+    router.replace("/");
   }
 
-  if (!hydrated || !user) return null;
+  if (!user) return null;
 
   return (
     <main className="min-h-dvh bg-white">
@@ -81,19 +119,32 @@ export default function CentroLayout({ children }: { children: React.ReactNode }
         <div className="mx-auto w-[90vw] max-w-none px-4 py-4 md:px-6">
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
-              <div className="flex items-center gap-3">
-                <div
-                  className="grid h-10 w-10 place-items-center rounded-2xl"
-                  style={{ backgroundColor: "rgba(127,1,127,0.10)" }}
-                >
-                  <ShieldCheck className="h-5 w-5" style={{ color: "#7F017F" }} />
-                </div>
+              <div className="flex items-center gap-4">
+                {config?.logo_url ? (
+                  <img
+                    src={config.logo_url}
+                    alt="Logo institucional"
+                    className="h-14 w-auto max-w-[84px] shrink-0 object-contain"
+                  />
+                ) : (
+                  <div
+                    className="grid h-11 w-11 place-items-center rounded-2xl"
+                    style={{ backgroundColor: "rgba(127,1,127,0.10)" }}
+                  >
+                    <ShieldCheck className="h-5 w-5" style={{ color: "#7F017F" }} />
+                  </div>
+                )}
 
                 <div className="leading-tight">
                   <p className="text-base font-extrabold tracking-tight" style={{ color: "#7F017F" }}>
-                    Mujer Alerta
+                    {config?.nombre_publico?.trim() || "Mujer Alerta"}
                   </p>
                   <p className="text-xs text-neutral-500">Panel de resultados</p>
+                  {centroLabel ? (
+                    <p className="mt-1 text-xs font-medium text-neutral-700">
+                      {centroLabel}
+                    </p>
+                  ) : null}
                 </div>
               </div>
 

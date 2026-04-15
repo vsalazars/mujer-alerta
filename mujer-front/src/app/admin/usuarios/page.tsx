@@ -50,14 +50,15 @@ type Centro = {
 };
 
 type CentroUser = {
-  id: number;
+  id: string;
   email: string;
   nombre: string;
   rol: "centro";
-  centro_id: number;
+  centros: number[];
   centro_nombre?: string;
-  activo?: boolean;
+  activo: boolean;
   created_at?: string;
+  generated_password?: string;
 };
 
 type UserForm = {
@@ -65,6 +66,13 @@ type UserForm = {
   email: string;
   centro_id: string; // select -> string
   password: string; // opcional; si vacío, back puede generar
+};
+
+type SaveUserPayload = {
+  nombre: string;
+  email: string;
+  centro_id: number;
+  password?: string;
 };
 
 function readAuth(): { token: string; user: AuthUser | null } {
@@ -83,6 +91,10 @@ function cx(...v: Array<string | false | null | undefined>) {
   return v.filter(Boolean).join(" ");
 }
 
+function errorMessage(e: unknown, fallback: string) {
+  return e instanceof Error ? e.message || fallback : fallback;
+}
+
 export default function AdminUsuariosPage() {
   const router = useRouter();
   const pathname = usePathname();
@@ -95,12 +107,13 @@ export default function AdminUsuariosPage() {
   const [items, setItems] = useState<CentroUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [success, setSuccess] = useState("");
 
   const [q, setQ] = useState("");
 
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"create" | "edit">("create");
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<UserForm>({
@@ -129,19 +142,21 @@ export default function AdminUsuariosPage() {
     const s = q.trim().toLowerCase();
     if (!s) return items;
     return items.filter((u) => {
-      const hay = `${u.nombre} ${u.email} ${u.centro_nombre || ""} ${u.centro_id}`.toLowerCase();
+      const hay = `${u.nombre} ${u.email} ${u.centro_nombre || ""} ${u.centros.join(" ")}`.toLowerCase();
       return hay.includes(s);
     });
   }, [items, q]);
 
   async function loadCentros() {
-    // reutiliza tu endpoint actual (activos)
-    const data = await api<Centro[]>("/api/centros");
+    const data = await api<Centro[]>("/api/admin/centros", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     setCentros(data || []);
   }
 
   async function loadUsers() {
     setErr("");
+    setSuccess("");
     setLoading(true);
     try {
       // endpoint admin (lista usuarios de centro)
@@ -149,8 +164,8 @@ export default function AdminUsuariosPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       setItems(data || []);
-    } catch (e: any) {
-      setErr(e?.message || "No se pudo cargar usuarios");
+    } catch (e: unknown) {
+      setErr(errorMessage(e, "No se pudo cargar usuarios"));
     } finally {
       setLoading(false);
     }
@@ -158,11 +173,12 @@ export default function AdminUsuariosPage() {
 
   async function loadAll() {
     setErr("");
+    setSuccess("");
     setLoading(true);
     try {
       await Promise.all([loadCentros(), loadUsers()]);
-    } catch (e: any) {
-      setErr(e?.message || "No se pudo cargar datos");
+    } catch (e: unknown) {
+      setErr(errorMessage(e, "No se pudo cargar datos"));
       setLoading(false);
     }
   }
@@ -191,7 +207,7 @@ export default function AdminUsuariosPage() {
     setForm({
       nombre: u.nombre || "",
       email: u.email || "",
-      centro_id: String(u.centro_id || ""),
+      centro_id: String(u.centros?.[0] || ""),
       password: "", // vacío -> no cambiar password
     });
     setOpen(true);
@@ -220,6 +236,7 @@ export default function AdminUsuariosPage() {
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
     setErr("");
+    setSuccess("");
 
     const msg = validateForm();
     if (msg) {
@@ -227,7 +244,7 @@ export default function AdminUsuariosPage() {
       return;
     }
 
-    const payload: any = {
+    const payload: SaveUserPayload = {
       nombre: form.nombre.trim(),
       email: form.email.trim().toLowerCase(),
       centro_id: Number(form.centro_id),
@@ -239,22 +256,28 @@ export default function AdminUsuariosPage() {
     setSaving(true);
     try {
       if (mode === "create") {
-        await api<CentroUser>("/api/admin/usuarios", {
+        const created = await api<CentroUser>("/api/admin/usuarios", {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
           body: JSON.stringify(payload),
         });
+        if (created.generated_password) {
+          setSuccess(`Usuario creado. Contraseña temporal: ${created.generated_password}`);
+        } else {
+          setSuccess("Usuario creado correctamente.");
+        }
       } else {
         await api<CentroUser>(`/api/admin/usuarios/${editingId}`, {
           method: "PUT",
           headers: { Authorization: `Bearer ${token}` },
           body: JSON.stringify(payload),
         });
+        setSuccess("Usuario actualizado correctamente.");
       }
       setOpen(false);
       await loadUsers();
-    } catch (e: any) {
-      setErr(e?.message || "No se pudo guardar");
+    } catch (e: unknown) {
+      setErr(errorMessage(e, "No se pudo guardar"));
     } finally {
       setSaving(false);
     }
@@ -265,14 +288,16 @@ export default function AdminUsuariosPage() {
     if (!ok) return;
 
     setErr("");
+    setSuccess("");
     try {
       await api<void>(`/api/admin/usuarios/${u.id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
       await loadUsers();
-    } catch (e: any) {
-      setErr(e?.message || "No se pudo desactivar");
+      setSuccess("Usuario desactivado correctamente.");
+    } catch (e: unknown) {
+      setErr(errorMessage(e, "No se pudo desactivar"));
     }
   }
 
@@ -445,6 +470,12 @@ export default function AdminUsuariosPage() {
           </div>
         ) : null}
 
+        {success ? (
+          <div className="px-5 pt-5">
+            <p className="text-sm text-emerald-700">{success}</p>
+          </div>
+        ) : null}
+
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-neutral-50 text-neutral-600">
@@ -481,7 +512,7 @@ export default function AdminUsuariosPage() {
                       <div className="inline-flex items-center gap-2">
                         <Building2 className="h-4 w-4" style={{ color: "#7F017F" }} />
                         <span className="text-neutral-800">
-                          {u.centro_nombre || `Centro #${u.centro_id}`}
+                          {u.centro_nombre || (u.centros?.[0] ? `Centro #${u.centros[0]}` : "Sin centro")}
                         </span>
                       </div>
                     </td>
@@ -521,7 +552,7 @@ export default function AdminUsuariosPage() {
             Total: <span className="font-semibold">{filtered.length}</span>
           </p>
           <p className="text-xs text-neutral-500">
-            Nota: back debe resolver centro_nombre (join) o se muestra “Centro #id”.
+            Los centros se resuelven por tenant autenticado y se muestra el nombre cuando existe una sola asignación.
           </p>
         </div>
       </div>

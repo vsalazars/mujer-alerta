@@ -29,7 +29,7 @@ import type {
   NLPJobStatus,
   YearOption,
 } from "@/components/centro/dashboard/types";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { extractInstitutionSlug } from "@/lib/routing";
 
@@ -40,6 +40,7 @@ function getErrorMessage(error: unknown, fallback: string) {
 export default function CentroPage() {
   const pathname = usePathname();
   const institucionSlug = extractInstitutionSlug(pathname);
+  const [centroLabel, setCentroLabel] = useState("");
   const [data, setData] = useState<CentroResumenResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -139,6 +140,22 @@ export default function CentroPage() {
       setNLPStatus(null);
     }
   }
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("auth_user") || "";
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { centro_nombres?: string[]; centros?: number[] };
+      const names = Array.isArray(parsed.centro_nombres) ? parsed.centro_nombres.filter(Boolean) : [];
+      if (names.length) {
+        setCentroLabel(names.join(" / "));
+        return;
+      }
+      if (Array.isArray(parsed.centros) && parsed.centros.length) {
+        setCentroLabel(parsed.centros.map((id) => `Centro #${id}`).join(" / "));
+      }
+    } catch {}
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -352,6 +369,7 @@ export default function CentroPage() {
     const start = (comentariosPageSafe - 1) * commentsPerPage;
     return comentariosFiltrados.slice(start, start + commentsPerPage);
   }, [comentariosFiltrados, comentariosPageSafe]);
+  const isEmptyState = err.trim().toLowerCase() === "no_data";
 
   useEffect(() => {
     setComentariosPage(1);
@@ -376,24 +394,103 @@ export default function CentroPage() {
 
   if (!data) {
     return (
-      <div className="min-h-screen bg-[#F8FAFC] p-10">
-        <Card className="max-w-xl">
-          <CardHeader>
-            <CardTitle className="text-slate-900">Sin datos</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-red-600">{err || "Error"}</CardContent>
-        </Card>
+      <div className="min-h-screen bg-[#F8FAFC] px-6 py-10 lg:px-12 text-slate-900">
+        <div className="mx-auto max-w-[1400px]">
+          <section className="overflow-hidden rounded-[32px] border border-[#E9D8F3] bg-white shadow-[0_18px_50px_rgba(127,1,127,0.08)]">
+            <div className="grid gap-0 lg:grid-cols-[1.15fr_0.85fr]">
+              <div className="relative overflow-hidden border-b border-[#F1E5F8] px-8 py-10 lg:border-b-0 lg:border-r lg:px-10 lg:py-12">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(127,1,127,0.10),transparent_40%),linear-gradient(135deg,rgba(255,255,255,0.98),rgba(249,241,252,0.92))]" />
+                <div className="relative">
+                  <div className="mb-5 inline-flex items-center rounded-full border border-[#E9D8F3] bg-[#FAF5FD] px-4 py-1 text-xs font-black uppercase tracking-[0.28em] text-[#7F017F]">
+                    Panel del centro
+                  </div>
+                  <h1 className="max-w-2xl text-3xl font-black tracking-tight text-slate-900 md:text-5xl">
+                    Aun no hay respuestas para mostrar.
+                  </h1>
+                  <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600 md:text-lg">
+                    {centroLabel
+                      ? `El centro ${centroLabel} todavia no tiene encuestas finalizadas, por eso el tablero aparece vacio.`
+                      : "Todavia no hay encuestas finalizadas para este centro, por eso el tablero aparece vacio."}
+                  </p>
+
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    {centroLabel ? (
+                      <span className="inline-flex items-center rounded-full bg-[#F3E5FB] px-4 py-2 text-sm font-bold text-[#7F017F]">
+                        Centro: {centroLabel}
+                      </span>
+                    ) : null}
+                    <span className="inline-flex items-center rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-[0_8px_24px_rgba(15,23,42,0.06)] ring-1 ring-[#E9D8F3]">
+                      Ano seleccionado: {year === "all" ? "Todos" : year}
+                    </span>
+                  </div>
+
+                  <div className="mt-8 flex flex-wrap gap-3">
+                    <Button
+                      onClick={() => void load(year)}
+                      className="rounded-full bg-[#7F017F] px-6 text-white hover:bg-[#680168]"
+                    >
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Recargar panel
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setYear("all")}
+                      className="rounded-full border-[#E9D8F3] text-[#7F017F] hover:bg-[#FAF5FD]"
+                    >
+                      Ver todos los anos
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-[#FCF9FE] px-8 py-10 lg:px-10 lg:py-12">
+                <div className="rounded-[28px] border border-[#E9D8F3] bg-white p-6 shadow-[0_12px_30px_rgba(127,1,127,0.06)]">
+                  <p className="text-xs font-black uppercase tracking-[0.28em] text-[#7F017F]">
+                    Que sigue
+                  </p>
+                  <div className="mt-5 space-y-4 text-sm leading-6 text-slate-600">
+                    <div className="rounded-2xl bg-[#FAF5FD] px-4 py-4">
+                      <p className="font-bold text-slate-900">1. Levanta las primeras encuestas</p>
+                      <p className="mt-1">
+                        En cuanto este centro reciba respuestas finalizadas, el tablero empezara a poblarse automaticamente.
+                      </p>
+                    </div>
+                    <div className="rounded-2xl bg-[#FAF5FD] px-4 py-4">
+                      <p className="font-bold text-slate-900">2. Revisa el ano seleccionado</p>
+                      <p className="mt-1">
+                        Si las respuestas existen pero pertenecen a otro periodo, cambia el filtro de ano para ubicarlas.
+                      </p>
+                    </div>
+                    <div className="rounded-2xl bg-[#FAF5FD] px-4 py-4">
+                      <p className="font-bold text-slate-900">3. Confirma que estas en el centro correcto</p>
+                      <p className="mt-1">
+                        El encabezado muestra el centro asignado a tu cuenta para evitar confusiones entre sedes o unidades.
+                      </p>
+                    </div>
+                  </div>
+
+                  {!isEmptyState && err ? (
+                    <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                      <span className="font-bold">Detalle tecnico:</span> {err}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] px-6 py-10 lg:px-12 text-slate-900">
-      <DashboardHero
-        data={data}
-        showSemantic={showSemantic}
-        year={year}
-        yearOptions={yearOptions}
+        <DashboardHero
+          data={data}
+          centerLabel={centroLabel}
+          showSemantic={showSemantic}
+          year={year}
+          yearOptions={yearOptions}
         onYearChange={setYear}
         onOpenTrends={() => setTrendsOpen(true)}
       />

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { isAdminRole, type UserRole } from "@/lib/auth";
+import { api } from "@/lib/api";
 import { extractInstitutionSlug, withInstitutionSlug } from "@/lib/routing";
 
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,12 @@ type AuthUser = {
   rol: UserRole;
   centros: number[];
   expires_at: number;
+};
+
+type ConfiguracionInstitucion = {
+  institucion_id: number;
+  nombre_publico?: string;
+  logo_url?: string;
 };
 
 function readAuth(): { token: string; user: AuthUser | null } {
@@ -94,6 +101,7 @@ export default function AdminLayout({
   const pathname = usePathname();
   const institucionSlug = extractInstitutionSlug(pathname);
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [config, setConfig] = useState<ConfiguracionInstitucion | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
   const expiresText = user?.expires_at
@@ -101,10 +109,30 @@ export default function AdminLayout({
     : "";
 
   useEffect(() => {
+    async function loadConfig() {
+      try {
+        const payload = await api<ConfiguracionInstitucion>(
+          "/api/admin/configuracion"
+        );
+        setConfig(payload);
+      } catch {
+        setConfig(null);
+      }
+    }
+
+    function onConfigUpdated(event: Event) {
+      const customEvent = event as CustomEvent<ConfiguracionInstitucion>;
+      if (customEvent.detail) {
+        setConfig(customEvent.detail);
+        return;
+      }
+      void loadConfig();
+    }
+
     setHydrated(true);
     const { user } = readAuth();
     if (!user) {
-      router.replace(withInstitutionSlug(institucionSlug, "/"));
+      router.replace("/");
       return;
     }
     if (!isAdminRole(user.rol)) {
@@ -112,11 +140,20 @@ export default function AdminLayout({
       return;
     }
     setUser(user);
+    void loadConfig();
+    window.addEventListener("institucion-config-updated", onConfigUpdated);
+
+    return () => {
+      window.removeEventListener(
+        "institucion-config-updated",
+        onConfigUpdated
+      );
+    };
   }, [institucionSlug, router]);
 
   function onLogout() {
     clearAuth();
-    router.replace(withInstitutionSlug(institucionSlug, "/"));
+    router.replace("/");
   }
 
   if (!hydrated || !user) return null;
@@ -138,23 +175,31 @@ export default function AdminLayout({
           <aside className="md:sticky md:top-6 md:h-[calc(100dvh-3rem)]">
             <div className="flex h-full flex-col rounded-2xl border border-neutral-200 bg-white shadow-sm">
               <div className="p-5">
-                <div className="flex items-center gap-3">
-                  <div
-                    className="grid h-11 w-11 place-items-center rounded-2xl"
-                    style={{ backgroundColor: "rgba(127,1,127,0.10)" }}
-                  >
-                    <ShieldCheck
-                      className="h-5 w-5"
-                      style={{ color: "#7F017F" }}
+                <div className="flex flex-col items-center gap-3 text-center">
+                  {config?.logo_url ? (
+                    <img
+                      src={config.logo_url}
+                      alt="Logo institucional"
+                      className="h-14 w-auto max-w-[140px] shrink-0 object-contain"
                     />
-                  </div>
+                  ) : (
+                    <div
+                      className="grid h-11 w-11 place-items-center rounded-2xl"
+                      style={{ backgroundColor: "rgba(127,1,127,0.10)" }}
+                    >
+                      <ShieldCheck
+                        className="h-5 w-5"
+                        style={{ color: "#7F017F" }}
+                      />
+                    </div>
+                  )}
 
-                  <div className="leading-tight">
+                  <div className="leading-tight text-center">
                     <p
-                      className="text-base font-extrabold tracking-tight"
+                      className="text-base font-extrabold tracking-tight break-words"
                       style={{ color: "#7F017F" }}
                     >
-                      Mujer Alerta
+                      {config?.nombre_publico?.trim() || "Mujer Alerta"}
                     </p>
                     <p className="text-xs text-neutral-500">
                       Panel administrador

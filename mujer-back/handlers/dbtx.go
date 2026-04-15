@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"database/sql"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -50,6 +51,23 @@ func begin(ctx context.Context, pool *pgxpool.Pool) (pgx.Tx, error) {
 	return pool.Begin(ctx)
 }
 
+type statusWriter struct {
+	http.ResponseWriter
+	wroteHeader bool
+}
+
+func (w *statusWriter) WriteHeader(statusCode int) {
+	w.wroteHeader = true
+	w.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (w *statusWriter) Write(p []byte) (int, error) {
+	if !w.wroteHeader {
+		w.wroteHeader = true
+	}
+	return w.ResponseWriter.Write(p)
+}
+
 func WithTenantSession(pool *pgxpool.Pool, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -74,10 +92,15 @@ func WithTenantSession(pool *pgxpool.Pool, next http.Handler) http.Handler {
 		}
 
 		ctx = context.WithValue(ctx, ctxDBTx, tx)
-		next.ServeHTTP(w, r.WithContext(ctx))
+		sw := &statusWriter{ResponseWriter: w}
+		next.ServeHTTP(sw, r.WithContext(ctx))
 
 		if err := tx.Commit(ctx); err != nil {
-			http.Error(w, "db_error", http.StatusInternalServerError)
+			if !sw.wroteHeader {
+				http.Error(w, "db_error", http.StatusInternalServerError)
+				return
+			}
+			log.Printf("WithTenantSession commit failed after response written: %v", err)
 			return
 		}
 	})
@@ -139,10 +162,16 @@ func WithPublicTenantSession(pool *pgxpool.Pool, next http.Handler) http.Handler
 		}
 
 		ctx = context.WithValue(ctx, ctxDBTx, tx)
-		next.ServeHTTP(w, r.WithContext(ctx))
+		ctx = context.WithValue(ctx, ctxInstitucionID, institucionID.Int64)
+		sw := &statusWriter{ResponseWriter: w}
+		next.ServeHTTP(sw, r.WithContext(ctx))
 
 		if err := tx.Commit(ctx); err != nil {
-			http.Error(w, "db_error", http.StatusInternalServerError)
+			if !sw.wroteHeader {
+				http.Error(w, "db_error", http.StatusInternalServerError)
+				return
+			}
+			log.Printf("WithPublicTenantSession commit failed after response written: %v", err)
 			return
 		}
 	})

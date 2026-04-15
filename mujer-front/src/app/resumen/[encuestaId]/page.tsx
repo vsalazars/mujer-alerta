@@ -18,7 +18,7 @@ import {
   DrawerFooter,
 } from "@/components/ui/drawer";
 
-import { ArrowLeft, Home, RefreshCw } from "lucide-react";
+import { ArrowLeft, Home, RefreshCw, ShieldCheck } from "lucide-react";
 import { api } from "@/lib/api";
 import { extractInstitutionSlug, withInstitutionSlug } from "@/lib/routing";
 import { CheckCircle } from "lucide-react";
@@ -47,6 +47,12 @@ type EncuestaResumenResponseBE = {
   encuesta_id: string;
   global: ResumenGlobalBE;
   matriz: MatrizItemBE[];
+};
+
+type TenantBranding = {
+  institucion_id: number;
+  nombre_publico?: string;
+  logo_url?: string;
 };
 
 // =========================
@@ -226,6 +232,7 @@ export default function ResultadosEncuestaPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [data, setData] = useState<EncuestaResumenResponseBE | null>(null);
+  const [branding, setBranding] = useState<TenantBranding | null>(null);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<{
@@ -258,6 +265,20 @@ export default function ResultadosEncuestaPage() {
       alive = false;
     };
   }, [encuestaId]);
+
+  useEffect(() => {
+    let alive = true;
+    void api<TenantBranding>("/api/tenant/branding")
+      .then((payload) => {
+        if (alive) setBranding(payload);
+      })
+      .catch(() => {
+        if (alive) setBranding(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [institucionSlug]);
 
   const global = data?.global;
 
@@ -438,14 +459,40 @@ export default function ResultadosEncuestaPage() {
     <main className="min-h-dvh bg-gradient-to-b from-neutral-50 to-white">
       <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-neutral-600">
-              Resultados del diagnóstico
-            </p>
-            <h1 className="mt-1 text-2xl font-bold text-neutral-900">
-              Tu percepción del entorno
-            </h1>
+        <div className="sticky top-0 z-20 -mx-4 mb-8 bg-white/92 px-4 py-4 backdrop-blur supports-[backdrop-filter]:bg-white/80 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              {branding?.logo_url ? (
+                <div className="mb-4 flex items-center gap-3">
+                  <img
+                    src={branding.logo_url}
+                    alt={branding.nombre_publico || "Logo institucional"}
+                    className="h-16 w-auto max-w-[120px] shrink-0 object-contain"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-neutral-500">
+                      Institución
+                    </p>
+                    <p className="truncate text-sm font-semibold text-neutral-700">
+                      {branding.nombre_publico || "Institución participante"}
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+              <p className="text-sm font-medium text-neutral-600">
+                Resultados del diagnóstico
+              </p>
+              <h1 className="mt-1 text-2xl font-bold text-neutral-900">
+                {branding?.nombre_publico?.trim()
+                  ? `Tu percepción del entorno en ${branding.nombre_publico.trim()}`
+                  : "Tu percepción del entorno"}
+              </h1>
+            </div>
+            {!branding?.logo_url ? (
+              <div className="grid h-11 w-11 place-items-center rounded-2xl border border-neutral-200 bg-white shadow-sm">
+                <ShieldCheck className="h-5 w-5 text-[#7F017F]" />
+              </div>
+            ) : null}
           </div>
         </div>
 

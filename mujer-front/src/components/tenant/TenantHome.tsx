@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -41,7 +41,14 @@ type LoginResponse = {
   institucion_id: number;
   institucion_slug: string;
   centros: number[];
+  centro_nombres?: string[];
   expires_at: number;
+};
+
+type TenantBranding = {
+  institucion_id: number;
+  nombre_publico?: string;
+  logo_url?: string;
 };
 
 const BRAND = "#7F017F";
@@ -59,11 +66,28 @@ export default function TenantHome() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [branding, setBranding] = useState<TenantBranding | null>(null);
 
   const canSubmit = useMemo(
     () => email.trim().length > 3 && password.trim().length >= 6 && !loading,
     [email, password, loading],
   );
+
+  useEffect(() => {
+    let alive = true;
+
+    void api<TenantBranding>("/api/tenant/branding")
+      .then((payload) => {
+        if (alive) setBranding(payload);
+      })
+      .catch(() => {
+        if (alive) setBranding(null);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [institucionSlug]);
 
   async function onLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -90,18 +114,23 @@ export default function TenantHome() {
           institucion_id: data.institucion_id,
           institucion_slug: data.institucion_slug,
           centros: data.centros,
+          centro_nombres: data.centro_nombres || [],
           expires_at: data.expires_at,
         }),
       );
 
       setOpen(false);
       setPassword("");
-      router.push(
-        withInstitutionSlug(
-          institucionSlug,
-          isAdminRole(data.rol) ? "/admin" : "/centro",
-        ),
-      );
+      if (data.rol === "super_admin") {
+        router.push("/super-admin");
+      } else {
+        router.push(
+          withInstitutionSlug(
+            data.institucion_slug,
+            isAdminRole(data.rol) ? "/admin" : "/centro",
+          ),
+        );
+      }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "";
       if (msg.includes("invalid_credentials")) setErr("Correo o contraseña incorrectos.");
@@ -138,8 +167,25 @@ export default function TenantHome() {
       <div className="mx-auto w-full max-w-md px-4 sm:px-5 py-8">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
+            {branding?.logo_url ? (
+              <div className="mb-4 flex items-center gap-3">
+                <img
+                  src={branding.logo_url}
+                  alt={branding.nombre_publico || "Logo institucional"}
+                  className="h-16 w-auto max-w-[104px] shrink-0 object-contain"
+                />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                    Institución
+                  </p>
+                  <p className="truncate text-sm font-semibold text-slate-700">
+                    {branding.nombre_publico || "Institución participante"}
+                  </p>
+                </div>
+              </div>
+            ) : null}
             <h1 className="mt-4 text-4xl font-extrabold tracking-tight" style={{ color: BRAND }}>
-              Mujer Alerta
+              {branding?.nombre_publico?.trim() || "Mujer Alerta"}
             </h1>
             <p className="mt-2 text-sm leading-6 text-slate-600">
               Instrumento de diagnóstico para identificar percepciones del entorno
@@ -250,7 +296,15 @@ export default function TenantHome() {
                   border: "1px solid rgba(2,6,23,0.06)",
                 }}
               >
-                <ShieldCheck className="h-5 w-5" style={{ color: BRAND_DARK }} />
+                {branding?.logo_url ? (
+                  <img
+                    src={branding.logo_url}
+                    alt={branding.nombre_publico || "Logo institucional"}
+                    className="h-8 w-8 rounded-xl object-contain"
+                  />
+                ) : (
+                  <ShieldCheck className="h-5 w-5" style={{ color: BRAND_DARK }} />
+                )}
               </div>
 
               <div className="flex-1 min-w-0">

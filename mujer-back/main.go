@@ -231,9 +231,64 @@ func main() {
 	})
 
 	// ======================
+	// Registro institucional publico
+	// ======================
+	rph := handlers.RegistroPublicoHandler{DB: pool}
+	mux.HandleFunc("/api/registro-institucional", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			rph.Create(w, r)
+			return
+		}
+		http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+	})
+
+	// ======================
+	// Super Admin: solicitudes de registro
+	// ======================
+	sah := handlers.SuperAdminHandler{DB: pool}
+	mux.HandleFunc("/api/super-admin/registro-institucional", func(w http.ResponseWriter, r *http.Request) {
+		handlers.RequireJWT(
+			handlers.WithTenantSession(pool,
+				handlers.RequireSuperAdmin(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if r.Method == http.MethodGet {
+						sah.ListSolicitudes(w, r)
+						return
+					}
+					http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+				})),
+			),
+		).ServeHTTP(w, r)
+	})
+	mux.HandleFunc("/api/super-admin/registro-institucional/", func(w http.ResponseWriter, r *http.Request) {
+		handlers.RequireJWT(
+			handlers.WithTenantSession(pool,
+				handlers.RequireSuperAdmin(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					id, err := handlers.ParseSolicitudID(r.URL.Path)
+					if err != nil || id <= 0 {
+						http.Error(w, "bad_id", http.StatusBadRequest)
+						return
+					}
+					switch r.Method {
+					case http.MethodGet:
+						sah.GetSolicitud(w, r, id)
+						return
+					case http.MethodPut:
+						sah.UpdateSolicitud(w, r, id)
+						return
+					default:
+						http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+						return
+					}
+				})),
+			),
+		).ServeHTTP(w, r)
+	})
+
+	// ======================
 	// Admin: Usuarios (CRUD)
 	// ======================
 	auh := handlers.AdminUsuariosHandler{DB: pool}
+	chConfig := handlers.ConfiguracionInstitucionHandler{DB: pool}
 
 	// /api/admin/usuarios → GET, POST (admin)
 	mux.HandleFunc("/api/admin/usuarios", func(w http.ResponseWriter, r *http.Request) {
@@ -253,6 +308,21 @@ func main() {
 						return
 					}
 
+				})),
+			),
+		).ServeHTTP(w, r)
+	})
+
+	// /api/admin/centros -> GET (admin autenticado por tenant)
+	mux.HandleFunc("/api/admin/centros", func(w http.ResponseWriter, r *http.Request) {
+		handlers.RequireJWT(
+			handlers.WithTenantSession(pool,
+				handlers.RequireAdmin(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if r.Method == http.MethodGet {
+						ch.ListAdmin(w, r)
+						return
+					}
+					http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
 				})),
 			),
 		).ServeHTTP(w, r)
@@ -286,6 +356,38 @@ func main() {
 				})),
 			),
 		).ServeHTTP(w, r)
+	})
+
+	// /api/admin/configuracion -> GET / PUT (admin)
+	mux.HandleFunc("/api/admin/configuracion", func(w http.ResponseWriter, r *http.Request) {
+		handlers.RequireJWT(
+			handlers.WithTenantSession(pool,
+				handlers.RequireAdmin(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.Method {
+					case http.MethodGet:
+						chConfig.Get(w, r)
+						return
+					case http.MethodPut:
+						chConfig.Upsert(w, r)
+						return
+					default:
+						http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+						return
+					}
+				})),
+			),
+		).ServeHTTP(w, r)
+	})
+
+	// /api/tenant/branding -> GET (publico por tenant, usable por publico y paneles)
+	mux.HandleFunc("/api/tenant/branding", func(w http.ResponseWriter, r *http.Request) {
+		handlers.WithPublicTenantSession(pool, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodGet {
+				chConfig.GetBranding(w, r)
+				return
+			}
+			http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+		})).ServeHTTP(w, r)
 	})
 
 	// ======================

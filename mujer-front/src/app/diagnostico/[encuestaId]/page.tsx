@@ -113,6 +113,12 @@ type RespuestaItem = {
   valor: number;
 };
 
+type TenantBranding = {
+  institucion_id: number;
+  nombre_publico?: string;
+  logo_url?: string;
+};
+
 // ===== LocalStorage helpers =====
 const LS_VERSION = 1;
 
@@ -192,6 +198,7 @@ export default function DiagnosticoEncuestaPage() {
   const [tovKind, setTovKind] = useState<string>("(no cargado)");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [branding, setBranding] = useState<TenantBranding | null>(null);
 
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [qIndex, setQIndex] = useState(0);
@@ -250,6 +257,20 @@ export default function DiagnosticoEncuestaPage() {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    let alive = true;
+    void api<TenantBranding>("/api/tenant/branding")
+      .then((payload) => {
+        if (alive) setBranding(payload);
+      })
+      .catch(() => {
+        if (alive) setBranding(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [institucionSlug]);
 
   const questions = useMemo(() => {
     if (!inst) return [];
@@ -547,50 +568,69 @@ export default function DiagnosticoEncuestaPage() {
 
       <div className="mx-auto h-dvh w-full max-w-md px-5 py-5 pb-[env(safe-area-inset-bottom)] flex flex-col">
         {/* Header fijo */}
-        <div className="flex items-start justify-between gap-3 shrink-0">
-          <div className="min-w-0 flex-1">
-            <h2 className="text-xl font-extrabold tracking-tight" style={{ color: BRAND }}>
-              {inst.name}
-            </h2>
+        <div className="sticky top-0 z-20 -mx-5 shrink-0 bg-white/95 px-5 pb-3 pt-2 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              {branding?.logo_url ? (
+                <div className="mb-3 flex items-center gap-3">
+                  <img
+                    src={branding.logo_url}
+                    alt={branding.nombre_publico || "Logo institucional"}
+                    className="h-14 w-auto max-w-[110px] shrink-0 object-contain"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-neutral-500">
+                      Institución
+                    </p>
+                    <p className="truncate text-sm font-semibold text-neutral-700">
+                      {branding.nombre_publico || "Institución participante"}
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+              <h2 className="text-xl font-extrabold tracking-tight" style={{ color: BRAND }}>
+                {branding?.nombre_publico?.trim() || inst.name}
+              </h2>
 
-            <div className="mt-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-medium text-neutral-600">{stepLabel}</span>
-                <span className="text-[11px] font-semibold tabular-nums" style={{ color: BRAND }}>
-                  {snapPctLabel}%
-                </span>
-              </div>
+              <div className="mt-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-medium text-neutral-600">{stepLabel}</span>
+                  <span className="text-[11px] font-semibold tabular-nums" style={{ color: BRAND }}>
+                    {snapPctLabel}%
+                  </span>
+                </div>
 
-              <div className="relative mt-2 w-full" style={{ height: `${TRACK_H}px` }}>
-                <div
-                  className="absolute inset-0 rounded-full"
-                  style={{ backgroundColor: "rgba(122,0,60,0.12)" }}
-                />
-                <div
-                  className="absolute left-0 top-0 h-full rounded-full transition-[width] duration-300 ease-out"
-                  style={{
-                    width: `calc(${DOT_R}px + ${fillWidth})`,
-                    background: GRADIENT,
-                    boxShadow: snapPct > 0 ? GLOW : "none",
-                  }}
-                />
-                <div
-                  className="absolute top-1/2 -translate-y-1/2 transition-[left] duration-250 ease-out"
-                  style={{ left: dotLeft }}
-                  aria-hidden="true"
-                >
+                <div className="relative mt-2 w-full" style={{ height: `${TRACK_H}px` }}>
                   <div
-                    className="rounded-full bg-white"
+                    className="absolute inset-0 rounded-full"
+                    style={{ backgroundColor: "rgba(122,0,60,0.12)" }}
+                  />
+                  <div
+                    className="absolute left-0 top-0 h-full rounded-full transition-[width] duration-300 ease-out"
                     style={{
-                      width: `${DOT_SIZE}px`,
-                      height: `${DOT_SIZE}px`,
-                      border: "2px solid #7A003C",
-                      boxShadow:
-                        snapPct > 0
-                          ? "0 0 6px rgba(122,0,60,0.45)"
-                          : "0 2px 6px rgba(0,0,0,0.15)",
+                      width: `calc(${DOT_R}px + ${fillWidth})`,
+                      background: GRADIENT,
+                      boxShadow: snapPct > 0 ? GLOW : "none",
                     }}
                   />
+                  <div
+                    className="absolute top-1/2 -translate-y-1/2 transition-[left] duration-250 ease-out"
+                    style={{ left: dotLeft }}
+                    aria-hidden="true"
+                  >
+                    <div
+                      className="rounded-full bg-white"
+                      style={{
+                        width: `${DOT_SIZE}px`,
+                        height: `${DOT_SIZE}px`,
+                        border: "2px solid #7A003C",
+                        boxShadow:
+                          snapPct > 0
+                            ? "0 0 6px rgba(122,0,60,0.45)"
+                            : "0 2px 6px rgba(0,0,0,0.15)",
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
             </div>

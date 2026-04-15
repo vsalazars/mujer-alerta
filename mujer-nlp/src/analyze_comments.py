@@ -93,6 +93,7 @@ WHITESPACE_RE = re.compile(r"\s+")
 class PendingComment:
     encuesta_id: str
     comentario: str
+    institucion_id: int
 
 
 def load_sentiment_analyzer():
@@ -334,7 +335,8 @@ def fetch_pending_comments(
     sql = f"""
         select
             e.id::text as encuesta_id,
-            e.comentario
+            e.comentario,
+            e.institucion_id
         from public.encuestas e
         left join public.comentario_analisis ca
             on ca.encuesta_id = e.id
@@ -350,7 +352,11 @@ def fetch_pending_comments(
         rows = cur.fetchall()
 
     return [
-        PendingComment(encuesta_id=str(row["encuesta_id"]), comentario=row["comentario"])
+        PendingComment(
+            encuesta_id=str(row["encuesta_id"]),
+            comentario=row["comentario"],
+            institucion_id=int(row["institucion_id"]),
+        )
         for row in rows
     ]
 
@@ -374,16 +380,17 @@ def save_success(
             cur.execute(
                 """
                 insert into public.comentario_analisis (
-                    encuesta_id, estado, pipeline_version, spacy_model, idioma,
+                    encuesta_id, institucion_id, estado, pipeline_version, spacy_model, idioma,
                     texto_normalizado, resumen, keywords, entidades,
                     sentimiento_label, sentimiento_score,
                     emocion_label, emocion_score, emociones,
                     tokens_count, caracteres_count, confianza_general,
                     error_detalle, analizado_at, updated_at
                 )
-                values (%s, 'procesado', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, null, %s, %s)
+                values (%s, %s, 'procesado', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, null, %s, %s)
                 on conflict (encuesta_id) do update
-                set estado            = excluded.estado,
+                set institucion_id    = excluded.institucion_id,
+                    estado            = excluded.estado,
                     pipeline_version  = excluded.pipeline_version,
                     spacy_model       = excluded.spacy_model,
                     idioma            = excluded.idioma,
@@ -406,6 +413,7 @@ def save_success(
                 """,
                 (
                     pending.encuesta_id,
+                    pending.institucion_id,
                     settings.pipeline_version,
                     settings.spacy_model,
                     settings.default_language,
@@ -452,10 +460,11 @@ def save_error(conn: psycopg.Connection[Any], pending: PendingComment, error_mes
             cur.execute(
                 """
                 insert into public.comentario_analisis
-                    (encuesta_id, estado, pipeline_version, spacy_model, idioma, error_detalle, updated_at)
-                values (%s, 'error', %s, %s, %s, %s, now())
+                    (encuesta_id, institucion_id, estado, pipeline_version, spacy_model, idioma, error_detalle, updated_at)
+                values (%s, %s, 'error', %s, %s, %s, %s, now())
                 on conflict (encuesta_id) do update
-                set estado           = excluded.estado,
+                set institucion_id   = excluded.institucion_id,
+                    estado           = excluded.estado,
                     pipeline_version = excluded.pipeline_version,
                     spacy_model      = excluded.spacy_model,
                     idioma           = excluded.idioma,
@@ -464,6 +473,7 @@ def save_error(conn: psycopg.Connection[Any], pending: PendingComment, error_mes
                 """,
                 (
                     pending.encuesta_id,
+                    pending.institucion_id,
                     settings.pipeline_version,
                     settings.spacy_model,
                     settings.default_language,

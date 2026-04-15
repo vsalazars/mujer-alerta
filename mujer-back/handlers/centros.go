@@ -125,6 +125,11 @@ func ensureUniqueCentroSlug(r *http.Request, db *pgxpool.Pool, institucionID int
 func (h CentrosHandler) List(w http.ResponseWriter, r *http.Request) {
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	tipo := strings.TrimSpace(r.URL.Query().Get("tipo"))
+	institucionID, ok := UserInstitucionIDFromCtx(r.Context())
+	if !ok {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
 
 	limit := 20
 	if s := strings.TrimSpace(r.URL.Query().Get("limit")); s != "" {
@@ -133,8 +138,8 @@ func (h CentrosHandler) List(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	args := []any{}
-	where := []string{"activo = true"}
+	args := []any{institucionID}
+	where := []string{"institucion_id = $1", "activo = true"}
 
 	if tipo != "" {
 		if tipo != "escolar" && tipo != "laboral" {
@@ -170,6 +175,68 @@ func (h CentrosHandler) List(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var c CentroDTO
 		if err := rows.Scan(&c.ID, &c.Tipo, &c.Nombre, &c.Slug, &c.Clave, &c.Ciudad, &c.Estado); err != nil {
+			http.Error(w, "db_error", http.StatusInternalServerError)
+			return
+		}
+		out = append(out, c)
+	}
+	if rows.Err() != nil {
+		http.Error(w, "db_error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	_ = json.NewEncoder(w).Encode(out)
+}
+
+// ADMIN: lista todos los centros del tenant, incluidos inactivos
+func (h CentrosHandler) ListAdmin(w http.ResponseWriter, r *http.Request) {
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	tipo := strings.TrimSpace(r.URL.Query().Get("tipo"))
+	institucionID, ok := UserInstitucionIDFromCtx(r.Context())
+	if !ok {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	limit := 100
+	args := []any{institucionID}
+	where := []string{"institucion_id = $1"}
+
+	if tipo != "" {
+		if tipo != "escolar" && tipo != "laboral" {
+			http.Error(w, "bad_tipo", http.StatusBadRequest)
+			return
+		}
+		args = append(args, tipo)
+		where = append(where, "tipo = $"+strconv.Itoa(len(args)))
+	}
+
+	if q != "" {
+		args = append(args, "%"+q+"%")
+		where = append(where, "nombre ilike $"+strconv.Itoa(len(args)))
+	}
+
+	args = append(args, limit)
+
+	sql := `
+		select id, tipo, nombre, slug, coalesce(clave,''), coalesce(ciudad,''), coalesce(estado,''), activo
+		from centros
+		where ` + strings.Join(where, " and ") + `
+		order by activo desc, nombre asc
+		limit $` + strconv.Itoa(len(args))
+
+	rows, err := query(r.Context(), h.DB, sql, args...)
+	if err != nil {
+		http.Error(w, "db_error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	out := make([]CentroDTO, 0, limit)
+	for rows.Next() {
+		var c CentroDTO
+		if err := rows.Scan(&c.ID, &c.Tipo, &c.Nombre, &c.Slug, &c.Clave, &c.Ciudad, &c.Estado, &c.Activo); err != nil {
 			http.Error(w, "db_error", http.StatusInternalServerError)
 			return
 		}
@@ -312,9 +379,33 @@ func (h CentrosHandler) Update(w http.ResponseWriter, r *http.Request, id int64)
 
 // ADMIN: delete lógico
 func (h CentrosHandler) Delete(w http.ResponseWriter, r *http.Request, id int64) {
+	var usuariosCount int64
+	if err := queryRow(r.Context(), h.DB, `
+		select count(*)
+		from usuario_centros
+		where centro_id = $1
+	`, id).Scan(&usuariosCount); err != nil {
+		http.Error(w, "db_error", http.StatusInternalServerError)
+		return
+	}
+
+	var encuestasCount int64
+	if err := queryRow(r.Context(), h.DB, `
+		select count(*)
+		from encuestas
+		where centro_id = $1
+	`, id).Scan(&encuestasCount); err != nil {
+		http.Error(w, "db_error", http.StatusInternalServerError)
+		return
+	}
+
+	if usuariosCount > 0 || encuestasCount > 0 {
+		http.Error(w, "centro_has_data", http.StatusConflict)
+		return
+	}
+
 	ct, err := exec(r.Context(), h.DB, `
-		update centros
-		set activo = false
+		delete from centros
 		where id = $1
 	`, id)
 	if err != nil {

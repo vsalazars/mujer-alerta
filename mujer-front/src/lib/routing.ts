@@ -12,6 +12,8 @@ export function extractInstitutionSlug(pathname: string | null | undefined): str
     case "centro":
     case "diagnostico":
     case "resumen":
+    case "super-admin":
+    case "registro":
       return "";
     default:
       return first;
@@ -27,4 +29,3 @@ export function withInstitutionSlug(
   if (!cleanSlug) return cleanPath;
   return `/${cleanSlug}${cleanPath}`;
 }
-
