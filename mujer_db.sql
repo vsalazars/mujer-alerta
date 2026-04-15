@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict q75RWMvSbFVPlZn5SuobGiP8vnZjt902THlogBxInVKWugtwFr5JnpHe02FweL8
+\restrict IJmbSPmuHx8cnGmhfwjlE9hh53cxSvRW4pUGKtgQHj9Msfoc0Edbifk6Ix6YDeB
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -34,6 +34,7 @@ ALTER TABLE IF EXISTS ONLY public.usuario_centros DROP CONSTRAINT IF EXISTS usua
 ALTER TABLE IF EXISTS ONLY public.usuario_centros DROP CONSTRAINT IF EXISTS usuario_centros_institucion_id_fkey;
 ALTER TABLE IF EXISTS ONLY public.usuario_centros DROP CONSTRAINT IF EXISTS usuario_centros_centro_institucion_fkey;
 ALTER TABLE IF EXISTS ONLY public.respuestas DROP CONSTRAINT IF EXISTS respuestas_encuesta_id_fkey;
+ALTER TABLE IF EXISTS ONLY public.registro_institucional_solicitudes DROP CONSTRAINT IF EXISTS registro_institucional_solicitudes_institucion_id_fkey;
 ALTER TABLE IF EXISTS ONLY public.instituciones DROP CONSTRAINT IF EXISTS instituciones_validado_por_fkey;
 ALTER TABLE IF EXISTS ONLY public.instituciones DROP CONSTRAINT IF EXISTS instituciones_owner_user_id_fkey;
 ALTER TABLE IF EXISTS ONLY public.encuestas DROP CONSTRAINT IF EXISTS encuestas_institucion_id_fkey;
@@ -52,6 +53,7 @@ DROP TRIGGER IF EXISTS trg_validar_encuesta_mismo_tenant ON public.encuestas;
 DROP TRIGGER IF EXISTS trg_validar_comentario_analisis_mismo_tenant ON public.comentario_analisis;
 DROP TRIGGER IF EXISTS trg_validar_auditoria_mismo_tenant ON public.auditoria;
 DROP TRIGGER IF EXISTS trg_set_updated_at_usuarios ON public.usuarios;
+DROP TRIGGER IF EXISTS trg_set_updated_at_registro_institucional_solicitudes ON public.registro_institucional_solicitudes;
 DROP TRIGGER IF EXISTS trg_set_updated_at_instituciones ON public.instituciones;
 DROP TRIGGER IF EXISTS trg_set_updated_at_configuracion_institucion ON public.configuracion_institucion;
 DROP TRIGGER IF EXISTS trg_set_updated_at_comentario_analisis ON public.comentario_analisis;
@@ -64,6 +66,8 @@ DROP INDEX IF EXISTS public.idx_usuario_centros_institucion;
 DROP INDEX IF EXISTS public.idx_usuario_centros_centro_id;
 DROP INDEX IF EXISTS public.idx_respuestas_preg_dim;
 DROP INDEX IF EXISTS public.idx_respuestas_encuesta;
+DROP INDEX IF EXISTS public.idx_registro_institucional_solicitudes_slug;
+DROP INDEX IF EXISTS public.idx_registro_institucional_solicitudes_email;
 DROP INDEX IF EXISTS public.idx_instituciones_estatus;
 DROP INDEX IF EXISTS public.idx_instituciones_activo;
 DROP INDEX IF EXISTS public.idx_encuestas_instrumento;
@@ -90,6 +94,7 @@ ALTER TABLE IF EXISTS ONLY public.usuarios DROP CONSTRAINT IF EXISTS usuarios_id
 ALTER TABLE IF EXISTS ONLY public.usuario_centros DROP CONSTRAINT IF EXISTS usuario_centros_pkey;
 ALTER TABLE IF EXISTS ONLY public.respuestas DROP CONSTRAINT IF EXISTS respuestas_pkey;
 ALTER TABLE IF EXISTS ONLY public.respuestas DROP CONSTRAINT IF EXISTS respuestas_encuesta_id_pregunta_id_dimension_key;
+ALTER TABLE IF EXISTS ONLY public.registro_institucional_solicitudes DROP CONSTRAINT IF EXISTS registro_institucional_solicitudes_pkey;
 ALTER TABLE IF EXISTS ONLY public.instituciones DROP CONSTRAINT IF EXISTS instituciones_slug_key;
 ALTER TABLE IF EXISTS ONLY public.instituciones DROP CONSTRAINT IF EXISTS instituciones_pkey;
 ALTER TABLE IF EXISTS ONLY public.generos DROP CONSTRAINT IF EXISTS generos_pkey;
@@ -105,6 +110,7 @@ ALTER TABLE IF EXISTS ONLY public.centros DROP CONSTRAINT IF EXISTS centros_pkey
 ALTER TABLE IF EXISTS ONLY public.centros DROP CONSTRAINT IF EXISTS centros_id_institucion_key;
 ALTER TABLE IF EXISTS ONLY public.auditoria DROP CONSTRAINT IF EXISTS auditoria_pkey;
 ALTER TABLE IF EXISTS public.respuestas ALTER COLUMN id DROP DEFAULT;
+ALTER TABLE IF EXISTS public.registro_institucional_solicitudes ALTER COLUMN id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.instituciones ALTER COLUMN id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.generos ALTER COLUMN id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.comentario_tema ALTER COLUMN id DROP DEFAULT;
@@ -119,6 +125,8 @@ DROP TABLE IF EXISTS public.usuarios;
 DROP TABLE IF EXISTS public.usuario_centros;
 DROP SEQUENCE IF EXISTS public.respuestas_id_seq;
 DROP TABLE IF EXISTS public.respuestas;
+DROP SEQUENCE IF EXISTS public.registro_institucional_solicitudes_id_seq;
+DROP TABLE IF EXISTS public.registro_institucional_solicitudes;
 DROP SEQUENCE IF EXISTS public.instituciones_id_seq;
 DROP TABLE IF EXISTS public.instituciones;
 DROP SEQUENCE IF EXISTS public.generos_id_seq;
@@ -828,7 +836,8 @@ CREATE TABLE public.configuracion_institucion (
     permite_autoregistro boolean DEFAULT true NOT NULL,
     requiere_correo_institucional boolean DEFAULT false CONSTRAINT configuracion_institucion_requiere_correo_instituciona_not_null NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    color_apoyo text
 );
 
 
@@ -930,6 +939,52 @@ CREATE SEQUENCE public.instituciones_id_seq
 --
 
 ALTER SEQUENCE public.instituciones_id_seq OWNED BY public.instituciones.id;
+
+
+--
+-- Name: registro_institucional_solicitudes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.registro_institucional_solicitudes (
+    id bigint NOT NULL,
+    institucion_nombre text NOT NULL,
+    tipo text DEFAULT 'institucion'::text NOT NULL,
+    nombre_contacto text NOT NULL,
+    cargo_contacto text,
+    email_contacto text NOT NULL,
+    telefono_contacto text,
+    estado text,
+    ciudad text,
+    sitio_web text,
+    slug_deseado text,
+    estatus text DEFAULT 'pendiente'::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    institucion_id bigint,
+    CONSTRAINT registro_institucional_email_check CHECK ((POSITION(('@'::text) IN (email_contacto)) > 1)),
+    CONSTRAINT registro_institucional_estatus_check CHECK ((estatus = ANY (ARRAY['pendiente'::text, 'contactado'::text, 'aprobado'::text, 'rechazado'::text]))),
+    CONSTRAINT registro_institucional_slug_check CHECK (((slug_deseado IS NULL) OR (slug_deseado ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'::text))),
+    CONSTRAINT registro_institucional_tipo_check CHECK ((tipo = ANY (ARRAY['universidad'::text, 'empresa'::text, 'institucion'::text])))
+);
+
+
+--
+-- Name: registro_institucional_solicitudes_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.registro_institucional_solicitudes_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: registro_institucional_solicitudes_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.registro_institucional_solicitudes_id_seq OWNED BY public.registro_institucional_solicitudes.id;
 
 
 --
@@ -1148,6 +1203,13 @@ ALTER TABLE ONLY public.instituciones ALTER COLUMN id SET DEFAULT nextval('publi
 
 
 --
+-- Name: registro_institucional_solicitudes id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.registro_institucional_solicitudes ALTER COLUMN id SET DEFAULT nextval('public.registro_institucional_solicitudes_id_seq'::regclass);
+
+
+--
 -- Name: respuestas id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1264,6 +1326,14 @@ ALTER TABLE ONLY public.instituciones
 
 ALTER TABLE ONLY public.instituciones
     ADD CONSTRAINT instituciones_slug_key UNIQUE (slug);
+
+
+--
+-- Name: registro_institucional_solicitudes registro_institucional_solicitudes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.registro_institucional_solicitudes
+    ADD CONSTRAINT registro_institucional_solicitudes_pkey PRIMARY KEY (id);
 
 
 --
@@ -1455,6 +1525,20 @@ CREATE INDEX idx_instituciones_estatus ON public.instituciones USING btree (esta
 
 
 --
+-- Name: idx_registro_institucional_solicitudes_email; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_registro_institucional_solicitudes_email ON public.registro_institucional_solicitudes USING btree (lower(email_contacto));
+
+
+--
+-- Name: idx_registro_institucional_solicitudes_slug; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_registro_institucional_solicitudes_slug ON public.registro_institucional_solicitudes USING btree (lower(slug_deseado)) WHERE (slug_deseado IS NOT NULL);
+
+
+--
 -- Name: idx_respuestas_encuesta; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1536,6 +1620,13 @@ CREATE TRIGGER trg_set_updated_at_configuracion_institucion BEFORE UPDATE ON pub
 --
 
 CREATE TRIGGER trg_set_updated_at_instituciones BEFORE UPDATE ON public.instituciones FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: registro_institucional_solicitudes trg_set_updated_at_registro_institucional_solicitudes; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_set_updated_at_registro_institucional_solicitudes BEFORE UPDATE ON public.registro_institucional_solicitudes FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 
 --
@@ -1674,6 +1765,14 @@ ALTER TABLE ONLY public.instituciones
 
 ALTER TABLE ONLY public.instituciones
     ADD CONSTRAINT instituciones_validado_por_fkey FOREIGN KEY (validado_por) REFERENCES public.usuarios(id) ON DELETE SET NULL;
+
+
+--
+-- Name: registro_institucional_solicitudes registro_institucional_solicitudes_institucion_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.registro_institucional_solicitudes
+    ADD CONSTRAINT registro_institucional_solicitudes_institucion_id_fkey FOREIGN KEY (institucion_id) REFERENCES public.instituciones(id) ON DELETE SET NULL;
 
 
 --
@@ -1858,5 +1957,5 @@ ALTER TABLE public.usuarios ENABLE ROW LEVEL SECURITY;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict q75RWMvSbFVPlZn5SuobGiP8vnZjt902THlogBxInVKWugtwFr5JnpHe02FweL8
+\unrestrict IJmbSPmuHx8cnGmhfwjlE9hh53cxSvRW4pUGKtgQHj9Msfoc0Edbifk6Ix6YDeB
 

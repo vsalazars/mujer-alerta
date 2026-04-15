@@ -14,6 +14,7 @@ import { Separator } from "../../../components/ui/separator";
 import { Textarea } from "../../../components/ui/textarea";
 
 import { api } from "../../../lib/api";
+import { themeFromBranding } from "../../../lib/branding";
 import { extractInstitutionSlug, withInstitutionSlug } from "../../../lib/routing";
 
 type LikertOption = { value: number; label: string };
@@ -54,17 +55,10 @@ type Instrumento = {
   scoring?: { total_responses_expected?: number };
 };
 
-// Brand
-const BRAND = "#7F017F";
-
 // === PROGRESS BAR PRO (Glow + Gradient) ===
 const TRACK_H = 10; // px
 const DOT_SIZE = 14; // px
 const DOT_R = DOT_SIZE / 2; // px
-
-const GRADIENT =
-  "linear-gradient(90deg, #7A003C 0%, #9A1B6E 55%, #C23C9A 100%)";
-const GLOW = "0 0 10px rgba(122,0,60,0.35)";
 
 function isObject(v: unknown): v is Record<string, any> {
   return typeof v === "object" && v !== null;
@@ -117,6 +111,8 @@ type TenantBranding = {
   institucion_id: number;
   nombre_publico?: string;
   logo_url?: string;
+  color_primario?: string;
+  color_secundario?: string;
 };
 
 // ===== LocalStorage helpers =====
@@ -199,6 +195,7 @@ export default function DiagnosticoEncuestaPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [branding, setBranding] = useState<TenantBranding | null>(null);
+  const theme = themeFromBranding(branding);
 
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [qIndex, setQIndex] = useState(0);
@@ -514,7 +511,7 @@ export default function DiagnosticoEncuestaPage() {
 
           <Button
             className="h-12 w-full rounded-full"
-            style={{ backgroundColor: BRAND }}
+            style={{ background: theme.gradient, color: "white" }}
             onClick={() => router.push(withInstitutionSlug(institucionSlug, "/diagnostico"))}
           >
             Volver
@@ -531,7 +528,7 @@ export default function DiagnosticoEncuestaPage() {
           <p className="text-sm text-neutral-600">No se pudo cargar el instrumento.</p>
           <Button
             className="mt-4 h-12 w-full rounded-full"
-            style={{ backgroundColor: BRAND }}
+            style={{ background: theme.gradient, color: "white" }}
             onClick={() => router.push(withInstitutionSlug(institucionSlug, "/diagnostico"))}
           >
             Volver
@@ -588,14 +585,14 @@ export default function DiagnosticoEncuestaPage() {
                   </div>
                 </div>
               ) : null}
-              <h2 className="text-xl font-extrabold tracking-tight" style={{ color: BRAND }}>
+              <h2 className="text-xl font-extrabold tracking-tight" style={{ color: theme.primary }}>
                 {branding?.nombre_publico?.trim() || inst.name}
               </h2>
 
               <div className="mt-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-medium text-neutral-600">{stepLabel}</span>
-                  <span className="text-[11px] font-semibold tabular-nums" style={{ color: BRAND }}>
+                  <span className="text-[11px] font-semibold tabular-nums" style={{ color: theme.primary }}>
                     {snapPctLabel}%
                   </span>
                 </div>
@@ -603,14 +600,14 @@ export default function DiagnosticoEncuestaPage() {
                 <div className="relative mt-2 w-full" style={{ height: `${TRACK_H}px` }}>
                   <div
                     className="absolute inset-0 rounded-full"
-                    style={{ backgroundColor: "rgba(122,0,60,0.12)" }}
+                    style={{ backgroundColor: theme.softStrong }}
                   />
                   <div
                     className="absolute left-0 top-0 h-full rounded-full transition-[width] duration-300 ease-out"
                     style={{
                       width: `calc(${DOT_R}px + ${fillWidth})`,
-                      background: GRADIENT,
-                      boxShadow: snapPct > 0 ? GLOW : "none",
+                      background: theme.gradientWide,
+                      boxShadow: snapPct > 0 ? `0 0 10px ${theme.glow}` : "none",
                     }}
                   />
                   <div
@@ -623,10 +620,10 @@ export default function DiagnosticoEncuestaPage() {
                       style={{
                         width: `${DOT_SIZE}px`,
                         height: `${DOT_SIZE}px`,
-                        border: "2px solid #7A003C",
+                        border: `2px solid ${theme.primary}`,
                         boxShadow:
                           snapPct > 0
-                            ? "0 0 6px rgba(122,0,60,0.45)"
+                            ? `0 0 6px ${theme.glow}`
                             : "0 2px 6px rgba(0,0,0,0.15)",
                       }}
                     />
@@ -647,7 +644,7 @@ export default function DiagnosticoEncuestaPage() {
           <CardHeader className="shrink-0">
             <CardTitle
               className="text-base font-heading font-semibold leading-snug"
-              style={{ color: "var(--primary)" }}
+              style={{ color: theme.primary }}
             >
               {isCommentStep
                 ? "Comentario final (opcional)"
@@ -673,6 +670,13 @@ export default function DiagnosticoEncuestaPage() {
                     onChange={(e) => setComentario(e.target.value)}
                     placeholder="Escribe aquí (opcional)…"
                     className="min-h-[180px] resize-none rounded-2xl"
+                    style={
+                      {
+                        borderColor: theme.border,
+                        boxShadow: `0 0 0 1px ${theme.border}`,
+                        "--ring": theme.primary,
+                      } as React.CSSProperties
+                    }
                     maxLength={2000}
                   />
 
@@ -722,13 +726,11 @@ export default function DiagnosticoEncuestaPage() {
                                     active ? "font-bold" : "font-medium",
                                   ].join(" ")}
                                   style={{
-                                    backgroundColor: active ? "var(--primary)" : "transparent",
-                                    color: active
-                                      ? "var(--primary-foreground)"
-                                      : "var(--foreground)",
-                                    borderColor: active ? "var(--primary)" : "var(--border)",
+                                    backgroundColor: active ? theme.primary : "transparent",
+                                    color: active ? "white" : "#111827",
+                                    borderColor: active ? theme.primary : theme.border,
                                     boxShadow: active
-                                      ? "0 0 0 4px color-mix(in oklch, var(--ring) 35%, transparent)"
+                                      ? `0 0 0 4px ${theme.softStrong}`
                                       : "none",
                                   }}
                                 >
@@ -742,10 +744,9 @@ export default function DiagnosticoEncuestaPage() {
                             <span
                               className="px-2 py-1 rounded-full font-bold"
                               style={{
-                                color: "var(--chart-2)",
-                                background:
-                                  "color-mix(in oklch, var(--accent) 70%, transparent)",
-                                border: "1px solid var(--border)",
+                                color: theme.primary,
+                                background: theme.soft,
+                                border: `1px solid ${theme.border}`,
                               }}
                             >
                               {scale.options[0]?.label}
@@ -754,10 +755,9 @@ export default function DiagnosticoEncuestaPage() {
                             <span
                               className="px-2 py-1 rounded-full font-bold"
                               style={{
-                                color: "var(--chart-2)",
-                                background:
-                                  "color-mix(in oklch, var(--accent) 70%, transparent)",
-                                border: "1px solid var(--border)",
+                                color: theme.primary,
+                                background: theme.soft,
+                                border: `1px solid ${theme.border}`,
                               }}
                             >
                               {scale.options[scale.options.length - 1]?.label}
@@ -778,9 +778,9 @@ export default function DiagnosticoEncuestaPage() {
               <div
                 className="mx-auto flex flex-col items-center rounded-full px-3 py-1 text-[11px] font-semibold text-center"
                 style={{
-                  color: "rgba(122,0,60,0.70)",
+                  color: theme.primary,
                   background: "rgba(255,255,255,0.92)",
-                  border: "1px solid rgba(122,0,60,0.14)",
+                  border: `1px solid ${theme.border}`,
                   boxShadow: "0 8px 18px rgba(0,0,0,0.05)",
                   backdropFilter: "blur(6px)",
                 }}
@@ -822,7 +822,7 @@ export default function DiagnosticoEncuestaPage() {
 
                   <Button
                     className="h-12 flex-1 rounded-full text-base font-semibold"
-                    style={{ backgroundColor: BRAND }}
+                    style={{ background: theme.gradient, color: "white" }}
                     onClick={onSubmitAll}
                     disabled={!allDone || saving}
                   >
@@ -842,7 +842,7 @@ export default function DiagnosticoEncuestaPage() {
 
                   <Button
                     className="h-12 flex-1 rounded-full text-base font-semibold"
-                    style={{ backgroundColor: BRAND }}
+                    style={{ background: theme.gradient, color: "white" }}
                     onClick={goNext}
                     disabled={!currentDone}
                   >

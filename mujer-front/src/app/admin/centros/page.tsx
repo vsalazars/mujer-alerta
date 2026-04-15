@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { isAdminRole, type UserRole } from "@/lib/auth";
+import { themeFromBranding } from "@/lib/branding";
 import { extractInstitutionSlug, withInstitutionSlug } from "@/lib/routing";
 
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,15 @@ type Centro = {
   activo?: boolean;
 };
 
+type ConfiguracionInstitucion = {
+  institucion_id: number;
+  nombre_publico?: string;
+  logo_url?: string;
+  color_primario?: string;
+  color_secundario?: string;
+  color_apoyo?: string;
+};
+
 type CentroForm = {
   tipo: "escolar" | "laboral";
   nombre: string;
@@ -70,6 +80,12 @@ function errorMessage(e: unknown, fallback: string) {
   return e instanceof Error ? e.message || fallback : fallback;
 }
 
+const destructiveButtonStyle = {
+  borderColor: "rgba(220, 38, 38, 0.2)",
+  backgroundColor: "rgba(254, 242, 242, 1)",
+  color: "rgb(185, 28, 28)",
+};
+
 function slugifyCentroNombre(nombre: string) {
   return String(nombre || "")
     .trim()
@@ -88,6 +104,7 @@ export default function AdminCentrosPage() {
 
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState("");
+  const [config, setConfig] = useState<ConfiguracionInstitucion | null>(null);
 
   const [items, setItems] = useState<Centro[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,6 +124,14 @@ export default function AdminCentrosPage() {
     ciudad: "",
     estado: "",
   });
+  const theme = themeFromBranding(config);
+  const fieldStyle = {
+    "--ring": theme.primary,
+    "--input": theme.border,
+  } as CSSProperties;
+  const buttonRingStyle = {
+    "--ring": theme.primary,
+  } as CSSProperties;
 
   // Guard (extra): si no hay auth, regresa a home
   useEffect(() => {
@@ -122,6 +147,22 @@ export default function AdminCentrosPage() {
     setUser(user);
     setToken(token);
   }, [institucionSlug, router]);
+
+  useEffect(() => {
+    async function loadConfig() {
+      try {
+        const payload = await api<ConfiguracionInstitucion>("/api/admin/configuracion", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setConfig(payload);
+      } catch {
+        setConfig(null);
+      }
+    }
+
+    if (!token) return;
+    void loadConfig();
+  }, [token]);
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -260,6 +301,11 @@ export default function AdminCentrosPage() {
         <div className="relative w-full md:max-w-md">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
           <Input
+            style={{
+              ...fieldStyle,
+              borderColor: theme.border,
+              boxShadow: `0 0 0 1px ${theme.border}`,
+            }}
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Buscar por nombre, clave, ciudad..."
@@ -271,7 +317,12 @@ export default function AdminCentrosPage() {
           <Button
             variant="outline"
             className="rounded-full"
-            style={{ borderColor: "#7F017F", color: "#7F017F" }}
+            style={{
+              ...buttonRingStyle,
+              borderColor: theme.support,
+              color: theme.primary,
+              backgroundColor: theme.supportSoft,
+            }}
             onClick={load}
             disabled={loading}
           >
@@ -283,7 +334,7 @@ export default function AdminCentrosPage() {
             <DialogTrigger asChild>
               <Button
                 className="rounded-full font-semibold shadow-sm"
-                style={{ backgroundColor: "#7F017F" }}
+                style={{ ...buttonRingStyle, background: theme.gradient, color: "white" }}
                 onClick={openCreate}
               >
                 <Plus className="mr-2 h-5 w-5" />
@@ -293,7 +344,7 @@ export default function AdminCentrosPage() {
 
             <DialogContent className="sm:max-w-lg">
               <DialogHeader>
-                <DialogTitle style={{ color: "#7F017F" }}>
+                <DialogTitle style={{ color: theme.primary }}>
                   {mode === "create" ? "Nuevo centro" : "Editar centro"}
                 </DialogTitle>
                 <DialogDescription className="text-sm text-neutral-600">
@@ -315,7 +366,11 @@ export default function AdminCentrosPage() {
                       )}
                       style={
                         form.tipo === "escolar"
-                          ? { borderColor: "#7F017F" }
+                          ? {
+                              borderColor: theme.primary,
+                              backgroundColor: theme.soft,
+                              color: theme.primary,
+                            }
                           : { borderColor: "rgb(229 229 229)" }
                       }
                       onClick={() => setForm((f) => ({ ...f, tipo: "escolar" }))}
@@ -333,7 +388,11 @@ export default function AdminCentrosPage() {
                       )}
                       style={
                         form.tipo === "laboral"
-                          ? { borderColor: "#7F017F" }
+                          ? {
+                              borderColor: theme.primary,
+                              backgroundColor: theme.soft,
+                              color: theme.primary,
+                            }
                           : { borderColor: "rgb(229 229 229)" }
                       }
                       onClick={() => setForm((f) => ({ ...f, tipo: "laboral" }))}
@@ -347,6 +406,7 @@ export default function AdminCentrosPage() {
                   <Label htmlFor="nombre">Nombre</Label>
                   <Input
                     id="nombre"
+                    style={fieldStyle}
                     value={form.nombre}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, nombre: e.target.value }))
@@ -360,6 +420,7 @@ export default function AdminCentrosPage() {
                   <Label htmlFor="slug-sugerido">Slug sugerido</Label>
                   <Input
                     id="slug-sugerido"
+                    style={fieldStyle}
                     value={suggestedSlug}
                     readOnly
                     disabled
@@ -374,6 +435,7 @@ export default function AdminCentrosPage() {
                     <Label htmlFor="clave">Clave</Label>
                     <Input
                       id="clave"
+                      style={fieldStyle}
                       value={form.clave}
                       onChange={(e) =>
                         setForm((f) => ({ ...f, clave: e.target.value }))
@@ -387,6 +449,7 @@ export default function AdminCentrosPage() {
                     <Label htmlFor="ciudad">Ciudad</Label>
                     <Input
                       id="ciudad"
+                      style={fieldStyle}
                       value={form.ciudad}
                       onChange={(e) =>
                         setForm((f) => ({ ...f, ciudad: e.target.value }))
@@ -401,6 +464,7 @@ export default function AdminCentrosPage() {
                   <Label htmlFor="estado">Estado</Label>
                   <Input
                     id="estado"
+                    style={fieldStyle}
                     value={form.estado}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, estado: e.target.value }))
@@ -417,6 +481,12 @@ export default function AdminCentrosPage() {
                     type="button"
                     variant="outline"
                     className="rounded-full"
+                    style={{
+                      ...buttonRingStyle,
+                      borderColor: theme.support,
+                      backgroundColor: theme.supportSoft,
+                      color: theme.primary,
+                    }}
                     onClick={() => setOpen(false)}
                     disabled={saving}
                   >
@@ -426,7 +496,7 @@ export default function AdminCentrosPage() {
                   <Button
                     type="submit"
                     className="rounded-full font-semibold shadow-sm"
-                    style={{ backgroundColor: "#7F017F" }}
+                    style={{ ...buttonRingStyle, background: theme.gradient, color: "white" }}
                     disabled={saving}
                   >
                     {saving ? "Guardando…" : "Guardar"}
@@ -439,11 +509,14 @@ export default function AdminCentrosPage() {
       </div>
 
       {/* Body */}
-      <div className="rounded-2xl border border-neutral-200 bg-white shadow-sm">
+      <div
+        className="rounded-2xl border bg-white shadow-sm"
+        style={{ borderColor: theme.border }}
+      >
         <div className="flex items-center justify-between gap-4 p-5">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <Building2 className="h-5 w-5" style={{ color: "#7F017F" }} />
+              <Building2 className="h-5 w-5" style={{ color: theme.primary }} />
               <h2 className="text-lg font-bold text-neutral-900">Listado</h2>
             </div>
             <p className="mt-1 text-sm text-neutral-600">
@@ -501,8 +574,8 @@ export default function AdminCentrosPage() {
                       <span
                         className="inline-flex rounded-full px-3 py-1 text-xs font-semibold"
                         style={{
-                          backgroundColor: "rgba(127,1,127,0.10)",
-                          color: "#7F017F",
+                          backgroundColor: theme.supportSoft,
+                          color: theme.primary,
                         }}
                       >
                         {c.tipo}
@@ -525,7 +598,12 @@ export default function AdminCentrosPage() {
                         <Button
                           variant="outline"
                           className="h-9 rounded-full"
-                          style={{ borderColor: "#7F017F", color: "#7F017F" }}
+                          style={{
+                            ...buttonRingStyle,
+                            borderColor: theme.support,
+                            color: theme.primary,
+                            backgroundColor: theme.supportSoft,
+                          }}
                           onClick={() => openEdit(c)}
                         >
                           <Pencil className="mr-2 h-4 w-4" />
@@ -535,6 +613,7 @@ export default function AdminCentrosPage() {
                         <Button
                           variant="outline"
                           className="h-9 rounded-full"
+                          style={{ ...buttonRingStyle, ...destructiveButtonStyle }}
                           onClick={() => onDelete(c)}
                         >
                           <Trash2 className="mr-2 h-4 w-4" />

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { isAdminRole, type UserRole } from "@/lib/auth";
 import { api } from "@/lib/api";
+import { themeFromBranding } from "@/lib/branding";
 import { extractInstitutionSlug, withInstitutionSlug } from "@/lib/routing";
 
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,9 @@ type ConfiguracionInstitucion = {
   institucion_id: number;
   nombre_publico?: string;
   logo_url?: string;
+  color_primario?: string;
+  color_secundario?: string;
+  color_apoyo?: string;
 };
 
 function readAuth(): { token: string; user: AuthUser | null } {
@@ -100,13 +104,13 @@ export default function AdminLayout({
   const router = useRouter();
   const pathname = usePathname();
   const institucionSlug = extractInstitutionSlug(pathname);
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [user] = useState<AuthUser | null>(() => readAuth().user);
   const [config, setConfig] = useState<ConfiguracionInstitucion | null>(null);
-  const [hydrated, setHydrated] = useState(false);
 
   const expiresText = user?.expires_at
     ? new Date(user.expires_at * 1000).toLocaleString()
     : "";
+  const theme = themeFromBranding(config);
 
   useEffect(() => {
     async function loadConfig() {
@@ -129,17 +133,15 @@ export default function AdminLayout({
       void loadConfig();
     }
 
-    setHydrated(true);
-    const { user } = readAuth();
-    if (!user) {
+    const { user: sessionUser } = readAuth();
+    if (!sessionUser) {
       router.replace("/");
       return;
     }
-    if (!isAdminRole(user.rol)) {
+    if (!isAdminRole(sessionUser.rol)) {
       router.replace(withInstitutionSlug(institucionSlug, "/centro"));
       return;
     }
-    setUser(user);
     void loadConfig();
     window.addEventListener("institucion-config-updated", onConfigUpdated);
 
@@ -156,7 +158,7 @@ export default function AdminLayout({
     router.replace("/");
   }
 
-  if (!hydrated || !user) return null;
+  if (!user) return null;
 
   const nav = [
     { label: "Dashboard", href: withInstitutionSlug(institucionSlug, "/admin"), icon: LayoutDashboard },
@@ -185,11 +187,11 @@ export default function AdminLayout({
                   ) : (
                     <div
                       className="grid h-11 w-11 place-items-center rounded-2xl"
-                      style={{ backgroundColor: "rgba(127,1,127,0.10)" }}
+                      style={{ backgroundColor: theme.soft }}
                     >
                       <ShieldCheck
                         className="h-5 w-5"
-                        style={{ color: "#7F017F" }}
+                        style={{ color: theme.primary }}
                       />
                     </div>
                   )}
@@ -197,7 +199,7 @@ export default function AdminLayout({
                   <div className="leading-tight text-center">
                     <p
                       className="text-base font-extrabold tracking-tight break-words"
-                      style={{ color: "#7F017F" }}
+                      style={{ color: theme.primary }}
                     >
                       {config?.nombre_publico?.trim() || "Mujer Alerta"}
                     </p>
@@ -230,9 +232,9 @@ export default function AdminLayout({
                         <Icon
                           className={cx(
                             "h-4 w-4",
-                            active ? "" : "text-neutral-500"
-                          )}
-                          style={active ? { color: "#7F017F" } : undefined}
+                          active ? "" : "text-neutral-500"
+                        )}
+                          style={active ? { color: theme.primary } : undefined}
                         />
                         <span
                           className={cx(
@@ -262,7 +264,12 @@ export default function AdminLayout({
                 <Button
                   onClick={onLogout}
                   variant="ghost"
-                  className="w-full justify-start rounded-xl"
+                  className="w-full justify-start rounded-xl border"
+                  style={{
+                    backgroundColor: theme.supportSoft,
+                    borderColor: theme.support,
+                    color: theme.primary,
+                  }}
                 >
                   <LogOut className="mr-2 h-4 w-4" />
                   Cerrar sesión
@@ -289,8 +296,8 @@ export default function AdminLayout({
                   <div
                     className="grid h-10 w-10 shrink-0 place-items-center rounded-full"
                     style={{
-                      backgroundColor: "rgba(127,1,127,0.10)",
-                      color: "#7F017F",
+                      backgroundColor: theme.soft,
+                      color: theme.primary,
                     }}
                     aria-label="Avatar"
                     title={user.nombre}
@@ -310,8 +317,8 @@ export default function AdminLayout({
                   <span
                     className="hidden rounded-full px-3 py-1 text-xs font-semibold md:inline-flex"
                     style={{
-                      backgroundColor: "rgba(127,1,127,0.10)",
-                      color: "#7F017F",
+                      backgroundColor: theme.soft,
+                      color: theme.primary,
                     }}
                   >
                     {user.rol.toUpperCase()}

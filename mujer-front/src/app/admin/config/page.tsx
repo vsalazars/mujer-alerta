@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { Upload, Image as ImageIcon, Save, Trash2 } from "lucide-react";
 
 import { api } from "@/lib/api";
+import { themeFromBranding } from "@/lib/branding";
+import { BrandColorField } from "@/components/admin/brand-color-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +16,7 @@ type ConfiguracionInstitucion = {
   logo_url?: string;
   color_primario?: string;
   color_secundario?: string;
+  color_apoyo?: string;
   dominio_permitido?: string;
   permite_autoregistro: boolean;
   requiere_correo_institucional: boolean;
@@ -22,6 +25,9 @@ type ConfiguracionInstitucion = {
 type FormState = {
   nombre_publico: string;
   logo_url: string;
+  color_primario: string;
+  color_secundario: string;
+  color_apoyo: string;
 };
 
 function readToken() {
@@ -38,7 +44,18 @@ export default function AdminConfigPage() {
   const [form, setForm] = useState<FormState>({
     nombre_publico: "",
     logo_url: "",
+    color_primario: "",
+    color_secundario: "",
+    color_apoyo: "",
   });
+  const theme = themeFromBranding(form);
+  const fieldStyle = {
+    "--ring": theme.primary,
+    "--input": theme.border,
+  } as CSSProperties;
+  const buttonRingStyle = {
+    "--ring": theme.primary,
+  } as CSSProperties;
 
   useEffect(() => {
     const authToken = readToken();
@@ -52,6 +69,9 @@ export default function AdminConfigPage() {
         setForm({
           nombre_publico: data.nombre_publico || "",
           logo_url: data.logo_url || "",
+          color_primario: data.color_primario || "",
+          color_secundario: data.color_secundario || "",
+          color_apoyo: data.color_apoyo || "",
         });
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : "";
@@ -99,8 +119,9 @@ export default function AdminConfigPage() {
         body: JSON.stringify({
           nombre_publico: form.nombre_publico.trim(),
           logo_url: form.logo_url.trim(),
-          color_primario: "",
-          color_secundario: "",
+          color_primario: form.color_primario.trim(),
+          color_secundario: form.color_secundario.trim(),
+          color_apoyo: form.color_apoyo.trim(),
           dominio_permitido: "",
           permite_autoregistro: true,
           requiere_correo_institucional: false,
@@ -109,6 +130,9 @@ export default function AdminConfigPage() {
       setForm({
         nombre_publico: saved.nombre_publico || "",
         logo_url: saved.logo_url || "",
+        color_primario: saved.color_primario || "",
+        color_secundario: saved.color_secundario || "",
+        color_apoyo: saved.color_apoyo || "",
       });
       window.dispatchEvent(
         new CustomEvent("institucion-config-updated", {
@@ -133,33 +157,46 @@ export default function AdminConfigPage() {
       <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-bold text-neutral-900">Identidad institucional</h2>
         <p className="mt-2 text-sm text-neutral-600">
-          Sube o cambia el logotipo/escudo para mostrarlo en el panel administrativo.
+          Ajusta nombre, logotipo y paleta de color para personalizar el panel admin, la encuesta pública y el tablero de resultados.
         </p>
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[320px_1fr]">
-          <div className="rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 p-4">
-            <p className="text-sm font-semibold text-neutral-900">Vista previa</p>
-            <div className="mt-4 grid min-h-48 place-items-center rounded-2xl bg-white p-4">
-              {form.logo_url ? (
-                <img
-                  src={form.logo_url}
-                  alt="Logo institucional"
-                  className="max-h-36 max-w-full object-contain"
-                />
-              ) : (
-                <div className="text-center text-neutral-500">
-                  <ImageIcon className="mx-auto h-8 w-8" />
-                  <p className="mt-2 text-sm">Sin logotipo cargado</p>
+            <div className="rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 p-4">
+              <p className="text-sm font-semibold text-neutral-900">Vista previa</p>
+              <div className="mt-4 grid min-h-48 place-items-center rounded-2xl bg-white p-4">
+                <div className="w-full max-w-[260px] rounded-[28px] border p-5 shadow-sm" style={{ borderColor: theme.border }}>
+                  <div className="rounded-[22px] p-5" style={{ background: `linear-gradient(135deg, ${theme.soft} 0%, rgba(255,255,255,1) 55%, ${theme.softStrong} 100%)` }}>
+                    {form.logo_url ? (
+                      <img
+                        src={form.logo_url}
+                        alt="Logo institucional"
+                        className="mx-auto max-h-24 max-w-full object-contain"
+                      />
+                    ) : (
+                      <div className="text-center text-neutral-500">
+                        <ImageIcon className="mx-auto h-8 w-8" style={{ color: theme.primary }} />
+                        <p className="mt-2 text-sm">Sin logotipo cargado</p>
+                      </div>
+                    )}
+                    <p className="mt-4 text-center text-base font-extrabold" style={{ color: theme.primary }}>
+                      {form.nombre_publico.trim() || "Nombre institucional"}
+                    </p>
+                    <div className="mt-4 flex items-center justify-center gap-2">
+                      <span className="h-4 w-4 rounded-full border border-white shadow-sm" style={{ backgroundColor: theme.primary }} />
+                      <span className="h-4 w-4 rounded-full border border-white shadow-sm" style={{ backgroundColor: theme.secondary }} />
+                      <span className="h-4 w-4 rounded-full border border-white shadow-sm" style={{ backgroundColor: theme.support }} />
+                    </div>
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
-          </div>
 
           <div className="grid gap-4">
             <div className="grid gap-2">
               <Label htmlFor="nombre_publico">Nombre público</Label>
               <Input
                 id="nombre_publico"
+                style={fieldStyle}
                 value={form.nombre_publico}
                 onChange={(e) => setForm((current) => ({ ...current, nombre_publico: e.target.value }))}
                 placeholder="Ej. UPIITA"
@@ -185,6 +222,12 @@ export default function AdminConfigPage() {
                   type="button"
                   variant="outline"
                   className="rounded-full"
+                  style={{
+                    ...buttonRingStyle,
+                    borderColor: theme.support,
+                    backgroundColor: theme.supportSoft,
+                    color: theme.primary,
+                  }}
                   onClick={() => {
                     setForm((current) => ({ ...current, logo_url: "" }));
                     setSuccess("");
@@ -199,6 +242,36 @@ export default function AdminConfigPage() {
               </p>
             </div>
 
+            <div className="grid gap-4 md:grid-cols-3">
+              <BrandColorField
+                id="color_primario"
+                label="Color primario"
+                value={form.color_primario}
+                resolvedColor={theme.primary}
+                placeholder="#7F017F"
+                onChange={(value) => setForm((current) => ({ ...current, color_primario: value }))}
+              />
+
+              <BrandColorField
+                id="color_secundario"
+                label="Color secundario"
+                value={form.color_secundario}
+                resolvedColor={theme.secondary}
+                placeholder="#C23C9A"
+                onChange={(value) => setForm((current) => ({ ...current, color_secundario: value }))}
+              />
+
+              <BrandColorField
+                id="color_apoyo"
+                label="Color de apoyo"
+                value={form.color_apoyo}
+                resolvedColor={theme.support}
+                placeholder="Opcional"
+                hint="Úsalo para acciones secundarias, chips suaves y detalles como cerrar sesión."
+                onChange={(value) => setForm((current) => ({ ...current, color_apoyo: value }))}
+              />
+            </div>
+
             {error ? <p className="text-sm text-red-600">{error}</p> : null}
             {success ? <p className="text-sm text-emerald-700">{success}</p> : null}
 
@@ -206,7 +279,7 @@ export default function AdminConfigPage() {
               <Button
                 type="button"
                 className="rounded-full font-semibold"
-                style={{ backgroundColor: "#7F017F" }}
+                style={{ ...buttonRingStyle, background: theme.gradient, color: "white" }}
                 onClick={onSave}
                 disabled={saving}
               >

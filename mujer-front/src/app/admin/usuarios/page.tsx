@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { isAdminRole, type UserRole } from "@/lib/auth";
+import { themeFromBranding } from "@/lib/branding";
 import { extractInstitutionSlug, withInstitutionSlug } from "@/lib/routing";
 
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,15 @@ type Centro = {
   ciudad?: string;
   estado?: string;
   activo?: boolean;
+};
+
+type ConfiguracionInstitucion = {
+  institucion_id: number;
+  nombre_publico?: string;
+  logo_url?: string;
+  color_primario?: string;
+  color_secundario?: string;
+  color_apoyo?: string;
 };
 
 type CentroUser = {
@@ -95,6 +105,12 @@ function errorMessage(e: unknown, fallback: string) {
   return e instanceof Error ? e.message || fallback : fallback;
 }
 
+const destructiveButtonStyle = {
+  borderColor: "rgba(220, 38, 38, 0.2)",
+  backgroundColor: "rgba(254, 242, 242, 1)",
+  color: "rgb(185, 28, 28)",
+};
+
 export default function AdminUsuariosPage() {
   const router = useRouter();
   const pathname = usePathname();
@@ -102,6 +118,7 @@ export default function AdminUsuariosPage() {
 
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState("");
+  const [config, setConfig] = useState<ConfiguracionInstitucion | null>(null);
 
   const [centros, setCentros] = useState<Centro[]>([]);
   const [items, setItems] = useState<CentroUser[]>([]);
@@ -122,6 +139,20 @@ export default function AdminUsuariosPage() {
     centro_id: "",
     password: "",
   });
+  const theme = themeFromBranding(config);
+  const fieldStyle = {
+    "--ring": theme.primary,
+    "--input": theme.border,
+  } as CSSProperties;
+  const buttonRingStyle = {
+    "--ring": theme.primary,
+  } as CSSProperties;
+  const selectContentStyle = {
+    "--accent": theme.supportSoft,
+    "--accent-foreground": theme.primary,
+    "--ring": theme.primary,
+    "--border": theme.border,
+  } as CSSProperties;
 
   // Guard extra (igual que centros)
   useEffect(() => {
@@ -137,6 +168,22 @@ export default function AdminUsuariosPage() {
     setUser(user);
     setToken(token);
   }, [institucionSlug, router]);
+
+  useEffect(() => {
+    async function loadConfig() {
+      try {
+        const payload = await api<ConfiguracionInstitucion>("/api/admin/configuracion", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setConfig(payload);
+      } catch {
+        setConfig(null);
+      }
+    }
+
+    if (!token) return;
+    void loadConfig();
+  }, [token]);
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -310,6 +357,11 @@ export default function AdminUsuariosPage() {
         <div className="relative w-full md:max-w-md">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
           <Input
+            style={{
+              ...fieldStyle,
+              borderColor: theme.border,
+              boxShadow: `0 0 0 1px ${theme.border}`,
+            }}
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Buscar por nombre, email o centro..."
@@ -321,7 +373,12 @@ export default function AdminUsuariosPage() {
           <Button
             variant="outline"
             className="rounded-full"
-            style={{ borderColor: "#7F017F", color: "#7F017F" }}
+            style={{
+              ...buttonRingStyle,
+              borderColor: theme.support,
+              color: theme.primary,
+              backgroundColor: theme.supportSoft,
+            }}
             onClick={loadAll}
             disabled={loading}
           >
@@ -333,7 +390,7 @@ export default function AdminUsuariosPage() {
             <DialogTrigger asChild>
               <Button
                 className="rounded-full font-semibold shadow-sm"
-                style={{ backgroundColor: "#7F017F" }}
+                style={{ ...buttonRingStyle, background: theme.gradient, color: "white" }}
                 onClick={openCreate}
               >
                 <Plus className="mr-2 h-5 w-5" />
@@ -343,7 +400,7 @@ export default function AdminUsuariosPage() {
 
             <DialogContent className="sm:max-w-lg">
               <DialogHeader>
-                <DialogTitle style={{ color: "#7F017F" }}>
+                <DialogTitle style={{ color: theme.primary }}>
                   {mode === "create" ? "Nuevo usuario de centro" : "Editar usuario"}
                 </DialogTitle>
                 <DialogDescription className="text-sm text-neutral-600">
@@ -356,6 +413,7 @@ export default function AdminUsuariosPage() {
                   <Label htmlFor="nombre">Nombre</Label>
                   <Input
                     id="nombre"
+                    style={fieldStyle}
                     value={form.nombre}
                     onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}
                     placeholder="Ej. Coordinación UPIITA"
@@ -367,6 +425,7 @@ export default function AdminUsuariosPage() {
                   <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
+                    style={fieldStyle}
                     value={form.email}
                     onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
                     placeholder="centro@institucion.mx"
@@ -383,10 +442,10 @@ export default function AdminUsuariosPage() {
                     onValueChange={(v) => setForm((f) => ({ ...f, centro_id: v }))}
                     disabled={saving}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger style={fieldStyle}>
                       <SelectValue placeholder="Selecciona un centro" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent style={selectContentStyle}>
                       {centros.map((c) => (
                         <SelectItem key={c.id} value={String(c.id)}>
                           {c.nombre}
@@ -406,6 +465,7 @@ export default function AdminUsuariosPage() {
                   <Input
                     id="password"
                     type="password"
+                    style={fieldStyle}
                     value={form.password}
                     onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
                     placeholder={
@@ -427,6 +487,12 @@ export default function AdminUsuariosPage() {
                     type="button"
                     variant="outline"
                     className="rounded-full"
+                    style={{
+                      ...buttonRingStyle,
+                      borderColor: theme.support,
+                      backgroundColor: theme.supportSoft,
+                      color: theme.primary,
+                    }}
                     onClick={() => setOpen(false)}
                     disabled={saving}
                   >
@@ -436,7 +502,7 @@ export default function AdminUsuariosPage() {
                   <Button
                     type="submit"
                     className="rounded-full font-semibold shadow-sm"
-                    style={{ backgroundColor: "#7F017F" }}
+                    style={{ ...buttonRingStyle, background: theme.gradient, color: "white" }}
                     disabled={saving}
                   >
                     {saving ? "Guardando…" : "Guardar"}
@@ -449,11 +515,14 @@ export default function AdminUsuariosPage() {
       </div>
 
       {/* Tabla */}
-      <div className="rounded-2xl border border-neutral-200 bg-white shadow-sm">
+      <div
+        className="rounded-2xl border bg-white shadow-sm"
+        style={{ borderColor: theme.border }}
+      >
         <div className="flex items-center justify-between gap-4 p-5">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <Users className="h-5 w-5" style={{ color: "#7F017F" }} />
+              <Users className="h-5 w-5" style={{ color: theme.primary }} />
               <h2 className="text-lg font-bold text-neutral-900">Usuarios de centro</h2>
             </div>
             <p className="mt-1 text-sm text-neutral-600">
@@ -510,7 +579,7 @@ export default function AdminUsuariosPage() {
                     <td className="px-5 py-4 text-neutral-700">{u.email}</td>
                     <td className="px-5 py-4">
                       <div className="inline-flex items-center gap-2">
-                        <Building2 className="h-4 w-4" style={{ color: "#7F017F" }} />
+                        <Building2 className="h-4 w-4" style={{ color: theme.primary }} />
                         <span className="text-neutral-800">
                           {u.centro_nombre || (u.centros?.[0] ? `Centro #${u.centros[0]}` : "Sin centro")}
                         </span>
@@ -521,7 +590,12 @@ export default function AdminUsuariosPage() {
                         <Button
                           variant="outline"
                           className="h-9 rounded-full"
-                          style={{ borderColor: "#7F017F", color: "#7F017F" }}
+                          style={{
+                            ...buttonRingStyle,
+                            borderColor: theme.support,
+                            color: theme.primary,
+                            backgroundColor: theme.supportSoft,
+                          }}
                           onClick={() => openEdit(u)}
                         >
                           <Pencil className="mr-2 h-4 w-4" />
@@ -531,6 +605,7 @@ export default function AdminUsuariosPage() {
                         <Button
                           variant="outline"
                           className="h-9 rounded-full"
+                          style={{ ...buttonRingStyle, ...destructiveButtonStyle }}
                           onClick={() => onDelete(u)}
                         >
                           <Trash2 className="mr-2 h-4 w-4" />

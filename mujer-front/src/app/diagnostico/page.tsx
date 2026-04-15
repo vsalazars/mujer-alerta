@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 
 import { api } from "../../lib/api";
+import { themeFromBranding } from "../../lib/branding";
 import { extractInstitutionSlug, withInstitutionSlug } from "../../lib/routing";
 
 type Centro = {
@@ -53,9 +54,9 @@ type TenantBranding = {
   institucion_id: number;
   nombre_publico?: string;
   logo_url?: string;
+  color_primario?: string;
+  color_secundario?: string;
 };
-
-const PRIMARY = "#7F017F";
 
 // === Detectar “encuesta en progreso” ===
 const LS_PREFIX = "mujer_alerta:diagnostico:";
@@ -267,6 +268,7 @@ export default function DiagnosticoInicioPage() {
 
   // ✅ NUEVO: bloqueo por “ya finalizó” en este navegador
   const [doneBlocked, setDoneBlocked] = useState<{ remainingMs: number } | null>(null);
+  const theme = themeFromBranding(branding);
 
   useEffect(() => {
     (async () => {
@@ -464,7 +466,10 @@ export default function DiagnosticoInicioPage() {
   return (
     <main className="min-h-dvh bg-white">
       <div className="relative min-h-dvh overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-white via-[#faf7fb] to-white" />
+        <div
+          className="absolute inset-0"
+          style={{ background: `linear-gradient(to bottom, #ffffff 0%, ${theme.soft} 55%, #ffffff 100%)` }}
+        />
 
         <div className="relative mx-auto w-full max-w-md px-5 pb-10 pt-7">
           <div className="sticky top-0 z-20 -mx-5 mb-5 bg-white/92 px-5 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/80">
@@ -487,7 +492,7 @@ export default function DiagnosticoInicioPage() {
                     </div>
                   </div>
                 ) : null}
-                <h1 className="mt-3 text-3xl font-extrabold tracking-tight" style={{ color: PRIMARY }}>
+                <h1 className="mt-3 text-3xl font-extrabold tracking-tight" style={{ color: theme.primary }}>
                   {branding?.nombre_publico?.trim()
                     ? `Diagnóstico ${branding.nombre_publico.trim()}`
                     : "Diagnóstico"}
@@ -496,7 +501,7 @@ export default function DiagnosticoInicioPage() {
               <div className="mt-1 shrink-0">
                 {!branding?.logo_url ? (
                   <div className="rounded-2xl border border-black/5 bg-white/70 p-3 shadow-sm backdrop-blur">
-                    <ShieldCheck className="h-5 w-5" style={{ color: PRIMARY }} />
+                    <ShieldCheck className="h-5 w-5" style={{ color: theme.primary }} />
                   </div>
                 ) : null}
               </div>
@@ -515,7 +520,7 @@ export default function DiagnosticoInicioPage() {
               <CardContent className="space-y-3">
                 <div className="rounded-2xl border border-black/5 bg-white/70 px-3 py-2 text-xs text-neutral-700">
                   <div className="flex items-start gap-2">
-                    <BadgeCheck className="mt-0.5 h-4 w-4" style={{ color: PRIMARY }} />
+                    <BadgeCheck className="mt-0.5 h-4 w-4" style={{ color: theme.primary }} />
                     <div className="min-w-0">
                       <p className="font-medium">Registro reciente detectado</p>
                       <p className="text-neutral-600">
@@ -550,7 +555,7 @@ export default function DiagnosticoInicioPage() {
                   onClick={onContinue}
                   className="h-12 w-full rounded-full text-base font-semibold"
                   style={{
-                    background: `linear-gradient(135deg, ${PRIMARY} 0%, #9b1aa0 45%, ${PRIMARY} 100%)`,
+                    background: theme.gradient,
                   }}
                 >
                   <span className="inline-flex items-center gap-2">
@@ -581,7 +586,7 @@ export default function DiagnosticoInicioPage() {
               {loading ? (
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 text-sm text-neutral-600">
-                    <Loader2 className="h-4 w-4 animate-spin" style={{ color: PRIMARY }} />
+                    <Loader2 className="h-4 w-4 animate-spin" style={{ color: theme.primary }} />
                     Cargando catálogos…
                   </div>
                   <div className="space-y-3">
@@ -601,7 +606,7 @@ export default function DiagnosticoInicioPage() {
                       <div className="rounded-xl border border-black/5 bg-white/80 px-4 py-3 shadow-sm">
                         <div className="flex items-center gap-3">
                           <div className="grid h-9 w-9 place-items-center rounded-xl bg-[#faf5ff]">
-                            <Building2 className="h-4 w-4" style={{ color: PRIMARY }} />
+                            <Building2 className="h-4 w-4" style={{ color: theme.primary }} />
                           </div>
                           <div className="min-w-0">
                             <p className="font-semibold text-neutral-900">{selectedCentro.nombre}</p>
@@ -633,7 +638,7 @@ export default function DiagnosticoInicioPage() {
                     {blockedByLock ? (
                       <div className="mt-2 rounded-2xl border border-black/5 bg-white/70 px-3 py-2 text-xs text-neutral-700">
                         <div className="flex items-start gap-2">
-                          <Lock className="mt-0.5 h-4 w-4" style={{ color: PRIMARY }} />
+                          <Lock className="mt-0.5 h-4 w-4" style={{ color: theme.primary }} />
                           <div className="min-w-0">
                             <p className="font-medium">
                               Ya realizaste un diagnóstico reciente para este centro.
@@ -692,8 +697,8 @@ export default function DiagnosticoInicioPage() {
                       <span
                         className="text-[11px] font-medium animate-pulse rounded-full px-2 py-0.5 text-white shadow-sm"
                         style={{
-                          background: `linear-gradient(135deg, ${PRIMARY}, #9b1aa0)`,
-                          boxShadow: "0 0 10px rgba(127,1,127,.45)",
+                          background: theme.gradient,
+                          boxShadow: `0 0 10px ${theme.glow}`,
                         }}
                       >
                         Opcional
@@ -735,7 +740,7 @@ export default function DiagnosticoInicioPage() {
                     disabled={!canSubmit || blockedByLock || blockedByResume || blockedByDoneBrowser}
                     className="h-12 w-full rounded-full text-base font-semibold"
                     style={{
-                      background: `linear-gradient(135deg, ${PRIMARY} 0%, #9b1aa0 45%, ${PRIMARY} 100%)`,
+                      background: theme.gradient,
                       opacity: !canSubmit || blockedByLock || blockedByResume || blockedByDoneBrowser ? 0.7 : 1,
                     }}
                     title={

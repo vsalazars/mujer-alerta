@@ -20,6 +20,7 @@ import {
 
 import { ArrowLeft, Home, RefreshCw, ShieldCheck } from "lucide-react";
 import { api } from "@/lib/api";
+import { themeFromBranding } from "@/lib/branding";
 import { extractInstitutionSlug, withInstitutionSlug } from "@/lib/routing";
 import { CheckCircle } from "lucide-react";
 
@@ -53,6 +54,8 @@ type TenantBranding = {
   institucion_id: number;
   nombre_publico?: string;
   logo_url?: string;
+  color_primario?: string;
+  color_secundario?: string;
 };
 
 // =========================
@@ -181,13 +184,40 @@ function levelLabel(v: number): string {
   return "Muy alto";
 }
 
-function levelBadgeVariant(
-  v: number
-): "default" | "secondary" | "destructive" | "outline" {
-  if (v < 2) return "secondary";
-  if (v < 3) return "outline";
-  if (v < 4) return "default";
-  return "destructive";
+function levelBadgeStyle(v: number, primary: string, secondary: string) {
+  if (!Number.isFinite(v)) {
+    return {
+      backgroundColor: "#F3F4F6",
+      color: "#4B5563",
+      border: "1px solid #E5E7EB",
+    };
+  }
+  if (v < 2) {
+    return {
+      backgroundColor: "rgba(148,163,184,0.12)",
+      color: "#475569",
+      border: "1px solid rgba(148,163,184,0.22)",
+    };
+  }
+  if (v < 3) {
+    return {
+      backgroundColor: "rgba(148,163,184,0.18)",
+      color: "#334155",
+      border: "1px solid rgba(148,163,184,0.28)",
+    };
+  }
+  if (v < 4) {
+    return {
+      backgroundColor: secondary,
+      color: "white",
+      border: `1px solid ${secondary}`,
+    };
+  }
+  return {
+    backgroundColor: primary,
+    color: "white",
+    border: `1px solid ${primary}`,
+  };
 }
 
 function useIsMobile(breakpointPx = 768) {
@@ -209,6 +239,34 @@ function colorForValue(v: number): string {
   const g = Math.round(243 - 220 * t);
   const b = Math.round(246 - 185 * t);
   return `rgb(${r}, ${g}, ${b})`;
+}
+
+function colorForValueBrand(v: number, primary: string, secondary: string): string {
+  if (!Number.isFinite(v)) return "#f9fafb";
+  const t = (Math.min(Math.max(v, 1), 5) - 1) / 4;
+  const start = { r: 247, g: 243, b: 246 };
+  const mid = hexToRgb(secondary);
+  const end = hexToRgb(primary);
+  const target = t < 0.6 ? mix(start, mid, t / 0.6) : mix(mid, end, (t - 0.6) / 0.4);
+  return `rgb(${target.r}, ${target.g}, ${target.b})`;
+}
+
+function hexToRgb(hex: string) {
+  const value = hex.replace("#", "");
+  return {
+    r: parseInt(value.slice(0, 2), 16),
+    g: parseInt(value.slice(2, 4), 16),
+    b: parseInt(value.slice(4, 6), 16),
+  };
+}
+
+function mix(a: { r: number; g: number; b: number }, b: { r: number; g: number; b: number }, t: number) {
+  const safe = Math.max(0, Math.min(1, t));
+  return {
+    r: Math.round(a.r + (b.r - a.r) * safe),
+    g: Math.round(a.g + (b.g - a.g) * safe),
+    b: Math.round(a.b + (b.b - a.b) * safe),
+  };
 }
 
 type TipoAgg = {
@@ -233,6 +291,7 @@ export default function ResultadosEncuestaPage() {
   const [err, setErr] = useState("");
   const [data, setData] = useState<EncuestaResumenResponseBE | null>(null);
   const [branding, setBranding] = useState<TenantBranding | null>(null);
+  const theme = themeFromBranding(branding);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<{
@@ -397,7 +456,13 @@ export default function ResultadosEncuestaPage() {
         left: "center",
         bottom: 20,
         inRange: {
-          color: ["#F7F3F6", "#E7C7D7", "#D29AB9", "#B96C98", "#7A003C"],
+          color: [
+            colorForValueBrand(1, theme.primary, theme.secondary),
+            colorForValueBrand(2, theme.primary, theme.secondary),
+            colorForValueBrand(3, theme.primary, theme.secondary),
+            colorForValueBrand(4, theme.primary, theme.secondary),
+            colorForValueBrand(5, theme.primary, theme.secondary),
+          ],
         },
         text: ["Muy alto", "Bajo"],
         textGap: 14,
@@ -424,11 +489,11 @@ export default function ResultadosEncuestaPage() {
             shadowBlur: 6,
             shadowColor: "rgba(0,0,0,0.08)",
           },
-          emphasis: { itemStyle: { borderWidth: 4, borderColor: "#7A003C" } },
+          emphasis: { itemStyle: { borderWidth: 4, borderColor: theme.primary } },
         },
       ],
     }),
-    [isMobile, xAxisLabels, yAxisLabelsFull, yAxisLabelsShort, heatmapSeriesData]
+    [isMobile, xAxisLabels, yAxisLabelsFull, yAxisLabelsShort, heatmapSeriesData, theme.primary, theme.secondary]
   );
 
   const onEvents = useMemo(
@@ -490,7 +555,7 @@ export default function ResultadosEncuestaPage() {
             </div>
             {!branding?.logo_url ? (
               <div className="grid h-11 w-11 place-items-center rounded-2xl border border-neutral-200 bg-white shadow-sm">
-                <ShieldCheck className="h-5 w-5 text-[#7F017F]" />
+                <ShieldCheck className="h-5 w-5" style={{ color: theme.primary }} />
               </div>
             ) : null}
           </div>
@@ -534,8 +599,9 @@ export default function ResultadosEncuestaPage() {
                       </p>
 
                       <Badge
-                        variant={levelBadgeVariant(global?.[dim] ?? 0)}
+                        variant="outline"
                         className="mt-3"
+                        style={levelBadgeStyle(global?.[dim] ?? 0, theme.primary, theme.secondary)}
                       >
                         {levelLabel(global?.[dim] ?? 0)}
                       </Badge>
@@ -546,8 +612,8 @@ export default function ResultadosEncuestaPage() {
                   <div
                     className="rounded-2xl p-5 flex flex-col items-center text-center"
                     style={{
-                      backgroundColor: "var(--primary)",
-                      color: "var(--primary-foreground)",
+                      background: theme.gradient,
+                      color: "white",
                     }}
                   >
                     <p className="text-sm font-medium">Total</p>
@@ -570,11 +636,9 @@ export default function ResultadosEncuestaPage() {
                           py-1
                         "
                         style={{
-                          backgroundColor:
-                            "color-mix(in oklch, var(--primary-foreground) 18%, transparent)",
-                          color: "var(--primary-foreground)",
-                          border:
-                            "1px solid color-mix(in oklch, var(--primary-foreground) 35%, transparent)",
+                          backgroundColor: "rgba(255,255,255,0.16)",
+                          color: "white",
+                          border: "1px solid rgba(255,255,255,0.28)",
                         }}
                       >
                         <span className="block">
@@ -650,10 +714,9 @@ export default function ResultadosEncuestaPage() {
                             <span
                               className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold tabular-nums"
                               style={{
-                                backgroundColor: "var(--primary)",
-                                color: "var(--primary-foreground)",
-                                boxShadow:
-                                  "0 0 0 3px color-mix(in oklch, var(--ring) 18%, transparent)",
+                                backgroundColor: theme.primary,
+                                color: "white",
+                                boxShadow: `0 0 0 3px ${theme.softStrong}`,
                               }}
                             >
                               {t.tipo_num}
@@ -678,7 +741,7 @@ export default function ResultadosEncuestaPage() {
               <Button
                 size="lg"
                 className="h-14 rounded-full text-base font-semibold text-white"
-                style={{ backgroundColor: "#7F017F" }}
+                style={{ background: theme.gradient }}
                 onClick={() => router.push("/")}
               >
                 <CheckCircle className="mr-3 h-5 w-5" />
@@ -739,7 +802,12 @@ export default function ResultadosEncuestaPage() {
                             <Badge
                               key={i}
                               variant="secondary"
-                              className="px-2 py-0.5 text-[11px] bg-pink-50 text-pink-900 border-pink-200"
+                              className="px-2 py-0.5 text-[11px]"
+                              style={{
+                                backgroundColor: theme.soft,
+                                color: theme.primary,
+                                borderColor: theme.border,
+                              }}
                             >
                               {ref.tipo}
                             </Badge>

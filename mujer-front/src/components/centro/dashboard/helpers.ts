@@ -8,7 +8,7 @@ import type {
   YearOption,
 } from "@/components/centro/dashboard/types";
 
-export const PURPLE = "#7F017F";
+export const PURPLE = "var(--brand-primary, #7F017F)";
 
 export function clamp5(x: number) {
   const n = Number.isFinite(x) ? x : 0;

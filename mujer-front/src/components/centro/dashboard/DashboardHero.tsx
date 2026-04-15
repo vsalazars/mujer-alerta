@@ -38,7 +38,13 @@ export function DashboardHero({
           className="pointer-events-none absolute -top-32 -right-32 h-[420px] w-[420px] rounded-full blur-3xl opacity-25"
           style={{ background: PURPLE }}
         />
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(1200px_circle_at_0%_0%,rgba(127,1,127,0.10),transparent_55%)]" />
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(1200px circle at 0% 0%, color-mix(in srgb, var(--brand-primary, #7F017F) 10%, transparent), transparent 55%)",
+          }}
+        />
         <div className="relative p-8 md:p-10">
           <div className="flex items-start justify-between gap-6">
             <div>
@@ -46,7 +52,7 @@ export function DashboardHero({
                 <Badge
                   variant="secondary"
                   className="rounded-full px-3 py-1 font-black tracking-[0.18em] uppercase"
-                  style={{ color: PURPLE, background: "rgba(127,1,127,0.08)" }}
+                  style={{ color: PURPLE, background: "color-mix(in srgb, var(--brand-primary, #7F017F) 8%, white)" }}
                 >
                   Analítica agregada
                 </Badge>
@@ -62,7 +68,7 @@ export function DashboardHero({
                   <Badge
                     variant="secondary"
                     className="rounded-full px-3 py-1 font-black tracking-wide"
-                    style={{ background: "rgba(127,1,127,0.08)", color: PURPLE }}
+                    style={{ background: "color-mix(in srgb, var(--brand-primary, #7F017F) 8%, white)", color: PURPLE }}
                   >
                     Centro: {centerLabel}
                   </Badge>
@@ -74,7 +80,7 @@ export function DashboardHero({
 
                 <Badge
                   className="rounded-full px-3 py-1 font-black text-sm"
-                  style={{ background: "rgba(127,1,127,0.12)", color: PURPLE }}
+                  style={{ background: "color-mix(in srgb, var(--brand-primary, #7F017F) 12%, white)", color: PURPLE }}
                 >
                   {pctFrom5(data.global.total)}%
                 </Badge>

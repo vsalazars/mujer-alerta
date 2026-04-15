@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { isAdminRole, type UserRole } from "@/lib/auth";
 import { api } from "@/lib/api";
+import { themeFromBranding } from "@/lib/branding";
 import { extractInstitutionSlug, withInstitutionSlug } from "@/lib/routing";
 
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,8 @@ type ConfiguracionInstitucion = {
   institucion_id: number;
   nombre_publico?: string;
   logo_url?: string;
+  color_primario?: string;
+  color_secundario?: string;
 };
 
 function readAuth(): { token: string; user: AuthUser | null } {
@@ -62,6 +65,7 @@ export default function CentroLayout({ children }: { children: React.ReactNode }
   const centroLabel =
     user?.centro_nombres?.filter(Boolean).join(" / ") ||
     (user?.centros?.length ? `Centro #${user.centros.join(", #")}` : "");
+  const theme = themeFromBranding(config);
 
   useEffect(() => {
     async function loadConfig() {
@@ -113,7 +117,15 @@ export default function CentroLayout({ children }: { children: React.ReactNode }
   if (!user) return null;
 
   return (
-    <main className="min-h-dvh bg-white">
+    <main
+      className="min-h-dvh bg-white"
+      style={
+        {
+          "--brand-primary": theme.primary,
+          "--brand-secondary": theme.secondary,
+        } as CSSProperties
+      }
+    >
       {/* Header fijo */}
       <header className="sticky top-0 z-10 border-b border-neutral-200 bg-white/90 backdrop-blur">
         <div className="mx-auto w-[90vw] max-w-none px-4 py-4 md:px-6">
@@ -129,14 +141,14 @@ export default function CentroLayout({ children }: { children: React.ReactNode }
                 ) : (
                   <div
                     className="grid h-11 w-11 place-items-center rounded-2xl"
-                    style={{ backgroundColor: "rgba(127,1,127,0.10)" }}
+                      style={{ backgroundColor: theme.soft }}
                   >
-                    <ShieldCheck className="h-5 w-5" style={{ color: "#7F017F" }} />
+                    <ShieldCheck className="h-5 w-5" style={{ color: theme.primary }} />
                   </div>
                 )}
 
                 <div className="leading-tight">
-                  <p className="text-base font-extrabold tracking-tight" style={{ color: "#7F017F" }}>
+                  <p className="text-base font-extrabold tracking-tight" style={{ color: theme.primary }}>
                     {config?.nombre_publico?.trim() || "Mujer Alerta"}
                   </p>
                   <p className="text-xs text-neutral-500">Panel de resultados</p>
@@ -154,7 +166,7 @@ export default function CentroLayout({ children }: { children: React.ReactNode }
             <div className="flex items-center gap-3">
               <div
                 className="grid h-10 w-10 shrink-0 place-items-center rounded-full"
-                style={{ backgroundColor: "rgba(127,1,127,0.10)", color: "#7F017F" }}
+                style={{ backgroundColor: theme.soft, color: theme.primary }}
                 aria-label="Avatar"
                 title={user.nombre}
               >
