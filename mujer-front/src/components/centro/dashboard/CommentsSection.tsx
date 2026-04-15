@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 
 import {
+  BRAND_SOFT,
   capitalizeWord,
   emotionLabelES,
   emotionTone,
@@ -53,6 +54,21 @@ export function CommentsSection({
   onPrevPage,
   onNextPage,
 }: CommentsSectionProps) {
+  const previousButtonStyle = {
+    "--ring": "var(--brand-primary, #7F017F)",
+    borderColor: "var(--brand-support, #EAD5F1)",
+    background: "var(--brand-support-soft, rgba(234,213,241,0.55))",
+    color: "var(--brand-primary, #7F017F)",
+  } as CSSProperties;
+  const nextButtonStyle = {
+    "--ring": "var(--brand-primary, #7F017F)",
+    borderColor: "transparent",
+    background:
+      "linear-gradient(135deg, var(--brand-primary, #7F017F), var(--brand-secondary, #C23C9A))",
+    color: "#ffffff",
+    boxShadow: "0 14px 32px var(--brand-glow, rgba(127,1,127,0.16))",
+  } as CSSProperties;
+
   return (
     <Card className="rounded-[2rem] border-slate-200 shadow-sm">
       <CardHeader className="pb-3">
@@ -65,7 +81,7 @@ export function CommentsSection({
             <Badge
               variant="secondary"
               className="rounded-full font-black text-[10px] uppercase tracking-widest"
-              style={{ background: "rgba(127,1,127,0.10)", color: PURPLE }}
+              style={{ background: BRAND_SOFT, color: PURPLE }}
             >
               {comentariosCount.toLocaleString("es-MX")}
               {comentariosCount !== comentarios.length
@@ -137,6 +153,7 @@ export function CommentsSection({
                     type="button"
                     variant="outline"
                     className="rounded-full"
+                    style={previousButtonStyle}
                     disabled={comentariosPageSafe <= 1}
                     onClick={onPrevPage}
                   >
@@ -147,7 +164,8 @@ export function CommentsSection({
                   <Button
                     type="button"
                     variant="outline"
-                    className="rounded-full"
+                    className="rounded-full border-0"
+                    style={nextButtonStyle}
                     disabled={comentariosPageSafe >= comentariosTotalPages}
                     onClick={onNextPage}
                   >
@@ -180,8 +198,8 @@ function FilterPill({
       className={[
         "rounded-full border px-4 py-2 text-sm font-semibold transition-all",
         active
-          ? "border-[rgba(127,1,127,0.28)] bg-[rgba(127,1,127,0.12)] text-[rgba(127,1,127,1)] shadow-[0_10px_30px_rgba(127,1,127,0.12)]"
-          : "border-slate-200 bg-white text-slate-600 hover:border-[rgba(127,1,127,0.22)] hover:text-[rgba(127,1,127,1)]",
+          ? "border-[var(--brand-border,rgba(127,1,127,0.18))] bg-[var(--brand-soft,rgba(127,1,127,0.10))] text-[var(--brand-primary,#7F017F)] shadow-[0_10px_30px_var(--brand-soft,rgba(127,1,127,0.10))]"
+          : "border-slate-200 bg-white text-slate-600 hover:border-[var(--brand-border,rgba(127,1,127,0.18))] hover:text-[var(--brand-primary,#7F017F)]",
       ].join(" ")}
     >
       {label}
@@ -199,7 +217,7 @@ function CommentCard({ comentario }: { comentario: ComentarioItem }) {
         className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
         style={{
           background:
-            "radial-gradient(360px circle at 100% 0%, rgba(127,1,127,0.08), transparent 52%)",
+            "radial-gradient(360px circle at 100% 0%, var(--brand-soft, rgba(127,1,127,0.08)), transparent 52%)",
         }}
       />
 
@@ -209,7 +227,7 @@ function CommentCard({ comentario }: { comentario: ComentarioItem }) {
             {comentario.genero ? (
               <MetaPill
                 label={comentario.genero}
-                className="border-[rgba(127,1,127,0.10)] bg-[rgba(127,1,127,0.08)] text-[rgba(127,1,127,1)]"
+                className="border-[var(--brand-border,rgba(127,1,127,0.18))] bg-[var(--brand-soft,rgba(127,1,127,0.10))] text-[var(--brand-primary,#7F017F)]"
               />
             ) : null}
 
@@ -248,7 +266,7 @@ function CommentCard({ comentario }: { comentario: ComentarioItem }) {
               <DialogTrigger asChild>
                 <button
                   type="button"
-                  className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-[rgba(127,1,127,1)] transition-opacity hover:opacity-80"
+                  className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-[var(--brand-primary,#7F017F)] transition-opacity hover:opacity-80"
                 >
                   Ver más
                 </button>
@@ -266,7 +284,7 @@ function CommentCard({ comentario }: { comentario: ComentarioItem }) {
                     {comentario.genero ? (
                       <MetaPill
                         label={comentario.genero}
-                        className="border-[rgba(127,1,127,0.10)] bg-[rgba(127,1,127,0.08)] text-[rgba(127,1,127,1)]"
+                        className="border-[var(--brand-border,rgba(127,1,127,0.18))] bg-[var(--brand-soft,rgba(127,1,127,0.10))] text-[var(--brand-primary,#7F017F)]"
                       />
                     ) : null}
 

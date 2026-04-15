@@ -1,6 +1,10 @@
 import { RefreshCw } from "lucide-react";
 
 import {
+  BRAND_BORDER,
+  BRAND_SECONDARY,
+  BRAND_SOFT,
+  BRAND_SUPPORT_SOFT,
   PURPLE,
   clamp5,
   consistencyTag,
@@ -43,7 +47,7 @@ export function ExecutiveSummarySection({
             <Badge
               variant="secondary"
               className="rounded-full font-black text-[10px] uppercase tracking-widest"
-              style={{ background: "rgba(127,1,127,0.10)", color: PURPLE }}
+              style={{ background: BRAND_SOFT, color: PURPLE }}
             >
               Resumen ejecutivo
             </Badge>
@@ -133,20 +137,20 @@ function ExecutiveSummaryContent({ advRows }: { advRows: AdvRow[] }) {
   function chipStyle(band: "Bajo" | "Medio" | "Alto") {
     if (band === "Alto") {
       return {
-        bg: "rgba(127,1,127,0.14)",
+        bg: BRAND_SUPPORT_SOFT,
         fg: PURPLE,
-        bd: "rgba(127,1,127,0.28)",
-        dot: "rgba(127,1,127,0.95)",
-        glow: "0 0 0 6px rgba(127,1,127,0.10)",
+        bd: BRAND_BORDER,
+        dot: PURPLE,
+        glow: `0 0 0 6px ${BRAND_SOFT}`,
       };
     }
     if (band === "Medio") {
       return {
-        bg: "rgba(127,1,127,0.08)",
+        bg: BRAND_SOFT,
         fg: PURPLE,
-        bd: "rgba(127,1,127,0.18)",
-        dot: "rgba(127,1,127,0.65)",
-        glow: "0 0 0 6px rgba(127,1,127,0.06)",
+        bd: BRAND_BORDER,
+        dot: BRAND_SECONDARY,
+        glow: `0 0 0 6px ${BRAND_SOFT}`,
       };
     }
     return {
@@ -213,13 +217,19 @@ function ExecutiveSummaryContent({ advRows }: { advRows: AdvRow[] }) {
           className="h-2 w-full"
           style={{
             background:
-              "linear-gradient(90deg, rgba(127,1,127,0.95), rgba(127,1,127,0.30), rgba(2,6,23,0.04))",
+              "linear-gradient(90deg, var(--brand-primary, #7F017F), var(--brand-secondary, #C23C9A), rgba(2,6,23,0.04))",
           }}
         />
 
         <div className="p-5">
           <div className="grid gap-3 md:grid-cols-[1fr,320px]">
-            <div className="rounded-[1.5rem] border border-slate-200 bg-[radial-gradient(900px_circle_at_0%_0%,rgba(127,1,127,0.10),transparent_55%)] p-5">
+            <div
+              className="rounded-[1.5rem] border border-slate-200 p-5"
+              style={{
+                background:
+                  "radial-gradient(900px_circle_at_0%_0%, var(--brand-soft, rgba(127,1,127,0.10)), transparent 55%)",
+              }}
+            >
               <p className="text-[11px] font-black uppercase tracking-widest" style={{ color: PURPLE }}>
                 Síntesis
               </p>
@@ -269,7 +279,7 @@ function ExecutiveSummaryContent({ advRows }: { advRows: AdvRow[] }) {
                   <div key={index} className="flex items-start gap-2">
                     <span
                       className="mt-1 inline-flex h-2 w-2 rounded-full"
-                      style={{ background: PURPLE, boxShadow: "0 0 0 6px rgba(127,1,127,0.08)" }}
+                      style={{ background: PURPLE, boxShadow: `0 0 0 6px ${BRAND_SOFT}` }}
                     />
                     <p className="text-xs font-semibold text-slate-700 leading-5">{action}</p>
                   </div>
@@ -362,7 +372,7 @@ function ExecutiveSummaryContent({ advRows }: { advRows: AdvRow[] }) {
                   <p className="mt-1 text-sm font-black text-slate-900">{solidez}</p>
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-[rgba(127,1,127,0.06)] p-4">
+                <div className="rounded-2xl border border-slate-200 p-4" style={{ background: BRAND_SOFT }}>
                   <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: PURPLE }}>
                     Confiabilidad de la medición
                   </p>
@@ -370,7 +380,7 @@ function ExecutiveSummaryContent({ advRows }: { advRows: AdvRow[] }) {
                 </div>
               </div>
 
-              <div className="mt-4 rounded-2xl border border-slate-200 bg-[rgba(127,1,127,0.06)] p-4">
+              <div className="mt-4 rounded-2xl border border-slate-200 p-4" style={{ background: BRAND_SOFT }}>
                 <p className="text-[11px] font-black uppercase tracking-widest" style={{ color: PURPLE }}>
                   Qué significa
                 </p>

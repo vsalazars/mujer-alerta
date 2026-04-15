@@ -1,7 +1,9 @@
+  "use client";
   /* eslint-disable @typescript-eslint/no-explicit-any */
+  import { useEffect, useState } from "react";
   import dynamic from "next/dynamic";
 
-  import { fmt2, PURPLE } from "@/components/centro/dashboard/helpers";
+  import { BRAND_BORDER, BRAND_GLOW, BRAND_SECONDARY, BRAND_SOFT, PURPLE, fmt2 } from "@/components/centro/dashboard/helpers";
 
   const ResponsiveHeatMap = dynamic(
     () => import("@nivo/heatmap").then((m) => m.ResponsiveHeatMap),
@@ -15,6 +17,76 @@
     () => import("@nivo/bar").then((m) => m.ResponsiveBar),
     { ssr: false }
   );
+
+  function readBrandColor(variableName: string, fallback: string) {
+    if (typeof window === "undefined") return fallback;
+    const root =
+      document.querySelector("main") ||
+      document.documentElement;
+    const value = getComputedStyle(root).getPropertyValue(variableName).trim();
+    return value || fallback;
+  }
+
+  function useResolvedBrandColors() {
+    const [colors, setColors] = useState(() => ({
+      primary: "#7F017F",
+      secondary: "#C23C9A",
+      support: "#EAD5F1",
+    }));
+
+    useEffect(() => {
+      const syncColors = () => {
+        setColors({
+          primary: readBrandColor("--brand-primary", "#7F017F"),
+          secondary: readBrandColor("--brand-secondary", "#C23C9A"),
+          support: readBrandColor("--brand-support", "#EAD5F1"),
+        });
+      };
+
+      syncColors();
+      window.addEventListener("institucion-config-updated", syncColors);
+      return () => {
+        window.removeEventListener("institucion-config-updated", syncColors);
+      };
+    }, []);
+
+    return colors;
+  }
+
+  function clampByte(value: number) {
+    return Math.max(0, Math.min(255, Math.round(value)));
+  }
+
+  function hexToRgbParts(hex: string) {
+    const clean = hex.replace("#", "").trim();
+    const normalized =
+      clean.length === 3
+        ? clean
+            .split("")
+            .map((char) => char + char)
+            .join("")
+        : clean;
+    if (!/^[0-9a-fA-F]{6}$/.test(normalized)) {
+      return { r: 127, g: 1, b: 127 };
+    }
+    const num = Number.parseInt(normalized, 16);
+    return {
+      r: (num >> 16) & 255,
+      g: (num >> 8) & 255,
+      b: num & 255,
+    };
+  }
+
+  function mixWithWhite(hex: string, ratio: number) {
+    const amount = Math.max(0, Math.min(1, ratio));
+    const { r, g, b } = hexToRgbParts(hex);
+    const mixed = {
+      r: clampByte(r + (255 - r) * amount),
+      g: clampByte(g + (255 - g) * amount),
+      b: clampByte(b + (255 - b) * amount),
+    };
+    return `rgb(${mixed.r}, ${mixed.g}, ${mixed.b})`;
+  }
 
   export function BarValueChipLayer({ bars }: any) {
     return (
@@ -31,9 +103,9 @@
               <foreignObject width={56} height={28} x={0} y={-14} style={{ overflow: "visible" }}>
                 <div
                   style={{
-                    background: "rgba(127,1,127,0.12)",
+                    background: BRAND_SOFT,
                     color: PURPLE,
-                    border: "1px solid rgba(127,1,127,0.25)",
+                    border: `1px solid ${BRAND_BORDER}`,
                     borderRadius: 999,
                     padding: "2px 10px",
                     fontSize: 12,
@@ -42,7 +114,7 @@
                     alignItems: "center",
                     justifyContent: "center",
                     whiteSpace: "nowrap",
-                    boxShadow: "0 6px 18px rgba(127,1,127,0.25)",
+                    boxShadow: `0 6px 18px ${BRAND_GLOW}`,
                   }}
                 >
                   {value}
@@ -70,9 +142,9 @@
               <foreignObject width={62} height={24} x={0} y={-12} style={{ overflow: "visible" }}>
                 <div
                   style={{
-                    background: "rgba(127,1,127,0.12)",
+                    background: BRAND_SOFT,
                     color: PURPLE,
-                    border: "1px solid rgba(127,1,127,0.25)",
+                    border: `1px solid ${BRAND_BORDER}`,
                     borderRadius: 999,
                     padding: "1px 8px",
                     fontSize: 9,
@@ -82,7 +154,7 @@
                     alignItems: "center",
                     justifyContent: "center",
                     whiteSpace: "nowrap",
-                    boxShadow: "0 6px 18px rgba(127,1,127,0.22)",
+                    boxShadow: `0 6px 18px ${BRAND_GLOW}`,
                   }}
                 >
                   {fmt2(raw)}
@@ -96,6 +168,7 @@
   }
 
   export function RadarChart({ radar }: { radar: { keys: string[]; data: unknown[] } | null }) {
+    const brand = useResolvedBrandColors();
     if (!radar) return null;
 
     return (
@@ -111,7 +184,7 @@
         dotSize={10}
         dotColor={{ theme: "background" }}
         dotBorderWidth={2}
-        colors={[PURPLE]}
+        colors={[brand.primary]}
         fillOpacity={0.14}
         borderWidth={3}
         blendMode="multiply"
@@ -167,12 +240,23 @@
   }: {
     heatmap: { xCount: number; data: unknown[] } | null;
   }) {
+    const brand = useResolvedBrandColors();
     if (!heatmap) return null;
+    const values = (heatmap.data as Array<Record<string, unknown>>)
+      .flatMap((row) =>
+        Object.entries(row)
+          .filter(([key]) => key !== "id")
+          .map(([, value]) => Number(value))
+      )
+      .filter((value) => Number.isFinite(value));
+    const minValue = values.length ? Math.min(...values) : 0;
+    const maxValue = values.length ? Math.max(...values) : 5;
+    const spread = Math.max(maxValue - minValue, 0.001);
 
     return (
       <ResponsiveHeatMap
         data={heatmap.data as any}
-        margin={{ top: 30, right: 180, bottom: 140, left: 160 }}
+        margin={{ top: 30, right: 180, bottom: 84, left: 160 }}
         valueFormat=">-.2f"
         axisTop={null}
         axisRight={null}
@@ -183,35 +267,18 @@
           tickRotation: -22,
           format: () => "",
         }}
-        colors={{
-          type: "sequential",
-          scheme: "purples",
-          minValue: 0,
-          maxValue: 5,
+        colors={({ value }: { value: number | string }) => {
+          const numeric = Number(value || 0);
+          const normalized = Math.max(0, Math.min(1, (numeric - minValue) / spread));
+          const whiteMix = 0.88 - normalized * 0.74;
+          return mixWithWhite(brand.primary, whiteMix);
         }}
         emptyColor="#F1F5F9"
         borderWidth={1}
         borderColor="rgba(2,6,23,0.06)"
         enableLabels={true}
         labelTextColor={{ from: "color", modifiers: [["darker", 2.1]] }}
-        legends={[
-          {
-            anchor: "bottom",
-            translateX: 0,
-            translateY: 80,
-            length: 420,
-            thickness: 26,
-            direction: "row",
-            tickPosition: "after",
-            tickSize: 3,
-            tickSpacing: 6,
-            tickOverlap: false,
-            tickFormat: ">-.1f",
-            title: "Intensidad →",
-            titleAlign: "start",
-            titleOffset: 6,
-          },
-        ]}
+        legends={[]}
         theme={{
           text: {
             fontFamily: "Montserrat",
@@ -250,9 +317,9 @@
         borderRadius={10}
         colors={({ id }) => {
           const k = String(id);
-          if (k === "Frecuencia") return "rgba(127,1,127,0.95)";
-          if (k === "Normalización") return "rgba(127,1,127,0.55)";
-          return "rgba(127,1,127,0.30)";
+          if (k === "Frecuencia") return PURPLE;
+          if (k === "Normalización") return BRAND_SECONDARY;
+          return "color-mix(in srgb, var(--brand-support, #EAD5F1) 78%, white)";
         }}
         enableGridX={true}
         enableGridY={false}

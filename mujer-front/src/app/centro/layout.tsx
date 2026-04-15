@@ -26,6 +26,7 @@ type ConfiguracionInstitucion = {
   logo_url?: string;
   color_primario?: string;
   color_secundario?: string;
+  color_apoyo?: string;
 };
 
 function readAuth(): { token: string; user: AuthUser | null } {
@@ -123,6 +124,12 @@ export default function CentroLayout({ children }: { children: React.ReactNode }
         {
           "--brand-primary": theme.primary,
           "--brand-secondary": theme.secondary,
+          "--brand-support": theme.support,
+          "--brand-soft": theme.soft,
+          "--brand-soft-strong": theme.softStrong,
+          "--brand-support-soft": theme.supportSoft,
+          "--brand-border": theme.border,
+          "--brand-glow": theme.glow,
         } as CSSProperties
       }
     >

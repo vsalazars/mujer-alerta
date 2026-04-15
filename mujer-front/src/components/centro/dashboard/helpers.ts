@@ -9,6 +9,13 @@ import type {
 } from "@/components/centro/dashboard/types";
 
 export const PURPLE = "var(--brand-primary, #7F017F)";
+export const BRAND_SECONDARY = "var(--brand-secondary, #C23C9A)";
+export const BRAND_SUPPORT = "var(--brand-support, #EAD5F1)";
+export const BRAND_SOFT = "var(--brand-soft, rgba(127,1,127,0.10))";
+export const BRAND_SOFT_STRONG = "var(--brand-soft-strong, rgba(127,1,127,0.16))";
+export const BRAND_SUPPORT_SOFT = "var(--brand-support-soft, rgba(234,213,241,0.55))";
+export const BRAND_BORDER = "var(--brand-border, rgba(127,1,127,0.18))";
+export const BRAND_GLOW = "var(--brand-glow, rgba(127,1,127,0.35))";
 
 export function clamp5(x: number) {
   const n = Number.isFinite(x) ? x : 0;
@@ -56,18 +63,20 @@ export function semanticLevel5(x: number): Semantic5 {
 }
 
 export function semanticBadgeClass5(level: Semantic5, onDark = false) {
-  if (onDark) return "bg-primary text-primary-foreground border border-primary";
+  if (onDark) {
+    return "bg-[color-mix(in_srgb,var(--brand-primary,#7F017F)_18%,white)] text-[var(--brand-primary,#7F017F)] border border-[color-mix(in_srgb,var(--brand-primary,#7F017F)_22%,white)]";
+  }
   switch (level) {
     case "Muy bajo":
       return "bg-slate-50 text-slate-700 border border-slate-200";
     case "Bajo":
       return "bg-slate-100 text-slate-800 border border-slate-200";
     case "Medio":
-      return "bg-[rgba(127,1,127,0.10)] text-[rgba(127,1,127,1)] border border-[rgba(127,1,127,0.18)]";
+      return "bg-[var(--brand-soft,rgba(127,1,127,0.10))] text-[var(--brand-primary,#7F017F)] border border-[var(--brand-border,rgba(127,1,127,0.18))]";
     case "Alto":
-      return "bg-[rgba(127,1,127,0.18)] text-[rgba(127,1,127,1)] border border-[rgba(127,1,127,0.22)]";
+      return "bg-[var(--brand-support-soft,rgba(234,213,241,0.55))] text-[var(--brand-primary,#7F017F)] border border-[var(--brand-border,rgba(127,1,127,0.18))]";
     case "Muy alto":
-      return "bg-[rgba(127,1,127,0.26)] text-[rgba(127,1,127,1)] border border-[rgba(127,1,127,0.28)]";
+      return "bg-[var(--brand-soft-strong,rgba(127,1,127,0.16))] text-[var(--brand-primary,#7F017F)] border border-[var(--brand-border,rgba(127,1,127,0.18))]";
   }
 }
 

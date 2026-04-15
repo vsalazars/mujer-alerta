@@ -33,6 +33,7 @@ export function OverviewSection({ data, showSemantic, radar }: OverviewSectionPr
             <Badge
               variant="secondary"
               className="rounded-full font-black uppercase tracking-widest text-[10px]"
+              style={{ background: "var(--brand-soft, rgba(127,1,127,0.10))", color: PURPLE }}
             >
               Resumen
             </Badge>
@@ -66,10 +67,24 @@ export function OverviewSection({ data, showSemantic, radar }: OverviewSectionPr
               </p>
             </div>
 
-            <div className="rounded-2xl border border-primary bg-primary p-4 shadow-[0_18px_50px_rgba(2,6,23,0.25)]">
+            <div
+              className="rounded-2xl border p-4 text-white"
+              style={{
+                borderColor: "transparent",
+                background:
+                  "linear-gradient(135deg, var(--brand-primary, #7F017F), var(--brand-secondary, #C23C9A))",
+                boxShadow: "0 18px 50px var(--brand-glow, rgba(127,1,127,0.35))",
+              }}
+            >
               <div className="flex items-center justify-between">
                 <p className="text-xs text-slate-300 font-semibold">Global</p>
-                <Activity className="h-4 w-4 text-purple-300" />
+                <Activity
+                  className="h-4 w-4"
+                  style={{
+                    color:
+                      "color-mix(in srgb, var(--brand-support, #EAD5F1) 65%, white)",
+                  }}
+                />
               </div>
 
               <p className="mt-2 text-3xl font-black text-white">{pctFrom5(data.global.total)}%</p>
@@ -95,7 +110,11 @@ export function OverviewSection({ data, showSemantic, radar }: OverviewSectionPr
               return (
                 <div
                   key={kpi.label}
-                  className="rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,rgba(127,1,127,0.08),rgba(255,255,255,0.0))] p-4"
+                  className="rounded-2xl border border-slate-200 p-4"
+                  style={{
+                    background:
+                      "linear-gradient(180deg, var(--brand-soft, rgba(127,1,127,0.08)), rgba(255,255,255,0.0))",
+                  }}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-xs text-slate-500 font-semibold">{kpi.label}</p>
@@ -135,6 +154,7 @@ export function OverviewSection({ data, showSemantic, radar }: OverviewSectionPr
               <Badge
                 variant="secondary"
                 className="rounded-full font-black text-[10px] uppercase tracking-widest"
+                style={{ background: "var(--brand-soft, rgba(127,1,127,0.10))", color: PURPLE }}
               >
                 Vectores
               </Badge>

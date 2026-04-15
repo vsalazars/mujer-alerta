@@ -1,4 +1,5 @@
 import { Activity, Calendar, Sparkles } from "lucide-react";
+import type { CSSProperties } from "react";
 
 import { PURPLE, pctFrom5, semanticBadgeClass5, semanticLevel5 } from "@/components/centro/dashboard/helpers";
 import type { CentroResumenResponse, YearOption } from "@/components/centro/dashboard/types";
@@ -31,6 +32,13 @@ export function DashboardHero({
   onYearChange,
   onOpenTrends,
 }: DashboardHeroProps) {
+  const controlStyle = {
+    "--ring": "var(--brand-primary, #7F017F)",
+    "--input": "var(--brand-border, rgba(127,1,127,0.18))",
+    "--accent": "var(--brand-soft, rgba(127,1,127,0.10))",
+    "--accent-foreground": "var(--brand-primary, #7F017F)",
+  } as CSSProperties;
+
   return (
     <div className="mx-auto max-w-[1400px] mb-10">
       <div className="relative overflow-hidden rounded-[2.25rem] border bg-white shadow-sm">
@@ -114,10 +122,10 @@ export function DashboardHero({
                 </div>
 
                 <Select value={year} onValueChange={onYearChange}>
-                  <SelectTrigger className="h-10 w-[180px] rounded-2xl bg-white border-slate-200 hover:border-purple-300">
+                  <SelectTrigger className="h-10 w-[180px] rounded-2xl bg-white border-slate-200" style={controlStyle}>
                     <SelectValue placeholder="Selecciona año" />
                   </SelectTrigger>
-                  <SelectContent className="rounded-2xl">
+                  <SelectContent className="rounded-2xl" style={controlStyle}>
                     {yearOptions.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
@@ -129,7 +137,13 @@ export function DashboardHero({
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-10 rounded-2xl bg-white border-slate-200 hover:border-purple-300"
+                  className="h-10 rounded-2xl bg-white border-slate-200"
+                  style={{
+                    ...controlStyle,
+                    borderColor: "var(--brand-border, rgba(127,1,127,0.18))",
+                    color: "var(--brand-primary, #7F017F)",
+                    background: "white",
+                  }}
                   onClick={onOpenTrends}
                   title="Comparar promedios anuales"
                 >

@@ -1,7 +1,8 @@
-import { BrainCircuit, Play, RefreshCw, Sparkles } from "lucide-react";
+import type { CSSProperties } from "react";
+import { BrainCircuit, Play, RefreshCw } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 
-import { fmtInt, PURPLE, safeArr } from "@/components/centro/dashboard/helpers";
+import { BRAND_SECONDARY, BRAND_SOFT, PURPLE, fmtInt, safeArr } from "@/components/centro/dashboard/helpers";
 import type { CentroNLPOverviewResponse, NLPJobStatus } from "@/components/centro/dashboard/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,10 +18,10 @@ type NLPProcessingSectionProps = {
   onProcess: () => void;
 };
 
-const SENTIMENT_COLORS = ["#7F017F", "#a855f7", "#c084fc", "#e9d5ff"];
+const SENTIMENT_COLORS = [PURPLE, BRAND_SECONDARY, "var(--brand-support, #EAD5F1)", "#e9d5ff"];
 const EMOTION_COLORS = ["#7F017F", "#0f766e", "#d97706", "#2563eb", "#f59e0b", "#475569", "#cbd5e1"];
 const SENTIMENT_COLOR_BY_KEY: Record<string, string> = {
-  negativo: "#7F017F",
+  negativo: PURPLE,
   neutral: "#a855f7",
   positivo: "#14b8a6",
   sin_clasificar: "#cbd5e1",
@@ -53,6 +54,13 @@ export function NLPProcessingSection({
     batchTotal > 0
       ? `${fmtInt(batchCurrent)} de ${fmtInt(batchTotal)}`
       : "Preparando lote...";
+  const processButtonStyle = {
+    "--ring": "var(--brand-primary, #7F017F)",
+    background:
+      "linear-gradient(135deg, var(--brand-primary, #7F017F), var(--brand-secondary, #C23C9A))",
+    color: "#ffffff",
+    boxShadow: "0 14px 32px var(--brand-glow, rgba(127,1,127,0.16))",
+  } as CSSProperties;
 
   return (
     <Card className="rounded-[2rem] border-slate-200 shadow-sm overflow-hidden">
@@ -75,7 +83,7 @@ export function NLPProcessingSection({
             <Badge
               variant="secondary"
               className="rounded-full font-black text-[10px] uppercase tracking-widest"
-              style={{ background: "rgba(127,1,127,0.10)", color: PURPLE }}
+              style={{ background: BRAND_SOFT, color: PURPLE }}
             >
               {year === "all" ? "Historico" : `Año ${year}`}
             </Badge>
@@ -114,7 +122,8 @@ export function NLPProcessingSection({
 
               <Button
                 type="button"
-                className="rounded-2xl px-5 py-6 text-sm font-black"
+                className="rounded-2xl border-0 px-5 py-6 text-sm font-black disabled:opacity-60"
+                style={processButtonStyle}
                 onClick={onProcess}
                 disabled={loading || processing || pending === 0}
               >
@@ -151,7 +160,7 @@ export function NLPProcessingSection({
                   style={{
                     width: `${Math.max(0, Math.min(100, progressValue))}%`,
                     background:
-                      "linear-gradient(90deg, rgba(127,1,127,0.95), rgba(127,1,127,0.50))",
+                      "linear-gradient(90deg, var(--brand-primary, #7F017F), var(--brand-secondary, #C23C9A))",
                   }}
                 />
               </div>
@@ -177,7 +186,13 @@ export function NLPProcessingSection({
             ) : null}
           </div>
 
-          <div className="rounded-[1.75rem] border border-slate-200 bg-[radial-gradient(900px_circle_at_100%_0%,rgba(127,1,127,0.10),transparent_55%)] p-5">
+          <div
+            className="rounded-[1.75rem] border border-slate-200 p-5"
+            style={{
+              background:
+                "radial-gradient(900px_circle_at_100%_0%, var(--brand-soft, rgba(127,1,127,0.10)), transparent 55%)",
+            }}
+          >
             <p className="text-[11px] font-black uppercase tracking-[0.18em]" style={{ color: PURPLE }}>
               Temas del analisis
             </p>
@@ -193,7 +208,7 @@ export function NLPProcessingSection({
                   <Badge
                     variant="secondary"
                     className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest"
-                    style={{ background: "rgba(127,1,127,0.10)", color: PURPLE }}
+                    style={{ background: BRAND_SOFT, color: PURPLE }}
                   >
                     {fmtInt(tema.total)}
                   </Badge>

@@ -7,6 +7,8 @@ import {
 } from "lucide-react";
 
 import {
+  BRAND_BORDER,
+  BRAND_SOFT,
   PURPLE,
   fmt2,
   fmtInt,
@@ -213,7 +215,7 @@ function StatsTable({ rows }: { rows: AdvRow[] }) {
     <div className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white">
       <div className="w-full overflow-x-auto">
         <table className="w-full min-w-[780px] text-left text-[12px]">
-          <thead className="bg-[rgba(127,1,127,0.06)]">
+          <thead style={{ background: BRAND_SOFT }}>
             <tr className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-600">
               <th className="px-4 py-3">Dimensión</th>
               <th className="px-3 py-3 text-right">
@@ -304,9 +306,9 @@ function StatsTable({ rows }: { rows: AdvRow[] }) {
                     <span
                       className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-black"
                       style={{
-                        background: "rgba(127,1,127,0.08)",
+                        background: BRAND_SOFT,
                         color: PURPLE,
-                        border: "0.5px solid rgba(127,1,127,0.18)",
+                        border: `0.5px solid ${BRAND_BORDER}`,
                       }}
                     >
                       {f2(row.ic95_inferior)} – {f2(row.ic95_superior)}
@@ -374,7 +376,7 @@ export function AdvancedStatsSection({
             <Badge
               variant="secondary"
               className="rounded-full font-black text-[10px] uppercase tracking-widest"
-              style={{ background: "rgba(127,1,127,0.10)", color: PURPLE }}
+              style={{ background: BRAND_SOFT, color: PURPLE }}
             >
               IC 95% · σ · P25/P50/P75 · α
             </Badge>

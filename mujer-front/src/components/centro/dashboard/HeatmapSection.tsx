@@ -1,7 +1,7 @@
 import { Grid3X3 } from "lucide-react";
 
 import { HeatmapChart } from "@/components/centro/dashboard/charts";
-import { PURPLE } from "@/components/centro/dashboard/helpers";
+import { BRAND_BORDER, PURPLE } from "@/components/centro/dashboard/helpers";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
@@ -28,8 +28,25 @@ export function HeatmapSection({
 
         <div className="mt-2 w-full overflow-x-auto">
           <div style={{ minWidth: Math.max(980, (heatmap?.xCount || 0) * 112) }}>
-            <div className="h-[520px]">
+            <div className="h-[430px]">
               <HeatmapChart heatmap={heatmap} />
+            </div>
+            <div className="mt-6 flex flex-col items-center gap-2 pb-1">
+              <div className="flex w-full max-w-[420px] items-center justify-between text-xs font-bold text-slate-500">
+                <span>Bajo</span>
+                <span>Muy alto</span>
+              </div>
+              <div
+                className="h-4 w-full max-w-[420px] rounded-full border"
+                style={{
+                  borderColor: BRAND_BORDER,
+                  background:
+                    "linear-gradient(90deg, rgba(255,255,255,0.98) 0%, color-mix(in srgb, var(--brand-primary, #7F017F) 22%, white) 24%, color-mix(in srgb, var(--brand-primary, #7F017F) 48%, white) 56%, color-mix(in srgb, var(--brand-primary, #7F017F) 72%, white) 78%, var(--brand-primary, #7F017F) 100%)",
+                }}
+              />
+              <div className="flex w-full max-w-[420px] items-center justify-start text-[11px] font-black tracking-[0.18em] text-slate-500 uppercase">
+                <span style={{ color: PURPLE }}>Intensidad</span>
+              </div>
             </div>
           </div>
         </div>
