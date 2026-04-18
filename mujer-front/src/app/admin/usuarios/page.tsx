@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { toast } from "sonner";
 
 import {
   Dialog,
@@ -123,8 +124,6 @@ export default function AdminUsuariosPage() {
   const [centros, setCentros] = useState<Centro[]>([]);
   const [items, setItems] = useState<CentroUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState("");
-  const [success, setSuccess] = useState("");
 
   const [q, setQ] = useState("");
 
@@ -143,6 +142,10 @@ export default function AdminUsuariosPage() {
   const fieldStyle = {
     "--ring": theme.primary,
     "--input": theme.border,
+    "--primary": theme.primary,
+    "--primary-foreground": "#FFFFFF",
+    accentColor: theme.primary,
+    caretColor: theme.primary,
   } as CSSProperties;
   const buttonRingStyle = {
     "--ring": theme.primary,
@@ -152,6 +155,14 @@ export default function AdminUsuariosPage() {
     "--accent-foreground": theme.primary,
     "--ring": theme.primary,
     "--border": theme.border,
+  } as CSSProperties;
+  const dialogContentStyle = {
+    borderColor: theme.border,
+    background:
+      mode === "edit"
+        ? `linear-gradient(180deg, rgba(255,255,255,0.98) 0%, ${theme.supportSoft} 100%)`
+        : "rgba(255,255,255,0.98)",
+    boxShadow: `0 24px 60px ${theme.glow}`,
   } as CSSProperties;
 
   // Guard extra (igual que centros)
@@ -202,8 +213,6 @@ export default function AdminUsuariosPage() {
   }
 
   async function loadUsers() {
-    setErr("");
-    setSuccess("");
     setLoading(true);
     try {
       // endpoint admin (lista usuarios de centro)
@@ -212,20 +221,18 @@ export default function AdminUsuariosPage() {
       });
       setItems(data || []);
     } catch (e: unknown) {
-      setErr(errorMessage(e, "No se pudo cargar usuarios"));
+      toast.error(errorMessage(e, "No se pudo cargar usuarios"));
     } finally {
       setLoading(false);
     }
   }
 
   async function loadAll() {
-    setErr("");
-    setSuccess("");
     setLoading(true);
     try {
       await Promise.all([loadCentros(), loadUsers()]);
     } catch (e: unknown) {
-      setErr(errorMessage(e, "No se pudo cargar datos"));
+      toast.error(errorMessage(e, "No se pudo cargar datos"));
       setLoading(false);
     }
   }
@@ -282,12 +289,10 @@ export default function AdminUsuariosPage() {
 
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
-    setErr("");
-    setSuccess("");
 
     const msg = validateForm();
     if (msg) {
-      setErr(msg);
+      toast.error(msg);
       return;
     }
 
@@ -309,9 +314,9 @@ export default function AdminUsuariosPage() {
           body: JSON.stringify(payload),
         });
         if (created.generated_password) {
-          setSuccess(`Usuario creado. Contraseña temporal: ${created.generated_password}`);
+          toast.success(`Usuario creado. Contraseña temporal: ${created.generated_password}`);
         } else {
-          setSuccess("Usuario creado correctamente.");
+          toast.success("Usuario creado correctamente.");
         }
       } else {
         await api<CentroUser>(`/api/admin/usuarios/${editingId}`, {
@@ -319,12 +324,12 @@ export default function AdminUsuariosPage() {
           headers: { Authorization: `Bearer ${token}` },
           body: JSON.stringify(payload),
         });
-        setSuccess("Usuario actualizado correctamente.");
+        toast.success("Usuario actualizado correctamente.");
       }
       setOpen(false);
       await loadUsers();
     } catch (e: unknown) {
-      setErr(errorMessage(e, "No se pudo guardar"));
+      toast.error(errorMessage(e, "No se pudo guardar"));
     } finally {
       setSaving(false);
     }
@@ -334,17 +339,15 @@ export default function AdminUsuariosPage() {
     const ok = confirm(`¿Desactivar la cuenta de "${u.nombre}" (${u.email})?`);
     if (!ok) return;
 
-    setErr("");
-    setSuccess("");
     try {
       await api<void>(`/api/admin/usuarios/${u.id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
       await loadUsers();
-      setSuccess("Usuario desactivado correctamente.");
+      toast.success("Usuario desactivado correctamente.");
     } catch (e: unknown) {
-      setErr(errorMessage(e, "No se pudo desactivar"));
+      toast.error(errorMessage(e, "No se pudo desactivar"));
     }
   }
 
@@ -398,7 +401,10 @@ export default function AdminUsuariosPage() {
               </Button>
             </DialogTrigger>
 
-            <DialogContent className="sm:max-w-lg">
+            <DialogContent
+              className="w-[min(92vw,42rem)] max-w-[min(92vw,42rem)] overflow-hidden rounded-[1.75rem] p-6 [&_[data-slot=dialog-close]]:rounded-full [&_[data-slot=dialog-close]]:border [&_[data-slot=dialog-close]]:border-[var(--brand-border)] [&_[data-slot=dialog-close]]:bg-white/90 [&_[data-slot=dialog-close]]:text-[var(--brand-primary)] [&_[data-slot=dialog-close]]:opacity-100"
+              style={dialogContentStyle}
+            >
               <DialogHeader>
                 <DialogTitle style={{ color: theme.primary }}>
                   {mode === "create" ? "Nuevo usuario de centro" : "Editar usuario"}
@@ -408,12 +414,13 @@ export default function AdminUsuariosPage() {
                 </DialogDescription>
               </DialogHeader>
 
-              <form onSubmit={onSave} className="mt-2 grid gap-4">
-                <div className="grid gap-2">
+              <form onSubmit={onSave} className="mt-2 grid min-w-0 gap-4">
+                <div className="grid min-w-0 gap-2">
                   <Label htmlFor="nombre">Nombre</Label>
                   <Input
                     id="nombre"
                     style={fieldStyle}
+                    className="min-w-0"
                     value={form.nombre}
                     onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}
                     placeholder="Ej. Coordinación UPIITA"
@@ -421,11 +428,12 @@ export default function AdminUsuariosPage() {
                   />
                 </div>
 
-                <div className="grid gap-2">
+                <div className="grid min-w-0 gap-2">
                   <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
                     style={fieldStyle}
+                    className="min-w-0"
                     value={form.email}
                     onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
                     placeholder="centro@institucion.mx"
@@ -435,19 +443,27 @@ export default function AdminUsuariosPage() {
                   />
                 </div>
 
-                <div className="grid gap-2">
+                <div className="grid min-w-0 gap-2">
                   <Label>Centro</Label>
                   <Select
                     value={form.centro_id}
                     onValueChange={(v) => setForm((f) => ({ ...f, centro_id: v }))}
                     disabled={saving}
                   >
-                    <SelectTrigger style={fieldStyle}>
+                    <SelectTrigger className="w-full min-w-0" style={fieldStyle}>
                       <SelectValue placeholder="Selecciona un centro" />
                     </SelectTrigger>
-                    <SelectContent style={selectContentStyle}>
+                    <SelectContent
+                      position="popper"
+                      className="w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]"
+                      style={selectContentStyle}
+                    >
                       {centros.map((c) => (
-                        <SelectItem key={c.id} value={String(c.id)}>
+                        <SelectItem
+                          key={c.id}
+                          value={String(c.id)}
+                          className="whitespace-normal break-words pr-8 leading-5"
+                        >
                           {c.nombre}
                         </SelectItem>
                       ))}
@@ -458,7 +474,7 @@ export default function AdminUsuariosPage() {
                   </p>
                 </div>
 
-                <div className="grid gap-2">
+                <div className="grid min-w-0 gap-2">
                   <Label htmlFor="password">
                     Contraseña {mode === "edit" ? "(opcional)" : "(opcional)"}
                   </Label>
@@ -466,6 +482,7 @@ export default function AdminUsuariosPage() {
                     id="password"
                     type="password"
                     style={fieldStyle}
+                    className="min-w-0"
                     value={form.password}
                     onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
                     placeholder={
@@ -479,9 +496,6 @@ export default function AdminUsuariosPage() {
                     Si la dejas vacía: en creación el backend puede generar una temporal; en edición no se modifica.
                   </p>
                 </div>
-
-                {err ? <p className="text-sm text-red-600">{err}</p> : null}
-
                 <div className="flex items-center justify-end gap-2 pt-1">
                   <Button
                     type="button"
@@ -532,19 +546,6 @@ export default function AdminUsuariosPage() {
         </div>
 
         <Separator />
-
-        {err ? (
-          <div className="p-5">
-            <p className="text-sm text-red-600">{err}</p>
-          </div>
-        ) : null}
-
-        {success ? (
-          <div className="px-5 pt-5">
-            <p className="text-sm text-emerald-700">{success}</p>
-          </div>
-        ) : null}
-
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-neutral-50 text-neutral-600">
@@ -626,9 +627,7 @@ export default function AdminUsuariosPage() {
           <p className="text-xs text-neutral-500">
             Total: <span className="font-semibold">{filtered.length}</span>
           </p>
-          <p className="text-xs text-neutral-500">
-            Los centros se resuelven por tenant autenticado y se muestra el nombre cuando existe una sola asignación.
-          </p>
+         
         </div>
       </div>
     </div>

@@ -1,20 +1,11 @@
   "use client";
   /* eslint-disable @typescript-eslint/no-explicit-any */
-  import { useEffect, useState } from "react";
+  import { useEffect, useMemo, useState } from "react";
   import dynamic from "next/dynamic";
 
-  import { BRAND_BORDER, BRAND_GLOW, BRAND_SECONDARY, BRAND_SOFT, PURPLE, fmt2 } from "@/components/centro/dashboard/helpers";
-
-  const ResponsiveHeatMap = dynamic(
-    () => import("@nivo/heatmap").then((m) => m.ResponsiveHeatMap),
-    { ssr: false }
-  );
-  const ResponsiveRadar = dynamic(
-    () => import("@nivo/radar").then((m) => m.ResponsiveRadar),
-    { ssr: false }
-  );
-  const ResponsiveBar = dynamic(
-    () => import("@nivo/bar").then((m) => m.ResponsiveBar),
+  import { fmt2 } from "@/components/centro/dashboard/helpers";
+  const Plot = dynamic(
+    () => import("react-plotly.js"),
     { ssr: false }
   );
 
@@ -88,149 +79,198 @@
     return `rgb(${mixed.r}, ${mixed.g}, ${mixed.b})`;
   }
 
-  export function BarValueChipLayer({ bars }: any) {
-    return (
-      <>
-        {bars.map((bar: any) => {
-          const value = Math.round(bar.data.value);
-          if (!value) return null;
-
-          return (
-            <g
-              key={bar.key}
-              transform={`translate(${bar.x + bar.width + 8}, ${bar.y + bar.height / 2})`}
-            >
-              <foreignObject width={56} height={28} x={0} y={-14} style={{ overflow: "visible" }}>
-                <div
-                  style={{
-                    background: BRAND_SOFT,
-                    color: PURPLE,
-                    border: `1px solid ${BRAND_BORDER}`,
-                    borderRadius: 999,
-                    padding: "2px 10px",
-                    fontSize: 12,
-                    fontWeight: 900,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    whiteSpace: "nowrap",
-                    boxShadow: `0 6px 18px ${BRAND_GLOW}`,
-                  }}
-                >
-                  {value}
-                </div>
-              </foreignObject>
-            </g>
-          );
-        })}
-      </>
-    );
+  function mixColors(hexA: string, hexB: string, ratio: number) {
+    const amount = Math.max(0, Math.min(1, ratio));
+    const a = hexToRgbParts(hexA);
+    const b = hexToRgbParts(hexB);
+    return `rgb(${clampByte(a.r + (b.r - a.r) * amount)}, ${clampByte(a.g + (b.g - a.g) * amount)}, ${clampByte(a.b + (b.b - a.b) * amount)})`;
   }
 
-  export function GroupedBarValuePillLayer({ bars }: any) {
-    return (
-      <>
-        {bars.map((bar: any) => {
-          const raw = Number(bar.data.value);
-          if (!Number.isFinite(raw)) return null;
+  function heatmapTextColor(fill: string) {
+    const { r, g, b } = hexToRgbParts(fill);
+    const luminance = ((0.2126 * r) + (0.7152 * g) + (0.0722 * b)) / 255;
+    return luminance < 0.5 ? "rgba(255,255,255,0.94)" : "rgba(17,24,39,0.82)";
+  }
 
-          return (
-            <g
-              key={bar.key}
-              transform={`translate(${bar.x + bar.width + 8}, ${bar.y + bar.height / 2})`}
-            >
-              <foreignObject width={62} height={24} x={0} y={-12} style={{ overflow: "visible" }}>
-                <div
-                  style={{
-                    background: BRAND_SOFT,
-                    color: PURPLE,
-                    border: `1px solid ${BRAND_BORDER}`,
-                    borderRadius: 999,
-                    padding: "1px 8px",
-                    fontSize: 9,
-                    fontWeight: 900,
-                    letterSpacing: "0.01em",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    whiteSpace: "nowrap",
-                    boxShadow: `0 6px 18px ${BRAND_GLOW}`,
-                  }}
-                >
-                  {fmt2(raw)}
-                </div>
-              </foreignObject>
-            </g>
-          );
-        })}
-      </>
-    );
+  function wrapHeatmapLabel(label: string, maxLen = 16) {
+    const words = String(label || "").trim().split(/\s+/).filter(Boolean);
+    if (!words.length) return "";
+    const lines: string[] = [];
+    let current = "";
+
+    words.forEach((word) => {
+      const next = current ? `${current} ${word}` : word;
+      if (next.length <= maxLen || !current) {
+        current = next;
+        return;
+      }
+      lines.push(current);
+      current = word;
+    });
+
+    if (current) lines.push(current);
+    return lines.slice(0, 3).join("<br>");
+  }
+
+  function withAlphaFromHex(hex: string, alpha: number) {
+    const { r, g, b } = hexToRgbParts(hex);
+    const safe = Math.max(0, Math.min(1, alpha));
+    return `rgba(${r}, ${g}, ${b}, ${safe})`;
+  }
+
+  function axisFont(color = "#334155", size = 12) {
+    return {
+      family: "Montserrat, sans-serif",
+      color,
+      size,
+    };
   }
 
   export function RadarChart({ radar }: { radar: { keys: string[]; data: unknown[] } | null }) {
     const brand = useResolvedBrandColors();
     if (!radar) return null;
 
+    const preferredOrder = ["Total", "Frecuencia", "Normalización", "Gravedad"];
+    const points = (radar.data as Array<{ dimension?: string; Global?: number }>)
+      .map((row) => ({
+        dimension: String(row.dimension || ""),
+        value: Number(row.Global || 0),
+      }))
+      .sort((a, b) => preferredOrder.indexOf(a.dimension) - preferredOrder.indexOf(b.dimension));
+    const theta = [...points.map((point) => point.dimension), points[0]?.dimension || ""];
+    const r = [...points.map((point) => point.value), points[0]?.value || 0];
+
     return (
-      <ResponsiveRadar
-        data={radar.data as any}
-        keys={radar.keys as any}
-        indexBy="dimension"
-        maxValue={5}
-        valueFormat={(v: any) => fmt2(Number(v))}
-        margin={{ top: 70, right: 80, bottom: 40, left: 80 }}
-        gridLabelOffset={36}
-        curve="catmullRomClosed"
-        dotSize={10}
-        dotColor={{ theme: "background" }}
-        dotBorderWidth={2}
-        colors={[brand.primary]}
-        fillOpacity={0.14}
-        borderWidth={3}
-        blendMode="multiply"
-        enableDotLabel={false}
-        legends={[]}
-        theme={{
-          text: { fontSize: 12, fontWeight: 900, fill: "#111827" },
-          grid: {
-            line: { stroke: "rgba(2,6,23,0.10)", strokeWidth: 1 },
-          },
-          tooltip: {
-            container: {
-              background: "rgba(17,24,39,0.92)",
-              color: "#fff",
-              borderRadius: 12,
-              boxShadow: "0 14px 40px rgba(0,0,0,0.22)",
-              fontWeight: 900,
+      <Plot
+        data={[
+          {
+            type: "scatterpolar",
+            mode: "lines+markers",
+            theta,
+            r,
+            fill: "toself",
+            fillcolor: withAlphaFromHex(brand.primary, 0.16),
+            line: {
+              color: brand.primary,
+              width: 4,
+            },
+            marker: {
+              size: 10,
+              color: brand.secondary,
+              line: {
+                color: "#FFFFFF",
+                width: 2,
+              },
+            },
+            hovertemplate: "<b>%{theta}</b><br>Valor: <b>%{r:.2f}</b><extra></extra>",
+          } as any,
+        ]}
+        layout={{
+          autosize: true,
+          margin: { t: 12, r: 24, b: 12, l: 24 },
+          paper_bgcolor: "rgba(0,0,0,0)",
+          plot_bgcolor: "rgba(0,0,0,0)",
+          showlegend: false,
+          polar: {
+            bgcolor: "rgba(0,0,0,0)",
+            radialaxis: {
+              range: [0, 5],
+              tickvals: [1, 2, 3, 4, 5],
+              tickfont: axisFont(brand.primary, 14),
+              gridcolor: withAlphaFromHex(brand.primary, 0.16),
+              linecolor: withAlphaFromHex(brand.primary, 0.2),
+              angle: 90,
+              tickcolor: withAlphaFromHex(brand.primary, 0.55),
+              ticklen: 8,
+            },
+            angularaxis: {
+              showticklabels: false,
+              rotation: 90,
+              direction: "clockwise",
+              gridcolor: withAlphaFromHex(brand.primary, 0.08),
+              linecolor: withAlphaFromHex(brand.primary, 0.14),
             },
           },
+          hoverlabel: {
+            bgcolor: "rgba(17,24,39,0.94)",
+            bordercolor: brand.primary,
+            font: axisFont("#FFFFFF", 13),
+          },
         }}
+        config={{
+          displayModeBar: false,
+          responsive: true,
+        }}
+        style={{ width: "100%", height: "100%" }}
+        useResizeHandler
       />
     );
   }
 
   export function HorizontalCountBarChart({ data }: { data: unknown[] }) {
+    const brand = useResolvedBrandColors();
+    const rows = (data as Array<{ label?: string; total?: number }>)
+      .map((item) => ({
+        label: String(item.label || ""),
+        total: Number(item.total || 0),
+      }))
+      .filter((item) => item.label);
+
     return (
-      <ResponsiveBar
-        data={data as any}
-        keys={["total"]}
-        indexBy="label"
-        layout="horizontal"
-        margin={{ top: 10, right: 96, bottom: 36, left: 190 }}
-        padding={0.32}
-        colors={[PURPLE]}
-        borderRadius={10}
-        enableGridY={false}
-        axisTop={null}
-        axisRight={null}
-        axisBottom={{
-          tickSize: 0,
-          tickPadding: 8,
-          format: (v) => String(Math.round(Number(v))),
+      <Plot
+        data={[
+          {
+            type: "bar",
+            orientation: "h",
+            x: rows.map((row) => row.total),
+            y: rows.map((row) => row.label),
+            marker: {
+              color: rows.map((_, index) =>
+                index % 2 === 0
+                  ? brand.primary
+                  : mixColors(brand.primary, brand.secondary, 0.54)
+              ),
+              line: {
+                color: withAlphaFromHex("#FFFFFF", 0.95),
+                width: 1.5,
+              },
+            },
+            hovertemplate: "<b>%{y}</b><br>Total: <b>%{x}</b><extra></extra>",
+          } as any,
+        ]}
+        layout={{
+          autosize: true,
+          margin: { t: 8, r: 42, b: 34, l: 180 },
+          paper_bgcolor: "rgba(0,0,0,0)",
+          plot_bgcolor: "rgba(0,0,0,0)",
+          bargap: 0.3,
+          xaxis: {
+            showgrid: true,
+            gridcolor: withAlphaFromHex(brand.primary, 0.08),
+            zeroline: false,
+            fixedrange: true,
+            tickfont: axisFont("#64748B", 12),
+          },
+          yaxis: {
+            autorange: "reversed",
+            showgrid: false,
+            zeroline: false,
+            fixedrange: true,
+            tickfont: axisFont("#1F2937", 12),
+          },
+          hoverlabel: {
+            bgcolor: "rgba(17,24,39,0.94)",
+            bordercolor: brand.primary,
+            font: axisFont("#FFFFFF", 13),
+          },
+          showlegend: false,
         }}
-        axisLeft={{ tickSize: 0, tickPadding: 10 }}
-        enableLabel={false}
-        layers={["grid", "axes", "bars", "markers", "legends", BarValueChipLayer]}
+        config={{
+          displayModeBar: false,
+          responsive: true,
+        }}
+        style={{ width: "100%", height: "100%" }}
+        useResizeHandler
       />
     );
   }
@@ -241,131 +281,231 @@
     heatmap: { xCount: number; data: unknown[] } | null;
   }) {
     const brand = useResolvedBrandColors();
-    if (!heatmap) return null;
-    const values = (heatmap.data as Array<Record<string, unknown>>)
-      .flatMap((row) =>
-        Object.entries(row)
-          .filter(([key]) => key !== "id")
-          .map(([, value]) => Number(value))
-      )
-      .filter((value) => Number.isFinite(value));
-    const minValue = values.length ? Math.min(...values) : 0;
-    const maxValue = values.length ? Math.max(...values) : 5;
-    const spread = Math.max(maxValue - minValue, 0.001);
+    const processed = useMemo(() => {
+      if (!heatmap) {
+        return {
+          xLabels: [] as string[],
+          yLabels: [] as string[],
+          zValues: [] as number[][],
+          textValues: [] as string[][],
+          hoverText: [] as string[][],
+          minValue: 0,
+          maxValue: 5,
+        };
+      }
 
+      const sourceRows = heatmap.data as Array<{ id?: string; data?: Array<{ x?: string; y?: number | string }> }>;
+      const xLabels = sourceRows[0]?.data?.map((cell) => String(cell.x || "")) || [];
+      const xDisplayLabels = xLabels.map((label) => wrapHeatmapLabel(label));
+      const yLabels = sourceRows.map((row) => String(row.id || ""));
+      const zValues = sourceRows.map((row) =>
+        (row.data || []).map((cell) => {
+          const numeric = Number(cell?.y || 0);
+          return Number.isFinite(numeric) ? numeric : 0;
+        })
+      );
+      const flatValues = zValues.flat().filter((value) => Number.isFinite(value));
+      const minValue = flatValues.length ? Math.min(...flatValues) : 0;
+      const maxValue = flatValues.length ? Math.max(...flatValues) : 5;
+
+      const textValues = zValues.map((row) => row.map((value) => fmt2(value)));
+      const hoverText = sourceRows.map((row, rowIndex) =>
+        (row.data || []).map((cell, columnIndex) => {
+          const value = zValues[rowIndex]?.[columnIndex] ?? 0;
+          return [
+            `<b>${xLabels[columnIndex] || ""}</b>`,
+            `${yLabels[rowIndex] || ""}: <b>${fmt2(value)}</b>`,
+          ].join("<br>");
+        })
+      );
+
+      return { xLabels, xDisplayLabels, yLabels, zValues, textValues, hoverText, minValue, maxValue };
+    }, [heatmap]);
+
+    if (!heatmap) return null;
+
+    const colorscale = [
+      [0, mixWithWhite(brand.support, 0.1)],
+      [0.35, mixColors(brand.support, brand.secondary, 0.62)],
+      [0.7, mixColors(brand.secondary, brand.primary, 0.7)],
+      [1, brand.primary],
+    ] as Array<[number, string]>;
     return (
-      <ResponsiveHeatMap
-        data={heatmap.data as any}
-        margin={{ top: 30, right: 180, bottom: 84, left: 160 }}
-        valueFormat=">-.2f"
-        axisTop={null}
-        axisRight={null}
-        axisLeft={{ tickSize: 0, tickPadding: 10 }}
-        axisBottom={{
-          tickSize: 0,
-          tickPadding: 16,
-          tickRotation: -22,
-          format: () => "",
-        }}
-        colors={({ value }: { value: number | string }) => {
-          const numeric = Number(value || 0);
-          const normalized = Math.max(0, Math.min(1, (numeric - minValue) / spread));
-          const whiteMix = 0.88 - normalized * 0.74;
-          return mixWithWhite(brand.primary, whiteMix);
-        }}
-        emptyColor="#F1F5F9"
-        borderWidth={1}
-        borderColor="rgba(2,6,23,0.06)"
-        enableLabels={true}
-        labelTextColor={{ from: "color", modifiers: [["darker", 2.1]] }}
-        legends={[]}
-        theme={{
-          text: {
-            fontFamily: "Montserrat",
-            fontSize: 14,
-            fontWeight: 900,
-            fill: "#111827",
+      <Plot
+        data={[
+          {
+            type: "heatmap",
+            x: processed.xLabels,
+            y: processed.yLabels,
+            z: processed.zValues,
+            text: processed.textValues,
+            texttemplate: "%{text}",
+            textfont: {
+              size: 18,
+              family: "Montserrat, sans-serif",
+              color: heatmapTextColor(brand.primary),
+            },
+            hoverinfo: "text",
+            hovertext: processed.hoverText,
+            colorscale,
+            zmin: processed.minValue,
+            zmax: processed.maxValue,
+            xgap: 16,
+            ygap: 16,
+            showscale: false,
+            hoverongaps: false,
+          } as any,
+        ]}
+        layout={{
+          autosize: true,
+          margin: { t: 28, r: 12, b: 18, l: 185 },
+          paper_bgcolor: "rgba(0,0,0,0)",
+          plot_bgcolor: "rgba(0,0,0,0)",
+          font: {
+            family: "Montserrat, sans-serif",
+            color: "#1F2937",
           },
-          axis: { ticks: { text: { fill: "#111827", fontWeight: 900 } } },
-          tooltip: {
-            container: {
-              background: "rgba(17,24,39,0.92)",
-              color: "#fff",
-              borderRadius: 12,
-              boxShadow: "0 14px 40px rgba(0,0,0,0.22)",
-              fontWeight: 900,
+          xaxis: {
+            side: "top",
+            tickmode: "array",
+            tickvals: processed.xLabels,
+            ticktext: processed.xDisplayLabels,
+            tickfont: {
+              size: 13,
+              color: "#64748B",
+              family: "Montserrat, sans-serif",
+            },
+            tickangle: 0,
+            showgrid: false,
+            zeroline: false,
+            fixedrange: true,
+            automargin: true,
+          },
+          yaxis: {
+            autorange: "reversed",
+            tickfont: {
+              size: 16,
+              color: "#1F2937",
+              family: "Montserrat, sans-serif",
+            },
+            showgrid: false,
+            zeroline: false,
+            fixedrange: true,
+            automargin: true,
+          },
+          hoverlabel: {
+            bgcolor: "rgba(17,24,39,0.94)",
+            bordercolor: brand.primary,
+            font: {
+              family: "Montserrat, sans-serif",
+              size: 13,
+              color: "#FFFFFF",
             },
           },
         }}
+        config={{
+          displayModeBar: false,
+          responsive: true,
+        }}
+        style={{ width: "100%", height: "100%" }}
+        useResizeHandler
       />
     );
   }
 
   export function GroupedGeneroBarChart({ data, wrapLabel }: { data: unknown[]; wrapLabel: (s: string, maxLen?: number, maxLines?: number) => string }) {
+    const brand = useResolvedBrandColors();
+    const rows = (data as Array<Record<string, unknown>>)
+      .map((item) => ({
+        label: String(item.label || ""),
+        Frecuencia: Number(item.Frecuencia || 0),
+        Normalización: Number(item.Normalización || 0),
+        Gravedad: Number(item.Gravedad || 0),
+      }))
+      .filter((item) => item.label);
+
     return (
-      <ResponsiveBar
-        data={data as any}
-        keys={["Frecuencia", "Normalización", "Gravedad"]}
-        indexBy="label"
-        groupMode="grouped"
-        layout="horizontal"
-        valueScale={{ type: "linear", min: 0, max: 5 }}
-        indexScale={{ type: "band", round: true }}
-        margin={{ top: 44, right: 110, bottom: 52, left: 210 }}
-        padding={0.32}
-        innerPadding={10}
-        borderRadius={10}
-        colors={({ id }) => {
-          const k = String(id);
-          if (k === "Frecuencia") return PURPLE;
-          if (k === "Normalización") return BRAND_SECONDARY;
-          return "color-mix(in srgb, var(--brand-support, #EAD5F1) 78%, white)";
-        }}
-        enableGridX={true}
-        enableGridY={false}
-        axisTop={null}
-        axisRight={null}
-        axisBottom={{
-          tickSize: 0,
-          tickPadding: 10,
-          tickValues: [0, 1, 2, 3, 4, 5],
-          format: (v) => String(v),
-          legend: "Promedio (1–5)",
-          legendPosition: "middle",
-          legendOffset: 38,
-        }}
-        axisLeft={{
-          tickSize: 0,
-          tickPadding: 12,
-          format: (v) => wrapLabel(String(v), 22, 2),
-        }}
-        enableLabel={false}
-        layers={["grid", "axes", "bars", "markers", "legends", GroupedBarValuePillLayer]}
-        valueFormat={(v: any) => fmt2(Number(v))}
-        legends={[
+      <Plot
+        data={[
           {
-            dataFrom: "keys",
-            anchor: "top",
-            direction: "row",
-            justify: false,
-            translateY: -28,
-            itemsSpacing: 18,
-            itemWidth: 90,
-            itemHeight: 18,
-            symbolSize: 10,
-            symbolShape: "circle",
-          },
+            type: "bar",
+            name: "Frecuencia",
+            orientation: "h",
+            x: rows.map((row) => row.Frecuencia),
+            y: rows.map((row) => wrapLabel(row.label, 22, 2)),
+            marker: {
+              color: brand.primary,
+            },
+            hovertemplate: "<b>%{y}</b><br>Frecuencia: <b>%{x:.2f}</b><extra></extra>",
+          } as any,
+          {
+            type: "bar",
+            name: "Normalización",
+            orientation: "h",
+            x: rows.map((row) => row.Normalización),
+            y: rows.map((row) => wrapLabel(row.label, 22, 2)),
+            marker: {
+              color: brand.secondary,
+            },
+            hovertemplate: "<b>%{y}</b><br>Normalización: <b>%{x:.2f}</b><extra></extra>",
+          } as any,
+          {
+            type: "bar",
+            name: "Gravedad",
+            orientation: "h",
+            x: rows.map((row) => row.Gravedad),
+            y: rows.map((row) => wrapLabel(row.label, 22, 2)),
+            marker: {
+              color: mixColors(brand.support, brand.primary, 0.42),
+            },
+            hovertemplate: "<b>%{y}</b><br>Gravedad: <b>%{x:.2f}</b><extra></extra>",
+          } as any,
         ]}
-        theme={{
-          text: {
-            fontFamily: "Montserrat",
-            fontSize: 12,
-            fontWeight: 900,
-            fill: "#111827",
+        layout={{
+          autosize: true,
+          barmode: "group",
+          bargap: 0.26,
+          bargroupgap: 0.14,
+          margin: { t: 36, r: 80, b: 44, l: 230 },
+          paper_bgcolor: "rgba(0,0,0,0)",
+          plot_bgcolor: "rgba(0,0,0,0)",
+          xaxis: {
+            range: [0, 5.25],
+            tickvals: [0, 1, 2, 3, 4, 5],
+            showgrid: true,
+            gridcolor: withAlphaFromHex(brand.primary, 0.08),
+            zeroline: false,
+            fixedrange: true,
+            title: {
+              text: "Promedio (1-5)",
+              font: axisFont("#64748B", 12),
+            },
           },
-          axis: { ticks: { text: { fill: "#111827", fontWeight: 900 } } },
-          grid: { line: { stroke: "rgba(2,6,23,0.08)", strokeWidth: 1 } },
+          yaxis: {
+            autorange: "reversed",
+            showgrid: false,
+            zeroline: false,
+            fixedrange: true,
+            tickfont: axisFont("#1F2937", 12),
+          },
+          legend: {
+            orientation: "h",
+            x: 0,
+            y: 1.12,
+            font: axisFont("#334155", 11),
+          },
+          hoverlabel: {
+            bgcolor: "rgba(17,24,39,0.94)",
+            bordercolor: brand.primary,
+            font: axisFont("#FFFFFF", 13),
+          },
         }}
+        config={{
+          displayModeBar: false,
+          responsive: true,
+        }}
+        style={{ width: "100%", height: "100%" }}
+        useResizeHandler
       />
     );
   }

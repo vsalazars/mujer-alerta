@@ -554,42 +554,40 @@ export default function DiagnosticoEncuestaPage() {
   const railWidthExpr = `(100% - ${DOT_SIZE}px)`;
   const dotLeft = `calc(${DOT_R}px + (${snapPct} / 100) * ${railWidthExpr})`;
   const fillWidth = `calc((${snapPct} / 100) * ${railWidthExpr})`;
+  const tenantFieldStyle = {
+    borderColor: theme.border,
+    boxShadow: `0 1px 2px rgba(15, 23, 42, 0.06)`,
+    "--ring": theme.primary,
+    "--input": theme.border,
+  } as React.CSSProperties;
 
   return (
-    <main className="h-dvh bg-white overflow-x-hidden">
+    <main className="min-h-dvh bg-white overflow-x-hidden">
       <style jsx global>{`
         .scroll-area {
           -webkit-overflow-scrolling: touch;
         }
       `}</style>
 
-      <div className="mx-auto h-dvh w-full max-w-md px-5 py-5 pb-[env(safe-area-inset-bottom)] flex flex-col">
-        {/* Header fijo */}
-        <div className="sticky top-0 z-20 -mx-5 shrink-0 bg-white/95 px-5 pb-3 pt-2 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+      <div className="fixed inset-x-0 top-0 z-30 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+        <div className="mx-auto w-full max-w-md px-4 pb-3 pt-2 sm:px-5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               {branding?.logo_url ? (
-                <div className="mb-3 flex items-center gap-3">
+                <div className="mb-2 flex items-center gap-3">
                   <img
                     src={branding.logo_url}
                     alt={branding.nombre_publico || "Logo institucional"}
-                    className="h-14 w-auto max-w-[110px] shrink-0 object-contain"
+                    className="h-12 w-auto max-w-[88px] shrink-0 object-contain sm:h-14 sm:max-w-[110px]"
                   />
                   <div className="min-w-0">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-neutral-500">
-                      Institución
-                    </p>
-                    <p className="truncate text-sm font-semibold text-neutral-700">
+                    <p className="text-sm font-semibold leading-5" style={{ color: theme.primary }}>
                       {branding.nombre_publico || "Institución participante"}
                     </p>
                   </div>
                 </div>
               ) : null}
-              <h2 className="text-xl font-extrabold tracking-tight" style={{ color: theme.primary }}>
-                {branding?.nombre_publico?.trim() || inst.name}
-              </h2>
-
-              <div className="mt-2">
+              <div className="mt-1">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-medium text-neutral-600">{stepLabel}</span>
                   <span className="text-[11px] font-semibold tabular-nums" style={{ color: theme.primary }}>
@@ -633,17 +631,20 @@ export default function DiagnosticoEncuestaPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="mx-auto min-h-dvh w-full max-w-md px-4 py-4 pb-[env(safe-area-inset-bottom)] pt-28 sm:px-5 sm:py-5 sm:pt-32 flex flex-col">
 
         {inst.instructions ? (
-          <p className="mt-2 text-[11px] leading-4 text-muted-foreground shrink-0">
+          <p className="mt-1 text-[11px] leading-4 text-muted-foreground shrink-0">
             {inst.instructions}
           </p>
         ) : null}
 
         <Card className="mt-4 flex-1 min-h-0 flex flex-col">
-          <CardHeader className="shrink-0">
+          <CardHeader className={isCommentStep ? "shrink-0 pb-3" : "min-h-[5.5rem] shrink-0 sm:min-h-[5rem]"}>
             <CardTitle
-              className="text-base font-heading font-semibold leading-snug"
+              className="text-sm font-heading font-semibold leading-snug sm:text-base"
               style={{ color: theme.primary }}
             >
               {isCommentStep
@@ -657,7 +658,7 @@ export default function DiagnosticoEncuestaPage() {
             <div
               ref={scrollAreaRef}
               onScroll={updateScrollHint}
-              className="scroll-area relative flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 pb-4"
+              className="scroll-area relative flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 pb-4 sm:px-6"
             >
               {isCommentStep ? (
                 <div className="flex flex-col gap-3">
@@ -672,8 +673,7 @@ export default function DiagnosticoEncuestaPage() {
                     className="min-h-[180px] resize-none rounded-2xl"
                     style={
                       {
-                        borderColor: theme.border,
-                        boxShadow: `0 0 0 1px ${theme.border}`,
+                        ...tenantFieldStyle,
                         "--ring": theme.primary,
                       } as React.CSSProperties
                     }
@@ -708,7 +708,7 @@ export default function DiagnosticoEncuestaPage() {
                         <div key={`${current!.question_id}:${c.dimension}`} className="space-y-3">
                           <p className="text-sm font-medium text-neutral-800">{c.prompt}</p>
 
-                          <div className="grid grid-cols-5 gap-2">
+                          <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
                             {scale.options.map((opt) => {
                               const active = picked === opt.value;
                               return (
@@ -720,7 +720,7 @@ export default function DiagnosticoEncuestaPage() {
                                   }
                                   aria-pressed={active}
                                   className={[
-                                    "h-11 w-11 rounded-full flex items-center justify-center",
+                                    "h-10 w-10 rounded-full flex items-center justify-center text-sm sm:h-11 sm:w-11",
                                     "border transition-colors duration-150",
                                     "focus-visible:outline-none focus-visible:ring-2",
                                     active ? "font-bold" : "font-medium",
@@ -729,10 +729,11 @@ export default function DiagnosticoEncuestaPage() {
                                     backgroundColor: active ? theme.primary : "transparent",
                                     color: active ? "white" : "#111827",
                                     borderColor: active ? theme.primary : theme.border,
+                                    "--tw-ring-color": `${theme.primary}55`,
                                     boxShadow: active
                                       ? `0 0 0 4px ${theme.softStrong}`
                                       : "none",
-                                  }}
+                                  } as React.CSSProperties}
                                 >
                                   {opt.value}
                                 </button>
@@ -773,16 +774,18 @@ export default function DiagnosticoEncuestaPage() {
             </div>
 
             {/* ✅ INDICADOR ENTRE SCROLL Y FOOTER (NO se recorta y NO tapa) */}
-            {!isCommentStep && showScrollHint ? (
-            <div className="shrink-0 px-6 pb-1">
+            {!isCommentStep ? (
+            <div className="min-h-[2.75rem] shrink-0 px-4 pb-1 sm:px-6">
               <div
-                className="mx-auto flex flex-col items-center rounded-full px-3 py-1 text-[11px] font-semibold text-center"
+                className="mx-auto flex flex-col items-center rounded-full px-3 py-1 text-[11px] font-semibold text-center transition-opacity duration-200"
                 style={{
                   color: theme.primary,
                   background: "rgba(255,255,255,0.92)",
                   border: `1px solid ${theme.border}`,
                   boxShadow: "0 8px 18px rgba(0,0,0,0.05)",
                   backdropFilter: "blur(6px)",
+                  opacity: showScrollHint ? 1 : 0,
+                  pointerEvents: "none",
                 }}
                 aria-hidden="true"
               >
@@ -809,7 +812,7 @@ export default function DiagnosticoEncuestaPage() {
             ) : null}
 
             {/* Footer fijo */}
-            <div className="shrink-0 border-t bg-white/90 backdrop-blur px-6 py-4 pt-5">
+            <div className="shrink-0 border-t bg-white/90 backdrop-blur px-4 py-4 pt-5 sm:px-6">
               {isCommentStep ? (
                 <div className="flex gap-3">
                   <Button

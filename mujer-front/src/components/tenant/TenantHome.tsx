@@ -26,6 +26,7 @@ import {
   Lock,
   ShieldCheck,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { api } from "../../lib/api";
 import { isAdminRole, type UserRole } from "../../lib/auth";
@@ -64,7 +65,6 @@ export default function TenantHome() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [branding, setBranding] = useState<TenantBranding | null>(null);
 
@@ -91,7 +91,6 @@ export default function TenantHome() {
 
   async function onLogin(e: React.FormEvent) {
     e.preventDefault();
-    setErr("");
     setLoading(true);
 
     try {
@@ -133,11 +132,11 @@ export default function TenantHome() {
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "";
-      if (msg.includes("invalid_credentials")) setErr("Correo o contraseña incorrectos.");
-      else if (msg.includes("user_inactive")) setErr("Tu usuario está desactivado. Contacta al administrador.");
-      else if (msg.includes("missing_jwt_secret")) setErr("Falta JWT_SECRET en el backend.");
-      else if (msg.includes("Failed to fetch")) setErr("Sin conexión con el servidor.");
-      else setErr(msg || "No se pudo iniciar sesión.");
+      if (msg.includes("invalid_credentials")) toast.error("Correo o contraseña incorrectos.");
+      else if (msg.includes("user_inactive")) toast.error("Tu usuario está desactivado. Contacta al administrador.");
+      else if (msg.includes("missing_jwt_secret")) toast.error("Falta JWT_SECRET en el backend.");
+      else if (msg.includes("Failed to fetch")) toast.error("Sin conexión con el servidor.");
+      else toast.error(msg || "No se pudo iniciar sesión.");
     } finally {
       setLoading(false);
     }
@@ -265,9 +264,6 @@ export default function TenantHome() {
                       </button>
                     </div>
                   </div>
-
-                  {err ? <p className="text-sm text-red-600">{err}</p> : null}
-
                   <Button
                     type="submit"
                     disabled={!canSubmit}

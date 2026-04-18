@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Montserrat, Poppins } from "next/font/google";
+import { AppToaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 const montserrat = Montserrat({
@@ -29,6 +30,7 @@ export default function RootLayout({
     <html lang="es">
       <body className={`${montserrat.variable} ${poppins.variable} antialiased`}>
         {children}
+        <AppToaster />
       </body>
     </html>
   );

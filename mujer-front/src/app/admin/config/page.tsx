@@ -9,6 +9,7 @@ import { BrandColorField } from "@/components/admin/brand-color-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 
 type ConfiguracionInstitucion = {
   institucion_id: number;
@@ -39,8 +40,6 @@ export default function AdminConfigPage() {
   const [token, setToken] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [form, setForm] = useState<FormState>({
     nombre_publico: "",
     logo_url: "",
@@ -76,7 +75,7 @@ export default function AdminConfigPage() {
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : "";
         if (!msg.includes("config_not_found")) {
-          setError(msg || "No se pudo cargar la configuración.");
+          toast.error(msg || "No se pudo cargar la configuración.");
         }
       } finally {
         setLoading(false);
@@ -88,13 +87,12 @@ export default function AdminConfigPage() {
 
   async function onPickLogo(file: File | null) {
     if (!file) return;
-    setSuccess("");
     if (!file.type.startsWith("image/")) {
-      setError("Selecciona un archivo de imagen válido.");
+      toast.error("Selecciona un archivo de imagen válido.");
       return;
     }
     if (file.size > 1024 * 1024) {
-      setError("La imagen no debe exceder 1 MB.");
+      toast.error("La imagen no debe exceder 1 MB.");
       return;
     }
 
@@ -102,16 +100,13 @@ export default function AdminConfigPage() {
     reader.onload = () => {
       const result = typeof reader.result === "string" ? reader.result : "";
       setForm((current) => ({ ...current, logo_url: result }));
-      setError("");
     };
-    reader.onerror = () => setError("No se pudo leer la imagen seleccionada.");
+    reader.onerror = () => toast.error("No se pudo leer la imagen seleccionada.");
     reader.readAsDataURL(file);
   }
 
   async function onSave() {
     setSaving(true);
-    setError("");
-    setSuccess("");
     try {
       const saved = await api<ConfiguracionInstitucion>("/api/admin/configuracion", {
         method: "PUT",
@@ -139,10 +134,10 @@ export default function AdminConfigPage() {
           detail: saved,
         })
       );
-      setSuccess("Cambios guardados. El menú ya refleja el logotipo actualizado.");
+      toast.success("Cambios guardados. El menú ya refleja el logotipo actualizado.");
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "";
-      setError(msg || "No se pudo guardar la configuración.");
+      toast.error(msg || "No se pudo guardar la configuración.");
     } finally {
       setSaving(false);
     }
@@ -230,7 +225,7 @@ export default function AdminConfigPage() {
                   }}
                   onClick={() => {
                     setForm((current) => ({ ...current, logo_url: "" }));
-                    setSuccess("");
+                    toast.success("Logotipo eliminado de la configuración.");
                   }}
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
@@ -267,14 +262,10 @@ export default function AdminConfigPage() {
                 value={form.color_apoyo}
                 resolvedColor={theme.support}
                 placeholder="Opcional"
-                hint="Úsalo para acciones secundarias, chips suaves y detalles como cerrar sesión."
+                hint=""
                 onChange={(value) => setForm((current) => ({ ...current, color_apoyo: value }))}
               />
             </div>
-
-            {error ? <p className="text-sm text-red-600">{error}</p> : null}
-            {success ? <p className="text-sm text-emerald-700">{success}</p> : null}
-
             <div className="pt-2">
               <Button
                 type="button"

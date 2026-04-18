@@ -41,7 +41,14 @@ export function DashboardHero({
 
   return (
     <div className="mx-auto max-w-[1400px] mb-10">
-      <div className="relative overflow-hidden rounded-[2.25rem] border bg-white shadow-sm">
+      <div
+        className="relative overflow-hidden rounded-[2.25rem] border shadow-sm"
+        style={{
+          background:
+            "linear-gradient(115deg, white 0%, color-mix(in srgb, var(--brand-support, #EAD5F1) 22%, white) 48%, color-mix(in srgb, var(--brand-primary, #7F017F) 14%, white) 100%)",
+          borderColor: "var(--brand-border, rgba(127,1,127,0.18))",
+        }}
+      >
         <div
           className="pointer-events-none absolute -top-32 -right-32 h-[420px] w-[420px] rounded-full blur-3xl opacity-25"
           style={{ background: PURPLE }}
@@ -50,7 +57,7 @@ export function DashboardHero({
           className="pointer-events-none absolute inset-0"
           style={{
             background:
-              "radial-gradient(1200px circle at 0% 0%, color-mix(in srgb, var(--brand-primary, #7F017F) 10%, transparent), transparent 55%)",
+              "radial-gradient(1200px circle at 0% 0%, color-mix(in srgb, var(--brand-primary, #7F017F) 10%, transparent), transparent 55%), radial-gradient(800px circle at 100% 50%, color-mix(in srgb, var(--brand-support, #EAD5F1) 55%, transparent), transparent 58%)",
           }}
         />
         <div className="relative p-8 md:p-10">
@@ -68,7 +75,7 @@ export function DashboardHero({
               </div>
 
               <h1 className="text-4xl md:text-5xl font-light tracking-tight">
-                Dashboard <span className="font-black">Mujer Alerta</span>
+                Dashboard <span className="font-black" style={{ color: PURPLE }}>Mujer Alerta</span>
               </h1>
 
               <div className="flex flex-wrap items-center gap-3">

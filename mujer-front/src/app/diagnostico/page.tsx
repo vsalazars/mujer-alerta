@@ -463,6 +463,18 @@ export default function DiagnosticoInicioPage() {
     setDoneBlocked(null);
   }
 
+  const tenantFieldStyle = {
+    borderColor: theme.border,
+    boxShadow: `0 1px 2px rgba(15, 23, 42, 0.06)`,
+    "--ring": theme.primary,
+    "--input": theme.border,
+  } as React.CSSProperties;
+
+  const tenantSelectContentStyle = {
+    borderColor: theme.border,
+    boxShadow: `0 18px 44px -24px ${theme.glow}`,
+  } as React.CSSProperties;
+
   return (
     <main className="min-h-dvh bg-white">
       <div className="relative min-h-dvh overflow-hidden">
@@ -471,32 +483,24 @@ export default function DiagnosticoInicioPage() {
           style={{ background: `linear-gradient(to bottom, #ffffff 0%, ${theme.soft} 55%, #ffffff 100%)` }}
         />
 
-        <div className="relative mx-auto w-full max-w-md px-5 pb-10 pt-7">
-          <div className="sticky top-0 z-20 -mx-5 mb-5 bg-white/92 px-5 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+        <div className="fixed inset-x-0 top-0 z-30 bg-white/92 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+          <div className="mx-auto w-full max-w-md px-4 py-3 sm:px-5">
             <div className="flex items-start justify-between gap-3">
               <div>
                 {branding?.logo_url ? (
-                  <div className="mb-3 flex items-center gap-3">
+                  <div className="mb-1 flex items-center gap-3">
                     <img
                       src={branding.logo_url}
                       alt={branding.nombre_publico || "Logo institucional"}
-                      className="h-16 w-auto max-w-[104px] shrink-0 object-contain"
+                      className="h-14 w-auto max-w-[92px] shrink-0 object-contain sm:h-16 sm:max-w-[104px]"
                     />
                     <div className="min-w-0">
-                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-neutral-500">
-                        Institución
-                      </p>
-                      <p className="truncate text-sm font-semibold text-neutral-700">
+                      <p className="text-sm font-semibold leading-5" style={{ color: theme.primary }}>
                         {branding.nombre_publico || "Institución participante"}
                       </p>
                     </div>
                   </div>
                 ) : null}
-                <h1 className="mt-3 text-3xl font-extrabold tracking-tight" style={{ color: theme.primary }}>
-                  {branding?.nombre_publico?.trim()
-                    ? `Diagnóstico ${branding.nombre_publico.trim()}`
-                    : "Diagnóstico"}
-                </h1>
               </div>
               <div className="mt-1 shrink-0">
                 {!branding?.logo_url ? (
@@ -507,6 +511,9 @@ export default function DiagnosticoInicioPage() {
               </div>
             </div>
           </div>
+        </div>
+
+        <div className="relative mx-auto w-full max-w-md px-4 pb-10 pt-28 sm:px-5 sm:pt-32">
 
           {/* ✅ aviso si ya finalizó en este navegador */}
           {blockedByDoneBrowser ? (
@@ -574,7 +581,7 @@ export default function DiagnosticoInicioPage() {
             </Card>
           ) : null}
 
-          <Card className="mt-6 overflow-hidden border-black/5 bg-white/70 shadow-[0_18px_50px_-22px_rgba(0,0,0,.25)] backdrop-blur">
+          <Card className="mt-4 overflow-hidden border-black/5 bg-white/70 shadow-[0_18px_50px_-22px_rgba(0,0,0,.25)] backdrop-blur sm:mt-6">
             <CardHeader className="space-y-1 pb-3">
               <CardTitle className="text-base">Datos iniciales</CardTitle>
               <p className="text-xs leading-5 text-neutral-500">
@@ -599,9 +606,7 @@ export default function DiagnosticoInicioPage() {
               ) : (
                 <>
                   <div className="space-y-2">
-                    <Label className="text-sm">
-                      {isCentroFixedBySlug ? "Centro asociado al acceso" : "Centro escolar o laboral"}
-                    </Label>
+                   
                     {isCentroFixedBySlug && selectedCentro ? (
                       <div className="rounded-xl border border-black/5 bg-white/80 px-4 py-3 shadow-sm">
                         <div className="flex items-center gap-3">
@@ -609,7 +614,7 @@ export default function DiagnosticoInicioPage() {
                             <Building2 className="h-4 w-4" style={{ color: theme.primary }} />
                           </div>
                           <div className="min-w-0">
-                            <p className="font-semibold text-neutral-900">{selectedCentro.nombre}</p>
+                            <p className="font-semibold leading-6 text-neutral-900">{selectedCentro.nombre}</p>
                             
                           </div>
                         </div>
@@ -620,12 +625,22 @@ export default function DiagnosticoInicioPage() {
                           <Building2 className="h-4 w-4 text-neutral-500" />
                         </div>
                         <Select value={centroId} onValueChange={setCentroId}>
-                          <SelectTrigger className="h-12 rounded-xl pl-10 shadow-sm">
+                          <SelectTrigger className="h-12 w-full rounded-xl pl-10 shadow-sm" style={tenantFieldStyle}>
                             <SelectValue placeholder="Selecciona un centro" />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent style={tenantSelectContentStyle}>
                             {centros.map((c) => (
-                              <SelectItem key={c.id} value={String(c.id)}>
+                              <SelectItem
+                                key={c.id}
+                                value={String(c.id)}
+                                className="data-[highlighted]:bg-[var(--tenant-soft)] data-[highlighted]:text-[var(--tenant-primary)]"
+                                style={
+                                  {
+                                    "--tenant-primary": theme.primary,
+                                    "--tenant-soft": theme.soft,
+                                  } as React.CSSProperties
+                                }
+                              >
                                 {c.nombre}
                               </SelectItem>
                             ))}
@@ -662,12 +677,22 @@ export default function DiagnosticoInicioPage() {
                         <User className="h-4 w-4 text-neutral-500" />
                       </div>
                       <Select value={generoId} onValueChange={setGeneroId}>
-                        <SelectTrigger className="h-12 rounded-xl pl-10 shadow-sm">
+                        <SelectTrigger className="h-12 w-full rounded-xl pl-10 shadow-sm" style={tenantFieldStyle}>
                           <SelectValue placeholder="Selecciona una opción" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent style={tenantSelectContentStyle}>
                           {generos.map((g) => (
-                            <SelectItem key={g.id} value={String(g.id)}>
+                            <SelectItem
+                              key={g.id}
+                              value={String(g.id)}
+                              className="data-[highlighted]:bg-[var(--tenant-soft)] data-[highlighted]:text-[var(--tenant-primary)]"
+                              style={
+                                  {
+                                  "--tenant-primary": theme.primary,
+                                  "--tenant-soft": theme.soft,
+                                } as React.CSSProperties
+                              }
+                            >
                               {g.etiqueta}
                             </SelectItem>
                           ))}
@@ -684,6 +709,7 @@ export default function DiagnosticoInicioPage() {
                       placeholder="Ej. 19"
                       value={edad}
                       onChange={(e) => setEdad(e.target.value.replace(/[^\d]/g, ""))}
+                      style={tenantFieldStyle}
                     />
                     <p className="text-xs text-neutral-500">
                       Rango permitido: <span className="font-medium">15</span> a{" "}
@@ -692,10 +718,10 @@ export default function DiagnosticoInicioPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-3">
                       <Label className="text-sm">Correo electrónico</Label>
                       <span
-                        className="text-[11px] font-medium animate-pulse rounded-full px-2 py-0.5 text-white shadow-sm"
+                        className="shrink-0 text-[11px] font-medium animate-pulse rounded-full px-2 py-0.5 text-white shadow-sm"
                         style={{
                           background: theme.gradient,
                           boxShadow: `0 0 10px ${theme.glow}`,
@@ -720,6 +746,7 @@ export default function DiagnosticoInicioPage() {
                         placeholder="tucorreo@ejemplo.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
+                        style={emailTrim && !emailOk ? undefined : tenantFieldStyle}
                       />
                     </div>
 
@@ -760,7 +787,7 @@ export default function DiagnosticoInicioPage() {
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-2">
-                        Nueva encuesta
+                        Responder encuesta
                         <ChevronRight className="h-4 w-4" />
                       </span>
                     )}

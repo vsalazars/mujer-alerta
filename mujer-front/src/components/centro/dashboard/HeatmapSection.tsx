@@ -41,7 +41,7 @@ export function HeatmapSection({
                 style={{
                   borderColor: BRAND_BORDER,
                   background:
-                    "linear-gradient(90deg, rgba(255,255,255,0.98) 0%, color-mix(in srgb, var(--brand-primary, #7F017F) 22%, white) 24%, color-mix(in srgb, var(--brand-primary, #7F017F) 48%, white) 56%, color-mix(in srgb, var(--brand-primary, #7F017F) 72%, white) 78%, var(--brand-primary, #7F017F) 100%)",
+                    "linear-gradient(90deg, color-mix(in srgb, var(--brand-support, #EAD5F1) 88%, white) 0%, color-mix(in srgb, var(--brand-support, #EAD5F1) 30%, var(--brand-secondary, #C23C9A)) 34%, color-mix(in srgb, var(--brand-secondary, #C23C9A) 82%, var(--brand-primary, #7F017F)) 68%, var(--brand-primary, #7F017F) 100%)",
                 }}
               />
               <div className="flex w-full max-w-[420px] items-center justify-start text-[11px] font-black tracking-[0.18em] text-slate-500 uppercase">

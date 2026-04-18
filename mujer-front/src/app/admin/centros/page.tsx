@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 
 import { Building2, Plus, RefreshCw, Search, Trash2, Pencil } from "lucide-react";
+import { toast } from "sonner";
 
 type AuthUser = {
   user_id: string;
@@ -108,7 +109,6 @@ export default function AdminCentrosPage() {
 
   const [items, setItems] = useState<Centro[]>([]);
   const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState("");
 
   const [q, setQ] = useState("");
 
@@ -178,7 +178,6 @@ export default function AdminCentrosPage() {
   const suggestedSlug = useMemo(() => slugifyCentroNombre(form.nombre), [form.nombre]);
 
   async function load() {
-    setErr("");
     setLoading(true);
     try {
       const data = await api<Centro[]>("/api/admin/centros", {
@@ -186,7 +185,7 @@ export default function AdminCentrosPage() {
       });
       setItems(data || []);
     } catch (e: unknown) {
-      setErr(errorMessage(e, "No se pudo cargar centros"));
+      toast.error(errorMessage(e, "No se pudo cargar centros"));
     } finally {
       setLoading(false);
     }
@@ -226,11 +225,10 @@ export default function AdminCentrosPage() {
 
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
-    setErr("");
 
     const nombre = form.nombre.trim();
     if (nombre.length < 3) {
-      setErr("El nombre debe tener al menos 3 caracteres.");
+      toast.error("El nombre debe tener al menos 3 caracteres.");
       return;
     }
 
@@ -264,8 +262,9 @@ export default function AdminCentrosPage() {
 
       setOpen(false);
       await load();
+      toast.success(mode === "create" ? "Centro creado correctamente." : "Centro actualizado correctamente.");
     } catch (e: unknown) {
-      setErr(errorMessage(e, "No se pudo guardar"));
+      toast.error(errorMessage(e, "No se pudo guardar"));
     } finally {
       setSaving(false);
     }
@@ -275,20 +274,20 @@ export default function AdminCentrosPage() {
     const ok = confirm(`¿Eliminar permanentemente el centro "${c.nombre}"? Esta acción solo se permite si no tiene usuarios ni encuestas asociadas.`);
     if (!ok) return;
 
-    setErr("");
     try {
       await api<void>(`/api/centros/${c.id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
       await load();
+      toast.success("Centro eliminado correctamente.");
     } catch (e: unknown) {
       const msg = errorMessage(e, "No se pudo eliminar");
       if (msg.includes("centro_has_data")) {
-        setErr("No se puede eliminar este centro porque ya tiene usuarios o encuestas asociadas.");
+        toast.error("No se puede eliminar este centro porque ya tiene usuarios o encuestas asociadas.");
         return;
       }
-      setErr(msg);
+      toast.error(msg);
     }
   }
 
@@ -473,9 +472,6 @@ export default function AdminCentrosPage() {
                     disabled={saving}
                   />
                 </div>
-
-                {err ? <p className="text-sm text-red-600">{err}</p> : null}
-
                 <div className="flex items-center justify-end gap-2 pt-1">
                   <Button
                     type="button"
@@ -526,13 +522,6 @@ export default function AdminCentrosPage() {
         </div>
 
         <Separator />
-
-        {err ? (
-          <div className="p-5">
-            <p className="text-sm text-red-600">{err}</p>
-          </div>
-        ) : null}
-
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-neutral-50 text-neutral-600">
@@ -634,9 +623,7 @@ export default function AdminCentrosPage() {
           <p className="text-xs text-neutral-500">
             Total: <span className="font-semibold">{filtered.length}</span>
           </p>
-          <p className="text-xs text-neutral-500">
-            Siguiente: lista admin incluyendo inactivos + restaurar.
-          </p>
+         
         </div>
       </div>
     </div>

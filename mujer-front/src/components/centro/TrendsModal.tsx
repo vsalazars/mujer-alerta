@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 
 import {
   Dialog,
@@ -15,6 +15,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 
 import { api } from "@/lib/api";
+import { mixColors, normalizeBrandColor, withAlpha } from "@/lib/branding";
+import { toast } from "sonner";
 
 // ✅ Nivo Bar (SSR off)
 const ResponsiveBar = dynamic(
@@ -39,6 +41,39 @@ type AnnualPoint = {
 
 type AnnualResponse = {
   series: AnnualPoint[];
+};
+
+type RawYearValue = number | { value?: unknown };
+
+type YearsResponse = number[] | { years?: RawYearValue[] };
+
+type ChartRow = {
+  vector: string;
+} & Record<string, number | string>;
+
+type DeltaLayerBar = {
+  data: {
+    indexValue: string | number;
+  };
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+type DeltaLayerProps = {
+  bars: DeltaLayerBar[];
+  innerWidth: number;
+};
+
+type ActiveBrandTheme = {
+  primary: string;
+  secondary: string;
+  support: string;
+  soft: string;
+  supportSoft: string;
+  border: string;
+  glow: string;
 };
 
 // 1..5 => 0..100
@@ -75,24 +110,73 @@ function deltaLabelKind(kind: "neutral" | "down" | "up") {
   return "•";
 }
 
-// ✅ Mujer Alerta — paleta diversa morado / violeta / rosa (sobria, diferenciable)
-const YEAR_PALETTE = [
-  "#4C1D95",
-  "#9D174D",
-  "#5E17EB",
-  "#7A3EF0",
-  "#8E44AD",
-  "#A855F7",
-  "#B83280",
-  "#C026D3",
-  "#BE185D",
-  "#DB2777",
-  "#E11D48",
-  "#6B1D5C",
-];
+function resolveActiveBrandTheme(): ActiveBrandTheme {
+  const fallbackPrimary = "#7F017F";
+  const fallbackSecondary = "#C23C9A";
+  const fallbackSupport = "#EAD5F1";
 
-function yearColorByIndex(i: number) {
-  return YEAR_PALETTE[i % YEAR_PALETTE.length];
+  if (typeof window === "undefined") {
+    return {
+      primary: fallbackPrimary,
+      secondary: fallbackSecondary,
+      support: fallbackSupport,
+      soft: withAlpha(fallbackPrimary, 0.1),
+      supportSoft: withAlpha(fallbackSupport, 0.55),
+      border: withAlpha(fallbackPrimary, 0.18),
+      glow: withAlpha(fallbackPrimary, 0.35),
+    };
+  }
+
+  const source =
+    Array.from(document.querySelectorAll<HTMLElement>("[style*='--brand-primary']")).at(-1) ??
+    document.documentElement;
+  const computed = getComputedStyle(source);
+
+  const primary = normalizeBrandColor(
+    computed.getPropertyValue("--brand-primary").trim(),
+    fallbackPrimary
+  );
+  const secondary = normalizeBrandColor(
+    computed.getPropertyValue("--brand-secondary").trim(),
+    fallbackSecondary
+  );
+  const support = normalizeBrandColor(
+    computed.getPropertyValue("--brand-support").trim(),
+    fallbackSupport
+  );
+
+  return {
+    primary,
+    secondary,
+    support,
+    soft: computed.getPropertyValue("--brand-soft").trim() || withAlpha(primary, 0.1),
+    supportSoft:
+      computed.getPropertyValue("--brand-support-soft").trim() || withAlpha(support, 0.55),
+    border: computed.getPropertyValue("--brand-border").trim() || withAlpha(primary, 0.18),
+    glow: computed.getPropertyValue("--brand-glow").trim() || withAlpha(primary, 0.35),
+  };
+}
+
+function buildYearPalette(theme: ActiveBrandTheme) {
+  const { primary, secondary, support } = theme;
+  return [
+    primary,
+    secondary,
+    mixColors(primary, secondary, 0.35),
+    mixColors(primary, secondary, 0.65),
+    mixColors(primary, support, 0.22),
+    mixColors(secondary, support, 0.18),
+    mixColors(primary, "#0F172A", 0.18),
+    mixColors(secondary, "#1E293B", 0.22),
+    mixColors(primary, "#FFFFFF", 0.14),
+    mixColors(secondary, "#FFFFFF", 0.12),
+    mixColors(primary, secondary, 0.5),
+    mixColors(primary, support, 0.34),
+  ];
+}
+
+function yearColorByIndex(i: number, palette: string[]) {
+  return palette[i % palette.length];
 }
 
 function textOnColor(bg: string) {
@@ -118,14 +202,18 @@ export function TrendsModal({
   const [loadingSeries, setLoadingSeries] = useState(false);
 
   const [allSeries, setAllSeries] = useState<AnnualPoint[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [brandTheme, setBrandTheme] = useState<ActiveBrandTheme>(() => resolveActiveBrandTheme());
+
+  useEffect(() => {
+    if (!open) return;
+    setBrandTheme(resolveActiveBrandTheme());
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
 
     let mounted = true;
 
-    setError(null);
     setLoadingYears(true);
     setLoadingSeries(false);
     setYears([]);
@@ -134,16 +222,16 @@ export function TrendsModal({
 
     (async () => {
       try {
-        const resp = await api<number[] | { years: any[] }>(`/api/centro/years`);
+        const resp = await api<YearsResponse>(`/api/centro/years`);
 
         const raw = Array.isArray(resp)
           ? resp
-          : Array.isArray((resp as any)?.years)
-            ? (resp as any).years
+          : Array.isArray(resp?.years)
+            ? resp.years
             : [];
 
         const nums = (Array.isArray(raw) ? raw : [])
-          .map((x: any) => {
+          .map((x) => {
             if (x && typeof x === "object" && "value" in x) return Number(x.value);
             return Number(x);
           })
@@ -160,7 +248,7 @@ export function TrendsModal({
         setLoadingYears(false);
 
         if (list.length === 0) {
-          setError("Aún no hay años con datos finalizados.");
+          toast.error("Aún no hay años con datos finalizados.");
           return;
         }
 
@@ -176,23 +264,23 @@ export function TrendsModal({
             `/api/centro/resumen-anual?years=${encodeURIComponent(qs)}`
           );
 
-          const s = Array.isArray((data as any)?.series) ? (data as any).series : [];
+          const s = Array.isArray(data?.series) ? data.series : [];
           const ordered = [...s].sort((a, b) => a.year - b.year);
 
           if (!mounted) return;
           setAllSeries(ordered);
 
-          if (ordered.length === 0) setError("No hay datos para los años disponibles.");
+          if (ordered.length === 0) toast.error("No hay datos para los años disponibles.");
         } catch {
           if (!mounted) return;
-          setError("No se pudo generar la serie anual.");
+          toast.error("No se pudo generar la serie anual.");
         } finally {
           if (!mounted) return;
           setLoadingSeries(false);
         }
       } catch {
         if (!mounted) return;
-        setError("No se pudieron cargar los años disponibles.");
+        toast.error("No se pudieron cargar los años disponibles.");
         setLoadingYears(false);
       }
     })();
@@ -204,7 +292,6 @@ export function TrendsModal({
 
   useEffect(() => {
     if (open) return;
-    setError(null);
     setLoadingYears(false);
     setLoadingSeries(false);
     setYears([]);
@@ -227,18 +314,37 @@ export function TrendsModal({
   }, [allSeries, selected]);
 
   const yearColorMap = useMemo(() => {
+    const palette = buildYearPalette(brandTheme);
     const map: Record<string, string> = {};
     years.forEach((y, i) => {
-      map[y.value] = yearColorByIndex(i);
+      map[y.value] = yearColorByIndex(i, palette);
     });
     return map;
-  }, [years]);
+  }, [brandTheme, years]);
+
+  const dialogBrandStyle = useMemo(
+    () =>
+      ({
+        "--brand-primary": brandTheme.primary,
+        "--brand-secondary": brandTheme.secondary,
+        "--brand-support": brandTheme.support,
+        "--brand-soft": brandTheme.soft,
+        "--brand-support-soft": brandTheme.supportSoft,
+        "--brand-border": brandTheme.border,
+        "--brand-glow": brandTheme.glow,
+        borderColor: brandTheme.border,
+        background:
+          "linear-gradient(180deg, rgba(255,255,255,0.98) 0%, color-mix(in srgb, var(--brand-support, #EAD5F1) 16%, white) 100%)",
+        boxShadow: `0 24px 60px ${brandTheme.glow}`,
+      }) as CSSProperties,
+    [brandTheme]
+  );
 
   const chartModel = useMemo(() => {
     if (!visibleSeries || visibleSeries.length === 0) {
       return {
         keys: [] as string[],
-        data: [] as any[],
+        data: [] as ChartRow[],
         deltaByVector: {} as Record<string, number>,
         yearsEdge: { first: "", last: "" },
       };
@@ -266,7 +372,7 @@ export function TrendsModal({
     };
 
     const row = (vector: string, getRaw: (p: AnnualPoint) => number) => {
-      const base: any = { vector };
+      const base: ChartRow = { vector };
       for (const p of pts) {
         const y = String(p.year);
         const raw = Number(getRaw(p));
@@ -285,13 +391,13 @@ export function TrendsModal({
     return { keys, data, deltaByVector, yearsEdge };
   }, [visibleSeries]);
 
-  const DeltaLayer = (props: any) => {
+  const DeltaLayer = (props: DeltaLayerProps) => {
     const { bars, innerWidth } = props;
 
     const groups: Record<string, { minY: number; maxY: number; maxX: number }> =
       {};
 
-    for (const b of bars as any[]) {
+    for (const b of bars) {
       const v = String(b.data.indexValue);
       const xEnd = b.x + b.width;
 
@@ -325,7 +431,7 @@ export function TrendsModal({
                 width={98}
                 height={22}
                 rx={11}
-                fill="rgba(2,6,23,0.06)"
+                fill="var(--brand-support-soft, rgba(234,213,241,0.55))"
               />
               <text
                 x={xText(g.maxX) + 8}
@@ -368,10 +474,14 @@ export function TrendsModal({
           !max-w-[64vw] !max-h-[85vh]
           rounded-[2rem] border-slate-200 p-0 overflow-hidden
         "
+        style={dialogBrandStyle}
       >
         <div className="h-full flex flex-col p-6">
           <DialogHeader className="shrink-0">
-            <DialogTitle className="text-lg font-black tracking-tight">
+            <DialogTitle
+              className="text-lg font-black tracking-tight"
+              style={{ color: "var(--brand-primary, #7F017F)" }}
+            >
               Tendencias
             </DialogTitle>
             <DialogDescription className="text-sm">
@@ -384,12 +494,22 @@ export function TrendsModal({
           {/* Pills */}
           <div className="shrink-0">
             <div className="flex items-center justify-between gap-3">
-              <div className="text-sm font-black text-slate-700">Años visibles</div>
+              <div
+                className="text-sm font-black"
+                style={{ color: "var(--brand-primary, #7F017F)" }}
+              >
+                Años visibles
+              </div>
 
               <div className="flex items-center gap-2">
                 <Badge
                   variant="secondary"
                   className="rounded-full text-[10px] font-black uppercase tracking-widest"
+                  style={{
+                    backgroundColor: "var(--brand-support-soft, rgba(234,213,241,0.55))",
+                    borderColor: "var(--brand-border, rgba(127,1,127,0.18))",
+                    color: "var(--brand-primary, #7F017F)",
+                  }}
                 >
                   {selected.length}/{years.length}
                 </Badge>
@@ -400,6 +520,11 @@ export function TrendsModal({
                   className="rounded-2xl"
                   disabled={years.length === 0}
                   onClick={() => setSelected(years.map((y) => y.value))}
+                  style={{
+                    borderColor: "var(--brand-border, rgba(127,1,127,0.18))",
+                    color: "var(--brand-primary, #7F017F)",
+                    backgroundColor: "#fff",
+                  }}
                 >
                   Mostrar todo
                 </Button>
@@ -410,6 +535,11 @@ export function TrendsModal({
                   className="rounded-2xl"
                   disabled={years.length === 0}
                   onClick={() => setSelected([])}
+                  style={{
+                    borderColor: "var(--brand-border, rgba(127,1,127,0.18))",
+                    color: "var(--brand-primary, #7F017F)",
+                    backgroundColor: "var(--brand-support-soft, rgba(234,213,241,0.55))",
+                  }}
                 >
                   Ocultar todo
                 </Button>
@@ -430,13 +560,13 @@ export function TrendsModal({
                     const c = yearColorMap[y.value] || "#334155";
                     const fg = textOnColor(c);
 
-                    const inactiveStyle: React.CSSProperties = {
-                      backgroundColor: "rgba(2,6,23,0.04)",
-                      borderColor: "rgba(2,6,23,0.10)",
-                      color: "#0f172a",
+                    const inactiveStyle: CSSProperties = {
+                      backgroundColor: "var(--brand-support-soft, rgba(234,213,241,0.55))",
+                      borderColor: "var(--brand-border, rgba(127,1,127,0.18))",
+                      color: "var(--brand-primary, #7F017F)",
                     };
 
-                    const activeStyle: React.CSSProperties = {
+                    const activeStyle: CSSProperties = {
                       backgroundColor: c,
                       color: fg,
                       borderColor: "transparent",
@@ -474,18 +604,19 @@ export function TrendsModal({
               )}
             </div>
 
-            {error ? (
-              <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
-                {error}
-              </div>
-            ) : null}
           </div>
 
           {/* Chart card */}
-          <div className="mt-4 flex-1 min-h-0 rounded-[1.75rem] border border-slate-200 bg-white p-4 flex flex-col">
+          <div
+            className="mt-4 flex-1 min-h-0 rounded-[1.75rem] border bg-white p-4 flex flex-col"
+            style={{ borderColor: "var(--brand-border, rgba(127,1,127,0.18))" }}
+          >
             {/* Header row */}
             <div className="shrink-0 flex items-start justify-between gap-3">
-              <div className="text-sm font-black text-slate-800">
+              <div
+                className="text-sm font-black"
+                style={{ color: "var(--brand-primary, #7F017F)" }}
+              >
                 Comparación anual por vector de violencia contra la mujer
               </div>
 
@@ -493,6 +624,10 @@ export function TrendsModal({
                 <Badge
                   variant="secondary"
                   className="rounded-full text-[10px] font-black uppercase tracking-widest"
+                  style={{
+                    backgroundColor: "var(--brand-support-soft, rgba(234,213,241,0.55))",
+                    color: "var(--brand-primary, #7F017F)",
+                  }}
                 >
                   0–100%
                 </Badge>
@@ -500,6 +635,10 @@ export function TrendsModal({
                 <Badge
                   variant="secondary"
                   className="rounded-full text-[10px] font-black uppercase tracking-widest"
+                  style={{
+                    backgroundColor: "var(--brand-soft, rgba(127,1,127,0.10))",
+                    color: "var(--brand-primary, #7F017F)",
+                  }}
                 >
                   Δ pp
                 </Badge>
@@ -518,7 +657,12 @@ export function TrendsModal({
                           className="inline-block h-2.5 w-2.5 rounded-full"
                           style={{ background: c }}
                         />
-                        <span className="text-xs font-black text-slate-700">{k}</span>
+                        <span
+                          className="text-xs font-black"
+                          style={{ color: "var(--brand-primary, #7F017F)" }}
+                        >
+                          {k}
+                        </span>
                       </div>
                     );
                   })}
@@ -578,14 +722,27 @@ export function TrendsModal({
                         fontFamily: "Montserrat",
                         fontSize: 12,
                         fontWeight: 900,
-                        fill: "#111827",
+                        fill: "var(--brand-primary, #7F017F)",
                       },
                       axis: {
-                        ticks: { text: { fill: "#111827", fontWeight: 900 } },
-                        legend: { text: { fill: "#111827", fontWeight: 900 } },
+                        ticks: {
+                          text: {
+                            fill: "var(--brand-primary, #7F017F)",
+                            fontWeight: 900,
+                          },
+                        },
+                        legend: {
+                          text: {
+                            fill: "var(--brand-primary, #7F017F)",
+                            fontWeight: 900,
+                          },
+                        },
                       },
                       grid: {
-                        line: { stroke: "rgba(2,6,23,0.08)", strokeWidth: 1 },
+                        line: {
+                          stroke: "var(--brand-border, rgba(127,1,127,0.18))",
+                          strokeWidth: 1,
+                        },
                       },
                     }}
                     layers={["grid", "axes", "bars", DeltaLayer]}
@@ -599,16 +756,31 @@ export function TrendsModal({
             {/* Leyenda Δ compacta */}
             {chartModel.keys.length >= 2 ? (
               <div className="mt-3 shrink-0 flex flex-wrap items-center gap-2 text-[11px] font-black text-slate-600">
-                <span className="rounded-full bg-slate-100 px-3 py-1">
+                <span
+                  className="rounded-full px-3 py-1"
+                  style={{
+                    backgroundColor: "var(--brand-support-soft, rgba(234,213,241,0.55))",
+                    color: "var(--brand-primary, #7F017F)",
+                  }}
+                >
                   Δ pp: {chartModel.yearsEdge.last} − {chartModel.yearsEdge.first}
                 </span>
-                <span className="rounded-full bg-slate-100 px-3 py-1">
+                <span
+                  className="rounded-full px-3 py-1"
+                  style={{ backgroundColor: "rgba(22,163,74,0.10)" }}
+                >
                   <span style={{ color: "#16a34a" }}>↓</span> disminución
                 </span>
-                <span className="rounded-full bg-slate-100 px-3 py-1">
+                <span
+                  className="rounded-full px-3 py-1"
+                  style={{ backgroundColor: "rgba(225,29,72,0.10)" }}
+                >
                   <span style={{ color: "#e11d48" }}>↑</span> aumento
                 </span>
-                <span className="rounded-full bg-slate-100 px-3 py-1">
+                <span
+                  className="rounded-full px-3 py-1"
+                  style={{ backgroundColor: "rgba(100,116,139,0.10)" }}
+                >
                   <span style={{ color: "#64748b" }}>•</span> marginal (±{DELTA_EPS_PP.toFixed(1)}{" "}
                   pp)
                 </span>
@@ -627,6 +799,11 @@ export function TrendsModal({
               variant="outline"
               className="rounded-2xl"
               onClick={() => onOpenChange(false)}
+              style={{
+                borderColor: "var(--brand-border, rgba(127,1,127,0.18))",
+                color: "var(--brand-primary, #7F017F)",
+                backgroundColor: "#fff",
+              }}
             >
               Cerrar
             </Button>

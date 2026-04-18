@@ -15,13 +15,12 @@ import {
   DrawerHeader,
   DrawerTitle,
   DrawerDescription,
-  DrawerFooter,
 } from "@/components/ui/drawer";
 
-import { ArrowLeft, Home, RefreshCw, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import { api } from "@/lib/api";
 import { themeFromBranding } from "@/lib/branding";
-import { extractInstitutionSlug, withInstitutionSlug } from "@/lib/routing";
+import { extractInstitutionSlug } from "@/lib/routing";
 import { CheckCircle } from "lucide-react";
 
 
@@ -221,10 +220,12 @@ function levelBadgeStyle(v: number, primary: string, secondary: string) {
 }
 
 function useIsMobile(breakpointPx = 768) {
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia(`(max-width: ${breakpointPx}px)`).matches;
+  });
   useEffect(() => {
     const mq = window.matchMedia(`(max-width: ${breakpointPx}px)`);
-    setIsMobile(mq.matches);
     const handler = () => setIsMobile(mq.matches);
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
@@ -520,25 +521,44 @@ export default function ResultadosEncuestaPage() {
     return { tipo, dimKey, value, refs: LGAM_MAP[tipo.tipo_num] || [] };
   }, [selected, tipoAgg]);
 
+  const panelStyle = {
+    borderColor: theme.border,
+    boxShadow: `0 22px 50px -30px ${theme.glow}`,
+  } as React.CSSProperties;
+
+  const softPanelStyle = {
+    borderColor: theme.border,
+    background: `linear-gradient(180deg, #ffffff 0%, ${theme.soft} 100%)`,
+  } as React.CSSProperties;
+
   return (
-    <main className="min-h-dvh bg-gradient-to-b from-neutral-50 to-white">
+    <main
+      className="min-h-dvh bg-white"
+      style={{
+        backgroundImage: `linear-gradient(180deg, #ffffff 0%, ${theme.soft} 22%, #ffffff 100%)`,
+      }}
+    >
       <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="sticky top-0 z-20 -mx-4 mb-8 bg-white/92 px-4 py-4 backdrop-blur supports-[backdrop-filter]:bg-white/80 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-          <div className="flex items-center justify-between gap-4">
-            <div>
+        <div className="sticky top-0 z-20 -mx-4 mb-6 bg-white/92 px-4 py-4 backdrop-blur supports-[backdrop-filter]:bg-white/80 sm:-mx-6 sm:mb-8 sm:px-6 lg:-mx-8 lg:px-8">
+          <div
+            className="rounded-[2rem] border px-4 py-4 sm:px-6 sm:py-5"
+            style={{
+              ...softPanelStyle,
+              boxShadow: `0 18px 45px -32px ${theme.glow}`,
+            }}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
               {branding?.logo_url ? (
                 <div className="mb-4 flex items-center gap-3">
                   <img
                     src={branding.logo_url}
                     alt={branding.nombre_publico || "Logo institucional"}
-                    className="h-16 w-auto max-w-[120px] shrink-0 object-contain"
+                    className="h-14 w-auto max-w-[96px] shrink-0 object-contain sm:h-16 sm:max-w-[120px]"
                   />
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-neutral-500">
-                      Institución
-                    </p>
-                    <p className="truncate text-sm font-semibold text-neutral-700">
+                    <p className="text-sm font-semibold leading-5 sm:text-base" style={{ color: theme.primary }}>
                       {branding.nombre_publico || "Institución participante"}
                     </p>
                   </div>
@@ -547,17 +567,16 @@ export default function ResultadosEncuestaPage() {
               <p className="text-sm font-medium text-neutral-600">
                 Resultados del diagnóstico
               </p>
-              <h1 className="mt-1 text-2xl font-bold text-neutral-900">
-                {branding?.nombre_publico?.trim()
-                  ? `Tu percepción del entorno en ${branding.nombre_publico.trim()}`
-                  : "Tu percepción del entorno"}
+              <h1 className="mt-1 text-2xl font-bold leading-tight sm:text-3xl" style={{ color: theme.primary }}>
+                Tu percepción del entorno
               </h1>
-            </div>
-            {!branding?.logo_url ? (
-              <div className="grid h-11 w-11 place-items-center rounded-2xl border border-neutral-200 bg-white shadow-sm">
-                <ShieldCheck className="h-5 w-5" style={{ color: theme.primary }} />
               </div>
-            ) : null}
+              {!branding?.logo_url ? (
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border bg-white shadow-sm" style={{ borderColor: theme.border }}>
+                  <ShieldCheck className="h-5 w-5" style={{ color: theme.primary }} />
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
 
@@ -576,9 +595,9 @@ export default function ResultadosEncuestaPage() {
         ) : (
           <>
             {/* Indicadores globales */}
-            <Card className="overflow-hidden rounded-3xl border-neutral-200 shadow-sm">
+            <Card className="overflow-hidden rounded-3xl border shadow-sm" style={panelStyle}>
               <CardHeader>
-                <CardTitle className="text-lg font-semibold">
+                <CardTitle className="text-lg font-semibold" style={{ color: theme.primary }}>
                   Indicadores globales
                 </CardTitle>
                 <p className="text-sm text-neutral-600">
@@ -587,10 +606,17 @@ export default function ResultadosEncuestaPage() {
               </CardHeader>
 
               <CardContent>
-                <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 md:grid-cols-4">
                   {DIM_ORDER.map((dim) => (
-                    <div key={dim} className="rounded-2xl bg-neutral-50 p-5 text-center">
-                      <p className="text-sm font-medium text-neutral-600">
+                    <div
+                      key={dim}
+                      className="rounded-2xl p-5 text-center"
+                      style={{
+                        background: `linear-gradient(180deg, #ffffff 0%, ${theme.soft} 100%)`,
+                        border: `1px solid ${theme.border}`,
+                      }}
+                    >
+                      <p className="text-sm font-medium" style={{ color: theme.primary }}>
                         {DIM_LABEL_FULL[dim]}
                       </p>
 
@@ -610,10 +636,11 @@ export default function ResultadosEncuestaPage() {
 
                   {/* ✅ ÚNICO CAMBIO: card Total con layout flex para centrar el badge REAL */}
                   <div
-                    className="rounded-2xl p-5 flex flex-col items-center text-center"
+                    className="rounded-2xl p-5 flex min-h-[154px] flex-col items-center justify-center text-center"
                     style={{
-                      background: theme.gradient,
+                      background: theme.gradientWide,
                       color: "white",
+                      boxShadow: `0 16px 40px -28px ${theme.glow}`,
                     }}
                   >
                     <p className="text-sm font-medium">Total</p>
@@ -655,9 +682,9 @@ export default function ResultadosEncuestaPage() {
             <Separator className="my-10" />
 
             {/* Heatmap */}
-            <Card className="overflow-hidden rounded-3xl border-neutral-200 shadow-sm">
+            <Card className="overflow-hidden rounded-3xl border shadow-sm" style={panelStyle}>
               <CardHeader>
-                <CardTitle className="text-lg font-semibold">
+                <CardTitle className="text-lg font-semibold" style={{ color: theme.primary }}>
                   Mapa de calor por tipo de violencia
                 </CardTitle>
                 <p className="text-xs text-neutral-600">
@@ -667,8 +694,14 @@ export default function ResultadosEncuestaPage() {
                 </p>
               </CardHeader>
 
-              <CardContent className="pb-8">
-                <div className="rounded-2xl bg-neutral-50/50 p-4">
+              <CardContent className="pb-6 sm:pb-8">
+                <div
+                  className="overflow-hidden rounded-2xl p-3 sm:p-4"
+                  style={{
+                    background: `linear-gradient(180deg, #ffffff 0%, ${theme.soft} 100%)`,
+                    border: `1px solid ${theme.border}`,
+                  }}
+                >
                   <ReactECharts
                     option={chartOption}
                     style={{ height: chartHeight, width: "100%" }}
@@ -679,9 +712,9 @@ export default function ResultadosEncuestaPage() {
 
                 {isMobile && (
                   <div className="mt-6 space-y-4">
-                    <div className="rounded-2xl border bg-white p-4 shadow-sm">
+                    <div className="rounded-2xl border bg-white p-4 shadow-sm" style={{ borderColor: theme.border }}>
                       <div className="flex items-center justify-between gap-3 text-sm">
-                        <span className="font-medium leading-none">
+                        <span className="font-medium leading-none" style={{ color: theme.primary }}>
                           Leyenda de dimensiones
                         </span>
                         <span className="text-neutral-500 leading-none whitespace-nowrap">
@@ -694,14 +727,14 @@ export default function ResultadosEncuestaPage() {
                           <div
                             key={v}
                             className="h-6 flex-1 rounded-full"
-                            style={{ backgroundColor: colorForValue(v) }}
+                            style={{ backgroundColor: colorForValueBrand(v, theme.primary, theme.secondary) }}
                           />
                         ))}
                       </div>
                     </div>
 
-                    <div className="rounded-2xl border bg-white p-4 shadow-sm">
-                      <p className="mb-3 text-sm font-medium">
+                    <div className="rounded-2xl border bg-white p-4 shadow-sm" style={{ borderColor: theme.border }}>
+                      <p className="mb-3 text-sm font-medium" style={{ color: theme.primary }}>
                         Tipos de Violencia contra la Mujer
                       </p>
 
@@ -709,12 +742,13 @@ export default function ResultadosEncuestaPage() {
                         {tipos.map((t) => (
                           <div
                             key={t.tipo_num}
-                            className="flex items-start gap-3 rounded-xl px-3 py-2 hover:bg-neutral-50 transition-colors"
+                            className="flex items-start gap-3 rounded-xl px-3 py-2 transition-colors"
+                            style={{ backgroundColor: "transparent" }}
                           >
                             <span
-                              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold tabular-nums"
+                              className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold tabular-nums"
                               style={{
-                                backgroundColor: theme.primary,
+                                background: theme.gradientWide,
                                 color: "white",
                                 boxShadow: `0 0 0 3px ${theme.softStrong}`,
                               }}
@@ -722,7 +756,7 @@ export default function ResultadosEncuestaPage() {
                               {t.tipo_num}
                             </span>
 
-                            <span className="text-sm text-neutral-800 leading-snug">
+                            <span className="min-w-0 text-sm leading-snug text-neutral-800">
                               {t.tipo_nombre}
                             </span>
                           </div>
@@ -760,11 +794,11 @@ export default function ResultadosEncuestaPage() {
           style={{ maxHeight: "calc(100dvh - 96px)" }}
         >
           {/* Handle */}
-          <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-neutral-300" />
+          <div className="mx-auto mt-2 h-1.5 w-12 rounded-full" style={{ backgroundColor: theme.softStrong }} />
 
           {/* Header compacto */}
-          <DrawerHeader className="relative shrink-0 pt-3 pb-2">
-            <DrawerTitle className="text-base">
+          <DrawerHeader className="relative shrink-0 border-b pt-3 pb-2" style={{ borderColor: theme.border }}>
+            <DrawerTitle className="text-base" style={{ color: theme.primary }}>
               Detalle del tipo seleccionado
             </DrawerTitle>
             <DrawerDescription className="text-xs">
@@ -774,7 +808,12 @@ export default function ResultadosEncuestaPage() {
             <button
               aria-label="Cerrar"
               onClick={() => setDrawerOpen(false)}
-              className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-neutral-100 hover:bg-neutral-200 transition"
+              className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full transition"
+              style={{
+                backgroundColor: theme.soft,
+                color: theme.primary,
+                border: `1px solid ${theme.border}`,
+              }}
             >
               ✕
             </button>
@@ -784,16 +823,16 @@ export default function ResultadosEncuestaPage() {
           <ScrollArea className="flex-1 min-h-0">
             <div className="px-4 pb-28">
               {selectedDetail ? (
-                <Card className="rounded-2xl border-neutral-200">
+                <Card className="rounded-2xl border" style={panelStyle}>
                   <CardContent className="pt-4 pb-4">
-                    <h3 className="mb-3 text-sm font-bold text-neutral-900 leading-snug">
+                    <h3 className="mb-3 text-sm font-bold leading-snug" style={{ color: theme.primary }}>
                       {selectedDetail.tipo.tipo_num}.{" "}
                       {selectedDetail.tipo.tipo_nombre}
                     </h3>
 
                     {selectedDetail.refs.length > 0 && (
                       <div className="mb-3">
-                        <p className="mb-2 text-xs font-medium text-neutral-700">
+                        <p className="mb-2 text-xs font-medium" style={{ color: theme.primary }}>
                           Clasificación LGAMVLV
                         </p>
 
@@ -822,7 +861,7 @@ export default function ResultadosEncuestaPage() {
                       </div>
                     )}
 
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-1 gap-2 min-[380px]:grid-cols-3">
                       {DIM_ORDER.map((dim) => {
                         const val = selectedDetail.tipo[
                           dim as keyof TipoAgg
@@ -832,14 +871,15 @@ export default function ResultadosEncuestaPage() {
                         return (
                           <div
                             key={dim}
-                            className={`rounded-2xl border-2 p-2.5 text-center transition-all ${
-                              isActive
-                                ? "border-neutral-900 bg-neutral-50"
-                                : "border-neutral-200"
-                            }`}
+                            className="rounded-2xl border-2 p-2.5 text-center transition-all"
+                            style={{
+                              borderColor: isActive ? theme.primary : theme.border,
+                              background: isActive ? `linear-gradient(180deg, #ffffff 0%, ${theme.soft} 100%)` : "#ffffff",
+                              boxShadow: isActive ? `0 10px 24px -18px ${theme.glow}` : "none",
+                            }}
                           >
                             <div className="flex items-center justify-center gap-1.5">
-                              <span className="text-sm font-bold">
+                              <span className="text-sm font-bold" style={{ color: isActive ? theme.primary : undefined }}>
                                 {DIM_LABEL_SHORT[dim]}
                               </span>
                               <div
@@ -861,14 +901,20 @@ export default function ResultadosEncuestaPage() {
                       })}
                     </div>
 
-                    <div className="mt-3 rounded-xl bg-neutral-100 p-3 text-center">
+                    <div
+                      className="mt-3 rounded-xl p-3 text-center"
+                      style={{
+                        background: `linear-gradient(180deg, #ffffff 0%, ${theme.soft} 100%)`,
+                        border: `1px solid ${theme.border}`,
+                      }}
+                    >
                       <p className="text-xs text-neutral-600">
                         Dimensión seleccionada:{" "}
-                        <span className="font-semibold text-neutral-900">
+                        <span className="font-semibold" style={{ color: theme.primary }}>
                           {DIM_LABEL_FULL[selectedDetail.dimKey]}
                         </span>
                       </p>
-                      <p className="mt-1 text-xl font-bold leading-none">
+                      <p className="mt-1 text-xl font-bold leading-none" style={{ color: theme.primary }}>
                         {fmt(selectedDetail.value)}
                       </p>
                     </div>
@@ -886,11 +932,13 @@ export default function ResultadosEncuestaPage() {
           <div
             className="shrink-0 border-t bg-white/95 backdrop-blur px-4 pt-3"
             style={{
+              borderColor: theme.border,
               paddingBottom: "calc(env(safe-area-inset-bottom) + 16px)",
             }}
           >
             <Button
-              className="h-11 w-full rounded-full mb-2"
+              className="mb-2 h-11 w-full rounded-full text-white"
+              style={{ background: theme.gradientWide }}
               onClick={() => setDrawerOpen(false)}
             >
               Cerrar

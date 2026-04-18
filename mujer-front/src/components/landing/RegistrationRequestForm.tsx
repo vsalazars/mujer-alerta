@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { api } from "@/lib/api";
+import { toast } from "sonner";
 
 const BRAND = "#7F017F";
 
@@ -49,6 +50,41 @@ const INITIAL_STATE: FormState = {
   sitio_web: "",
 };
 
+const MEXICAN_STATES = [
+  "Aguascalientes",
+  "Baja California",
+  "Baja California Sur",
+  "Campeche",
+  "Chiapas",
+  "Chihuahua",
+  "Ciudad de México",
+  "Coahuila",
+  "Colima",
+  "Durango",
+  "Estado de México",
+  "Guanajuato",
+  "Guerrero",
+  "Hidalgo",
+  "Jalisco",
+  "Michoacán",
+  "Morelos",
+  "Nayarit",
+  "Nuevo León",
+  "Oaxaca",
+  "Puebla",
+  "Querétaro",
+  "Quintana Roo",
+  "San Luis Potosí",
+  "Sinaloa",
+  "Sonora",
+  "Tabasco",
+  "Tamaulipas",
+  "Tlaxcala",
+  "Veracruz",
+  "Yucatán",
+  "Zacatecas",
+] as const;
+
 export function RegistrationRequestForm({
   mode = "page",
   onSuccess,
@@ -58,37 +94,50 @@ export function RegistrationRequestForm({
 }) {
   const [form, setForm] = useState<FormState>(INITIAL_STATE);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const [success, setSuccess] = useState<RegistroResponse | null>(null);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
+  function updatePhone(value: string) {
+    const digitsOnly = value.replace(/\D/g, "").slice(0, 10);
+    update("telefono_contacto", digitsOnly);
+  }
+
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setError("");
+
+    if (form.telefono_contacto && !/^\d{10}$/.test(form.telefono_contacto)) {
+      toast.error("El teléfono debe contener exactamente 10 números.");
+      return;
+    }
+
     setLoading(true);
 
     try {
       const payload = await api<RegistroResponse>("/api/registro-institucional", {
         method: "POST",
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          telefono_contacto: form.telefono_contacto.trim(),
+        }),
       });
       setSuccess(payload);
+      toast.success("Solicitud enviada correctamente.");
       setForm(INITIAL_STATE);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "";
       if (msg.includes("missing_required_fields")) {
-        setError("Completa institución, persona de contacto y correo.");
+        toast.error("Completa institución, persona de contacto y correo.");
       } else if (msg.includes("bad_email")) {
-        setError("Escribe un correo válido.");
+        toast.error("Escribe un correo válido.");
       } else if (msg.includes("request_already_exists")) {
-        setError("Ya existe una solicitud activa con ese correo. Te contactaremos pronto.");
+        toast.error("Ya existe una solicitud activa con ese correo. Te contactaremos pronto.");
       } else if (msg.includes("Failed to fetch")) {
-        setError("No hubo conexión con el servidor.");
+        toast.error("No hubo conexión con el servidor.");
       } else {
-        setError("No pudimos enviar tu solicitud. Intenta de nuevo.");
+        toast.error("No pudimos enviar tu solicitud. Intenta de nuevo.");
       }
     } finally {
       setLoading(false);
@@ -202,22 +251,31 @@ export function RegistrationRequestForm({
           <Label htmlFor={`telefono_contacto_${mode}`}>Teléfono</Label>
           <Input
             id={`telefono_contacto_${mode}`}
+            type="tel"
             value={form.telefono_contacto}
-            onChange={(e) => update("telefono_contacto", e.target.value)}
-            placeholder="+52 777 123 4567"
+            onChange={(e) => updatePhone(e.target.value)}
+            inputMode="numeric"
+            maxLength={10}
+            pattern="\d{10}"
+            placeholder="7771234567"
             disabled={loading}
           />
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor={`estado_${mode}`}>Estado</Label>
-          <Input
-            id={`estado_${mode}`}
-            value={form.estado}
-            onChange={(e) => update("estado", e.target.value)}
-            placeholder="Morelos"
-            disabled={loading}
-          />
+          <Label>Estado</Label>
+          <Select value={form.estado} onValueChange={(value) => update("estado", value)} disabled={loading}>
+            <SelectTrigger id={`estado_${mode}`} className="w-full">
+              <SelectValue placeholder="Selecciona un estado" />
+            </SelectTrigger>
+            <SelectContent>
+              {MEXICAN_STATES.map((state) => (
+                <SelectItem key={state} value={state}>
+                  {state}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="grid gap-2">
@@ -242,9 +300,6 @@ export function RegistrationRequestForm({
           />
         </div>
       </div>
-
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
-
       <Button
         type="submit"
         className="rounded-full px-6 font-semibold"
@@ -258,7 +313,7 @@ export function RegistrationRequestForm({
           </>
         ) : (
           <>
-            Solicitar alta institucional
+            Enviar solicitud
             <ArrowRight className="ml-2 h-4 w-4" />
           </>
         )}

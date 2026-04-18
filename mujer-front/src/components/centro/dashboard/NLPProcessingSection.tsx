@@ -294,8 +294,8 @@ function DonutCard({
         </Badge>
       </div>
 
-      <div className="mt-4 flex flex-col gap-6 lg:grid lg:grid-cols-[minmax(340px,1.2fr)_minmax(220px,0.8fr)] lg:items-start lg:gap-6">
-        <div className="flex h-[300px] items-center justify-center lg:h-[340px] lg:w-full">
+      <div className="mt-4 flex flex-col gap-5 xl:grid xl:grid-cols-[minmax(320px,1.1fr)_minmax(0,0.9fr)] xl:items-start xl:gap-6">
+        <div className="flex h-[280px] items-center justify-center sm:h-[300px] xl:h-[340px] xl:w-full">
           {total === 0 ? (
             <div className="flex h-full w-full items-center justify-center rounded-2xl border border-dashed border-slate-200 text-sm font-semibold text-slate-500">
               Sin datos
@@ -331,24 +331,26 @@ function DonutCard({
           )}
         </div>
 
-        <div className="grid gap-3 lg:min-h-[340px] lg:content-center">
+        <div className="grid gap-3 xl:min-h-[340px] xl:content-center">
           {sortedData.map((item, index) => {
             const pct = total > 0 ? Math.round((item.total / total) * 100) : 0;
             return (
               <div
                 key={item.clave}
-                className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3"
+                className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3"
               >
-                <div className="flex items-center gap-3">
+                <div className="flex min-w-0 items-center gap-3">
                   <span
-                    className="inline-flex h-3 w-3 rounded-full"
+                    className="inline-flex h-3 w-3 shrink-0 rounded-full"
                     style={{
                       background: colorByKey?.[item.clave] ?? colors[index % colors.length],
                     }}
                   />
-                  <span className="text-[15px] font-semibold text-slate-700">{item.label}</span>
+                  <span className="min-w-0 break-words text-[15px] font-semibold leading-5 text-slate-700">
+                    {item.label}
+                  </span>
                 </div>
-                <div className="text-right leading-tight">
+                <div className="shrink-0 text-right leading-tight">
                   <p className="text-base font-black text-slate-900">{fmtInt(item.total)}</p>
                   <p className="text-[11px] font-semibold" style={{ color: PURPLE }}>{pct}%</p>
                 </div>

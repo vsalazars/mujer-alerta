@@ -31,6 +31,7 @@ export function DistributionSection({
                 <Badge
                   variant="secondary"
                   className="rounded-full font-black text-[10px] uppercase tracking-widest"
+                  style={{ background: "var(--brand-soft, rgba(127,1,127,0.10))", color: PURPLE }}
                 >
                   Género
                 </Badge>
@@ -56,6 +57,7 @@ export function DistributionSection({
                 <Badge
                   variant="secondary"
                   className="rounded-full font-black text-[10px] uppercase tracking-widest"
+                  style={{ background: "var(--brand-soft, rgba(127,1,127,0.10))", color: PURPLE }}
                 >
                   Edad
                 </Badge>
@@ -79,6 +81,13 @@ export function DistributionSection({
             </CardTitle>
             <div className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" style={{ color: PURPLE }} />
+              <Badge
+                variant="secondary"
+                className="rounded-full font-black text-[10px] uppercase tracking-widest"
+                style={{ background: "var(--brand-soft, rgba(127,1,127,0.10))", color: PURPLE }}
+              >
+                Comparativo
+              </Badge>
             </div>
           </div>
         </CardHeader>

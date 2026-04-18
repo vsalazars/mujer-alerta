@@ -143,9 +143,9 @@ export default function CentroLayout({ children }: { children: React.ReactNode }
                   <img
                     src={config.logo_url}
                     alt="Logo institucional"
-                    className="h-14 w-auto max-w-[84px] shrink-0 object-contain"
+                    className="h-28 w-auto max-w-[180px] shrink-0 object-contain"
                   />
-                ) : (
+                ) : ( 
                   <div
                     className="grid h-11 w-11 place-items-center rounded-2xl"
                       style={{ backgroundColor: theme.soft }}
@@ -185,8 +185,28 @@ export default function CentroLayout({ children }: { children: React.ReactNode }
                 <p className="text-xs text-neutral-500">{user.email}</p>
               </div>
 
-              <Button onClick={onLogout} variant="outline" className="rounded-full">
-                <LogOut className="mr-2 h-4 w-4" />
+              <Button
+                onClick={onLogout}
+                variant="outline"
+                className="group rounded-full transition-all duration-200 ease-out hover:-translate-y-[1px]"
+                style={{
+                  borderColor: theme.support,
+                  backgroundColor: theme.supportSoft,
+                  color: theme.primary,
+                  boxShadow: "0 0 0 rgba(0,0,0,0)",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = `linear-gradient(135deg, ${theme.soft} 0%, ${theme.supportSoft} 100%)`;
+                  e.currentTarget.style.borderColor = theme.border;
+                  e.currentTarget.style.boxShadow = `0 12px 28px ${theme.soft}`;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = theme.supportSoft;
+                  e.currentTarget.style.borderColor = theme.support;
+                  e.currentTarget.style.boxShadow = "0 0 0 rgba(0,0,0,0)";
+                }}
+              >
+                <LogOut className="mr-2 h-4 w-4 transition-transform duration-200 ease-out group-hover:-translate-y-[1px] group-hover:scale-110" />
                 Salir
               </Button>
             </div>

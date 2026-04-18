@@ -383,7 +383,7 @@ export default function CentroPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="flex items-center gap-3 text-slate-500 font-semibold">
           <RefreshCw className="h-5 w-5 animate-spin" />
           Cargando resultados…
@@ -394,7 +394,7 @@ export default function CentroPage() {
 
   if (!data) {
     return (
-      <div className="min-h-screen bg-[#F8FAFC] px-6 py-10 lg:px-12 text-slate-900">
+      <div className="min-h-screen bg-white px-6 py-10 lg:px-12 text-slate-900">
         <div className="mx-auto max-w-[1400px]">
           <section
             className="overflow-hidden rounded-[32px] border bg-white"
@@ -542,7 +542,7 @@ export default function CentroPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] px-6 py-10 lg:px-12 text-slate-900">
+    <div className="min-h-screen bg-white px-6 py-10 lg:px-12 text-slate-900">
         <DashboardHero
           data={data}
           centerLabel={centroLabel}

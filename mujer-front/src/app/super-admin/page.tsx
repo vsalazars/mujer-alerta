@@ -8,6 +8,7 @@ import { Building2, CheckCircle2, Clock3, Power, XCircle } from "lucide-react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import type { UserRole } from "@/lib/auth";
+import { toast } from "sonner";
 
 type Solicitud = {
   id: number;
@@ -56,7 +57,6 @@ export default function SuperAdminPage() {
   const router = useRouter();
   const [items, setItems] = useState<Solicitud[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [busyId, setBusyId] = useState<number | null>(null);
   const [filter, setFilter] = useState("all");
   const [sessionChecked, setSessionChecked] = useState(false);
@@ -64,7 +64,6 @@ export default function SuperAdminPage() {
 
   async function load(status: string) {
     setLoading(true);
-    setError("");
     try {
       const path =
         status === "all"
@@ -74,7 +73,7 @@ export default function SuperAdminPage() {
       setItems(data);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "";
-      setError(
+      toast.error(
         msg.includes("forbidden")
           ? "Tu sesión no tiene permisos de super admin."
           : msg
@@ -96,7 +95,7 @@ export default function SuperAdminPage() {
       setAllowed(false);
       setSessionChecked(true);
       setLoading(false);
-      setError("Esta pantalla solo se puede usar con una cuenta super admin.");
+      toast.error("Esta pantalla solo se puede usar con una cuenta super admin.");
       return;
     }
     setAllowed(true);
@@ -116,8 +115,17 @@ export default function SuperAdminPage() {
         body: JSON.stringify({ accion }),
       });
       setItems((current) => current.map((item) => (item.id === id ? updated : item)));
+      const successMessage =
+        accion === "aprobar"
+          ? "Solicitud aprobada y activada."
+          : accion === "rechazar"
+            ? "Solicitud rechazada."
+            : accion === "activar"
+              ? "Institución reactivada."
+              : "Institución desactivada.";
+      toast.success(successMessage);
     } catch {
-      setError("No se pudo actualizar la solicitud.");
+      toast.error("No se pudo actualizar la solicitud.");
     } finally {
       setBusyId(null);
     }
@@ -131,7 +139,7 @@ export default function SuperAdminPage() {
     };
   }, [items]);
 
-  if (!sessionChecked) return null;
+  if (!sessionChecked || !allowed) return null;
 
   return (
     <div className="grid gap-6">
@@ -176,13 +184,6 @@ export default function SuperAdminPage() {
           </Button>
         ))}
       </div>
-
-      {error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-      ) : null}
-
       {loading ? (
         <div className="rounded-[1.75rem] border border-white/80 bg-white p-8 text-sm text-slate-600 shadow-sm">
           Cargando solicitudes...
