@@ -272,8 +272,34 @@ func main() {
 					case http.MethodGet:
 						sah.GetSolicitud(w, r, id)
 						return
+					case http.MethodPatch:
+						sah.EditSolicitud(w, r, id)
+						return
 					case http.MethodPut:
 						sah.UpdateSolicitud(w, r, id)
+						return
+					default:
+						http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+						return
+					}
+				})),
+			),
+		).ServeHTTP(w, r)
+	})
+	mux.HandleFunc("/api/super-admin/instituciones/", func(w http.ResponseWriter, r *http.Request) {
+		handlers.RequireJWT(
+			handlers.WithTenantSession(pool,
+				handlers.RequireSuperAdmin(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					idStr := strings.TrimPrefix(r.URL.Path, "/api/super-admin/instituciones/")
+					idStr = strings.Trim(idStr, "/")
+					id, err := strconv.ParseInt(idStr, 10, 64)
+					if err != nil || id <= 0 {
+						http.Error(w, "bad_id", http.StatusBadRequest)
+						return
+					}
+					switch r.Method {
+					case http.MethodPatch:
+						sah.EditInstitucion(w, r, id)
 						return
 					default:
 						http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
@@ -491,7 +517,7 @@ func main() {
 			"https://mujer-alerta-git-main-vidal-salazars-projects.vercel.app",
 			"https://mujer-alerta-92958pdcf-vidal-salazars-projects.vercel.app",
 		},
-		AllowedMethods: "GET, POST, PUT, DELETE, OPTIONS",
+		AllowedMethods: "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 		AllowedHeaders: "Content-Type, Authorization, X-Institucion-Slug",
 	})
 

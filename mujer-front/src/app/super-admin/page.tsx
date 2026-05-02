@@ -3,10 +3,26 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { Building2, CheckCircle2, Clock3, Power, XCircle } from "lucide-react";
+import { Building2, CheckCircle2, Clock3, Pencil, Power, XCircle } from "lucide-react";
 
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { UserRole } from "@/lib/auth";
 import { toast } from "sonner";
 
@@ -30,6 +46,19 @@ type Solicitud = {
   institucion_activa?: boolean;
   created_at: string;
   updated_at: string;
+};
+
+type EditForm = {
+  institucion_nombre: string;
+  tipo: string;
+  nombre_contacto: string;
+  cargo_contacto: string;
+  email_contacto: string;
+  telefono_contacto: string;
+  estado: string;
+  ciudad: string;
+  sitio_web: string;
+  slug_deseado: string;
 };
 
 const BRAND = "#7F017F";
@@ -63,6 +92,20 @@ export default function SuperAdminPage() {
   const [filter, setFilter] = useState("all");
   const [sessionChecked, setSessionChecked] = useState(false);
   const [allowed, setAllowed] = useState(false);
+  const [editingItem, setEditingItem] = useState<Solicitud | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editForm, setEditForm] = useState<EditForm>({
+    institucion_nombre: "",
+    tipo: "institucion",
+    nombre_contacto: "",
+    cargo_contacto: "",
+    email_contacto: "",
+    telefono_contacto: "",
+    estado: "",
+    ciudad: "",
+    sitio_web: "",
+    slug_deseado: "",
+  });
 
   async function load(status: string) {
     setLoading(true);
@@ -133,6 +176,51 @@ export default function SuperAdminPage() {
     }
   }
 
+  function openEdit(item: Solicitud) {
+    setEditingItem(item);
+    setEditForm({
+      institucion_nombre: item.institucion_nombre || "",
+      tipo: item.tipo || "institucion",
+      nombre_contacto: item.nombre_contacto || "",
+      cargo_contacto: item.cargo_contacto || "",
+      email_contacto: item.email_contacto || "",
+      telefono_contacto: item.telefono_contacto || "",
+      estado: item.estado || "",
+      ciudad: item.ciudad || "",
+      sitio_web: item.sitio_web || "",
+      slug_deseado: item.slug_deseado || "",
+    });
+  }
+
+  async function saveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingItem) return;
+    setEditLoading(true);
+    try {
+      const isExistingInstitution = editingItem.origen === "institucion" || editingItem.solo_lectura;
+      const path = isExistingInstitution
+        ? `/api/super-admin/instituciones/${editingItem.institucion_id}`
+        : `/api/super-admin/registro-institucional/${editingItem.id}`;
+      const updated = await api<Solicitud>(path, {
+        method: "PATCH",
+        body: JSON.stringify(editForm),
+      });
+      setItems((current) => current.map((item) => (item.id === editingItem.id ? updated : item)));
+      setEditingItem(null);
+      toast.success("Información actualizada.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("slug_exists")) toast.error("El slug ya está en uso.");
+      else if (msg.includes("bad_email")) toast.error("El correo no es válido.");
+      else if (msg.includes("missing_required_fields")) toast.error("Completa los campos obligatorios.");
+      else if (msg.includes("method_not_allowed")) toast.error("El backend aún no permite esta edición. Reinicia el servidor.");
+      else if (msg.includes("Failed to fetch")) toast.error("La edición fue bloqueada por conexión o CORS. Reinicia el backend y vuelve a intentar.");
+      else toast.error("No se pudo guardar la información.");
+    } finally {
+      setEditLoading(false);
+    }
+  }
+
   const summary = useMemo(() => {
     return {
       pendientes: items.filter((item) => item.estatus_solicitud === "pendiente").length,
@@ -141,10 +229,161 @@ export default function SuperAdminPage() {
     };
   }, [items]);
 
+  const editingExistingInstitution = editingItem?.origen === "institucion" || editingItem?.solo_lectura;
+
   if (!sessionChecked || !allowed) return null;
 
   return (
     <div className="grid gap-6">
+      <Dialog open={Boolean(editingItem)} onOpenChange={(open) => (!open ? setEditingItem(null) : null)}>
+        <DialogContent className="max-w-2xl rounded-[1.75rem]">
+          <DialogHeader>
+            <DialogTitle style={{ color: BRAND }}>
+              {editingExistingInstitution ? "Editar institución" : "Editar solicitud"}
+            </DialogTitle>
+            <DialogDescription>
+              {editingExistingInstitution
+                ? "Modifica los datos base de la institución ya registrada en el sistema."
+                : "Ajusta la información antes de aprobar o para corregir una solicitud ya vinculada."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={saveEdit} className="grid gap-4">
+            {editingExistingInstitution ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                En esta vista solo se editan campos que existen en la tabla de instituciones. Los datos de contacto extendidos
+                como cargo o sitio web requieren una solicitud vinculada.
+              </div>
+            ) : null}
+            <div className="grid gap-2 md:grid-cols-2">
+              <div className="grid gap-2 md:col-span-2">
+                <Label htmlFor="institucion_nombre">Institución</Label>
+                <Input
+                  id="institucion_nombre"
+                  value={editForm.institucion_nombre}
+                  onChange={(e) => setEditForm((current) => ({ ...current, institucion_nombre: e.target.value }))}
+                  disabled={editLoading}
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="tipo">Tipo</Label>
+                <Select
+                  value={editForm.tipo}
+                  onValueChange={(value) => setEditForm((current) => ({ ...current, tipo: value }))}
+                  disabled={editLoading}
+                >
+                  <SelectTrigger id="tipo" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="institucion">Institución</SelectItem>
+                    <SelectItem value="universidad">Universidad</SelectItem>
+                    <SelectItem value="empresa">Empresa</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="slug_deseado">Slug</Label>
+                <Input
+                  id="slug_deseado"
+                  value={editForm.slug_deseado}
+                  onChange={(e) => setEditForm((current) => ({ ...current, slug_deseado: e.target.value }))}
+                  disabled={editLoading}
+                />
+              </div>
+
+              {!editingExistingInstitution ? (
+                <>
+                  <div className="grid gap-2">
+                    <Label htmlFor="nombre_contacto">Contacto</Label>
+                    <Input
+                      id="nombre_contacto"
+                      value={editForm.nombre_contacto}
+                      onChange={(e) => setEditForm((current) => ({ ...current, nombre_contacto: e.target.value }))}
+                      disabled={editLoading}
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="cargo_contacto">Cargo</Label>
+                    <Input
+                      id="cargo_contacto"
+                      value={editForm.cargo_contacto}
+                      onChange={(e) => setEditForm((current) => ({ ...current, cargo_contacto: e.target.value }))}
+                      disabled={editLoading}
+                    />
+                  </div>
+                </>
+              ) : null}
+
+              <div className="grid gap-2">
+                <Label htmlFor="email_contacto">Correo</Label>
+                <Input
+                  id="email_contacto"
+                  type="email"
+                  value={editForm.email_contacto}
+                  onChange={(e) => setEditForm((current) => ({ ...current, email_contacto: e.target.value }))}
+                  disabled={editLoading}
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="telefono_contacto">Teléfono</Label>
+                <Input
+                  id="telefono_contacto"
+                  value={editForm.telefono_contacto}
+                  onChange={(e) => setEditForm((current) => ({ ...current, telefono_contacto: e.target.value }))}
+                  disabled={editLoading}
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="estado">Estado</Label>
+                <Input
+                  id="estado"
+                  value={editForm.estado}
+                  onChange={(e) => setEditForm((current) => ({ ...current, estado: e.target.value }))}
+                  disabled={editLoading}
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="ciudad">Ciudad</Label>
+                <Input
+                  id="ciudad"
+                  value={editForm.ciudad}
+                  onChange={(e) => setEditForm((current) => ({ ...current, ciudad: e.target.value }))}
+                  disabled={editLoading}
+                />
+              </div>
+
+              {!editingExistingInstitution ? (
+                <div className="grid gap-2 md:col-span-2">
+                  <Label htmlFor="sitio_web">Sitio web</Label>
+                  <Input
+                    id="sitio_web"
+                    value={editForm.sitio_web}
+                    onChange={(e) => setEditForm((current) => ({ ...current, sitio_web: e.target.value }))}
+                    disabled={editLoading}
+                  />
+                </div>
+              ) : null}
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <Button type="button" variant="outline" onClick={() => setEditingItem(null)} disabled={editLoading}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={editLoading} style={{ backgroundColor: BRAND }}>
+                {editLoading ? "Guardando..." : "Guardar cambios"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       <div className="rounded-[1.75rem] border border-white/80 bg-white/85 p-6 shadow-sm backdrop-blur">
         <p className="text-sm font-black uppercase tracking-[0.24em] text-slate-500">
           Panel global
@@ -234,58 +473,72 @@ export default function SuperAdminPage() {
                   </div>
 
                   <div className="flex min-w-[240px] flex-col gap-3">
-                    {!isReadOnlyInstitution ? (
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-full font-semibold"
+                        disabled={isBusy}
+                        onClick={() => openEdit(item)}
+                      >
+                        <Pencil className="mr-2 h-4 w-4" />
+                        Editar información
+                      </Button>
                       <>
-                        <Button
-                          type="button"
-                          className="rounded-full font-semibold"
-                          style={{ backgroundColor: BRAND }}
-                          disabled={isBusy}
-                          onClick={() => runAction(item.id, "aprobar")}
-                        >
-                          <CheckCircle2 className="mr-2 h-4 w-4" />
-                          Aprobar y activar
-                        </Button>
+                        {!isReadOnlyInstitution ? (
+                          <>
+                            <Button
+                              type="button"
+                              className="rounded-full font-semibold"
+                              style={{ backgroundColor: BRAND }}
+                              disabled={isBusy}
+                              onClick={() => runAction(item.id, "aprobar")}
+                            >
+                              <CheckCircle2 className="mr-2 h-4 w-4" />
+                              Aprobar y activar
+                            </Button>
 
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="rounded-full font-semibold"
-                          disabled={isBusy}
-                          onClick={() => runAction(item.id, "rechazar")}
-                        >
-                          <XCircle className="mr-2 h-4 w-4" />
-                          Rechazar
-                        </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="rounded-full font-semibold"
+                              disabled={isBusy}
+                              onClick={() => runAction(item.id, "rechazar")}
+                            >
+                              <XCircle className="mr-2 h-4 w-4" />
+                              Rechazar
+                            </Button>
 
-                        {isApproved ? (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="rounded-full font-semibold"
-                            disabled={isBusy}
-                            onClick={() => runAction(item.id, item.institucion_activa ? "desactivar" : "activar")}
-                          >
-                            {item.institucion_activa ? (
-                              <>
-                                <Power className="mr-2 h-4 w-4" />
-                                Desactivar institución
-                              </>
-                            ) : (
-                              <>
-                                <Clock3 className="mr-2 h-4 w-4" />
-                                Reactivar institución
-                              </>
-                            )}
-                          </Button>
-                        ) : null}
+                            {isApproved ? (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="rounded-full font-semibold"
+                                disabled={isBusy}
+                                onClick={() => runAction(item.id, item.institucion_activa ? "desactivar" : "activar")}
+                              >
+                                {item.institucion_activa ? (
+                                  <>
+                                    <Power className="mr-2 h-4 w-4" />
+                                    Desactivar institución
+                                  </>
+                                ) : (
+                                  <>
+                                    <Clock3 className="mr-2 h-4 w-4" />
+                                    Reactivar institución
+                                  </>
+                                )}
+                              </Button>
+                            ) : null}
+                          </>
+                        ) : (
+                          <div className="rounded-2xl bg-slate-50 px-4 py-3 text-xs text-slate-500">
+                            <Building2 className="mb-2 h-4 w-4 text-slate-400" />
+                            Puedes editar esta institución desde aquí. Los campos avanzados de contacto no existen en su registro actual.
+                          </div>
+                        )}
                       </>
-                    ) : (
-                      <div className="rounded-2xl bg-slate-50 px-4 py-3 text-xs text-slate-500">
-                        <Building2 className="mb-2 h-4 w-4 text-slate-400" />
-                        Esta institución ya existe en el sistema y se muestra como referencia.
-                      </div>
-                    )}
+                    </>
 
                     {item.institucion_id ? (
                       <div className="rounded-2xl bg-slate-50 px-4 py-3 text-xs text-slate-500">

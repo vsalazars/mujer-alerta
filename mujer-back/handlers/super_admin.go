@@ -43,6 +43,19 @@ type ActualizarSolicitudRegistroReq struct {
 	Accion string `json:"accion"`
 }
 
+type EditarSolicitudRegistroReq struct {
+	InstitucionNombre string `json:"institucion_nombre"`
+	Tipo              string `json:"tipo"`
+	NombreContacto    string `json:"nombre_contacto"`
+	CargoContacto     string `json:"cargo_contacto"`
+	EmailContacto     string `json:"email_contacto"`
+	TelefonoContacto  string `json:"telefono_contacto"`
+	Estado            string `json:"estado"`
+	Ciudad            string `json:"ciudad"`
+	SitioWeb          string `json:"sitio_web"`
+	SlugDeseado       string `json:"slug_deseado"`
+}
+
 func ptrInt64(v int64) *int64 { return &v }
 
 type institucionesSchemaSupport struct {
@@ -758,6 +771,244 @@ func (h SuperAdminHandler) UpdateSolicitud(w http.ResponseWriter, r *http.Reques
 	}
 
 	h.GetSolicitud(w, r, id)
+}
+
+func (h SuperAdminHandler) EditSolicitud(w http.ResponseWriter, r *http.Request, id int64) {
+	var req EditarSolicitudRegistroReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad_json", http.StatusBadRequest)
+		return
+	}
+
+	institucionNombre := normalizeOptional(req.InstitucionNombre)
+	tipo := normalizeOptional(req.Tipo)
+	nombreContacto := normalizeOptional(req.NombreContacto)
+	cargoContacto := normalizeOptional(req.CargoContacto)
+	emailContacto := normalizeEmailRegistro(req.EmailContacto)
+	telefonoContacto := normalizeOptional(req.TelefonoContacto)
+	estado := normalizeOptional(req.Estado)
+	ciudad := normalizeOptional(req.Ciudad)
+	sitioWeb := normalizeOptional(req.SitioWeb)
+	slugDeseado := strings.ToLower(normalizeOptional(req.SlugDeseado))
+
+	if tipo == "" {
+		tipo = "institucion"
+	}
+	if tipo != "universidad" && tipo != "empresa" && tipo != "institucion" {
+		http.Error(w, "bad_tipo", http.StatusBadRequest)
+		return
+	}
+	if institucionNombre == "" || nombreContacto == "" || emailContacto == "" {
+		http.Error(w, "missing_required_fields", http.StatusBadRequest)
+		return
+	}
+	if !strings.Contains(emailContacto, "@") {
+		http.Error(w, "bad_email", http.StatusBadRequest)
+		return
+	}
+	if slugDeseado == "" {
+		http.Error(w, "missing_slug", http.StatusBadRequest)
+		return
+	}
+	if !registroSlugRegex.MatchString(slugDeseado) {
+		http.Error(w, "bad_slug", http.StatusBadRequest)
+		return
+	}
+
+	tx, err := begin(r.Context(), h.DB)
+	if err != nil {
+		http.Error(w, "db_error", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(r.Context())
+
+	var linkedInstitucionID sql.NullInt64
+	var currentSlug string
+	var currentStatus string
+	if err := tx.QueryRow(r.Context(), `
+		select institucion_id, coalesce(slug_deseado, ''), estatus
+		from public.registro_institucional_solicitudes
+		where id = $1
+	`, id).Scan(&linkedInstitucionID, &currentSlug, &currentStatus); err != nil {
+		http.Error(w, "not_found", http.StatusNotFound)
+		return
+	}
+
+	if !strings.EqualFold(currentSlug, slugDeseado) {
+		exists, err := h.slugExists(r, slugDeseado)
+		if err != nil {
+			http.Error(w, "db_error", http.StatusInternalServerError)
+			return
+		}
+		if exists {
+			http.Error(w, "slug_exists", http.StatusConflict)
+			return
+		}
+	}
+
+	if _, err := tx.Exec(r.Context(), `
+		update public.registro_institucional_solicitudes
+		set institucion_nombre = $2,
+			tipo = $3,
+			nombre_contacto = $4,
+			cargo_contacto = $5,
+			email_contacto = $6,
+			telefono_contacto = $7,
+			estado = $8,
+			ciudad = $9,
+			sitio_web = $10,
+			slug_deseado = $11
+		where id = $1
+	`, id, institucionNombre, tipo, nombreContacto, cargoContacto, emailContacto, telefonoContacto, estado, ciudad, sitioWeb, slugDeseado); err != nil {
+		http.Error(w, "db_error", http.StatusInternalServerError)
+		return
+	}
+
+	if linkedInstitucionID.Valid {
+		if _, err := tx.Exec(r.Context(), `
+			update public.instituciones
+			set nombre = $2,
+				slug = $3,
+				tipo = $4,
+				email_contacto = $5,
+				telefono = $6,
+				estado = $7,
+				ciudad = $8
+			where id = $1
+		`, linkedInstitucionID.Int64, institucionNombre, slugDeseado, tipo, emailContacto, telefonoContacto, estado, ciudad); err != nil {
+			http.Error(w, "db_error", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	if err := tx.Commit(r.Context()); err != nil {
+		http.Error(w, "db_error", http.StatusInternalServerError)
+		return
+	}
+
+	_ = currentStatus
+	h.GetSolicitud(w, r, id)
+}
+
+func (h SuperAdminHandler) EditInstitucion(w http.ResponseWriter, r *http.Request, id int64) {
+	var req EditarSolicitudRegistroReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad_json", http.StatusBadRequest)
+		return
+	}
+
+	institucionNombre := normalizeOptional(req.InstitucionNombre)
+	tipo := normalizeOptional(req.Tipo)
+	emailContacto := normalizeEmailRegistro(req.EmailContacto)
+	telefonoContacto := normalizeOptional(req.TelefonoContacto)
+	estado := normalizeOptional(req.Estado)
+	ciudad := normalizeOptional(req.Ciudad)
+	slugDeseado := strings.ToLower(normalizeOptional(req.SlugDeseado))
+
+	if tipo == "" {
+		tipo = "institucion"
+	}
+	if tipo != "universidad" && tipo != "empresa" && tipo != "institucion" {
+		http.Error(w, "bad_tipo", http.StatusBadRequest)
+		return
+	}
+	if institucionNombre == "" {
+		http.Error(w, "missing_required_fields", http.StatusBadRequest)
+		return
+	}
+	if emailContacto != "" && !strings.Contains(emailContacto, "@") {
+		http.Error(w, "bad_email", http.StatusBadRequest)
+		return
+	}
+	if slugDeseado == "" {
+		http.Error(w, "missing_slug", http.StatusBadRequest)
+		return
+	}
+	if !registroSlugRegex.MatchString(slugDeseado) {
+		http.Error(w, "bad_slug", http.StatusBadRequest)
+		return
+	}
+
+	tx, err := begin(r.Context(), h.DB)
+	if err != nil {
+		http.Error(w, "db_error", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(r.Context())
+
+	var currentSlug string
+	var createdAt string
+	var updatedAt string
+	var estatusInstitucion string
+	var activo sql.NullBool
+	if err := tx.QueryRow(r.Context(), `
+		select
+			coalesce(slug, ''),
+			created_at::text,
+			updated_at::text,
+			coalesce(estatus_validacion::text, ''),
+			activo
+		from public.instituciones
+		where id = $1
+	`, id).Scan(&currentSlug, &createdAt, &updatedAt, &estatusInstitucion, &activo); err != nil {
+		http.Error(w, "not_found", http.StatusNotFound)
+		return
+	}
+
+	if !strings.EqualFold(currentSlug, slugDeseado) {
+		exists, err := h.slugExists(r, slugDeseado)
+		if err != nil {
+			http.Error(w, "db_error", http.StatusInternalServerError)
+			return
+		}
+		if exists {
+			http.Error(w, "slug_exists", http.StatusConflict)
+			return
+		}
+	}
+
+	if _, err := tx.Exec(r.Context(), `
+		update public.instituciones
+		set nombre = $2,
+			slug = $3,
+			tipo = $4,
+			email_contacto = $5,
+			telefono = $6,
+			estado = $7,
+			ciudad = $8
+		where id = $1
+	`, id, institucionNombre, slugDeseado, tipo, emailContacto, telefonoContacto, estado, ciudad); err != nil {
+		http.Error(w, "db_error", http.StatusInternalServerError)
+		return
+	}
+
+	if err := tx.Commit(r.Context()); err != nil {
+		http.Error(w, "db_error", http.StatusInternalServerError)
+		return
+	}
+
+	item := RegistroSolicitudAdminDTO{
+		ID:                 -id,
+		InstitucionID:      ptrInt64(id),
+		Origen:             "institucion",
+		SoloLectura:        true,
+		InstitucionNombre:  institucionNombre,
+		Tipo:               tipo,
+		NombreContacto:     "Registro previo",
+		EmailContacto:      emailContacto,
+		TelefonoContacto:   telefonoContacto,
+		Estado:             estado,
+		Ciudad:             ciudad,
+		SlugDeseado:        slugDeseado,
+		EstatusSolicitud:   "aprobado",
+		EstatusInstitucion: estatusInstitucion,
+		CreatedAt:          createdAt,
+		UpdatedAt:          updatedAt,
+	}
+	if activo.Valid {
+		item.InstitucionActiva = &activo.Bool
+	}
+	writeJSON(w, http.StatusOK, item)
 }
 
 func (h SuperAdminHandler) GetSolicitud(w http.ResponseWriter, r *http.Request, id int64) {
