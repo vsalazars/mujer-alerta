@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -19,6 +20,8 @@ type SuperAdminHandler struct {
 type RegistroSolicitudAdminDTO struct {
 	ID                 int64  `json:"id"`
 	InstitucionID      *int64 `json:"institucion_id,omitempty"`
+	Origen             string `json:"origen,omitempty"`
+	SoloLectura        bool   `json:"solo_lectura,omitempty"`
 	InstitucionNombre  string `json:"institucion_nombre"`
 	Tipo               string `json:"tipo"`
 	NombreContacto     string `json:"nombre_contacto"`
@@ -42,6 +45,13 @@ type ActualizarSolicitudRegistroReq struct {
 
 func ptrInt64(v int64) *int64 { return &v }
 
+type institucionesSchemaSupport struct {
+	Activo            bool
+	EstatusValidacion bool
+	ValidadoAt        bool
+	ValidadoPor       bool
+}
+
 func (h SuperAdminHandler) solicitudesHasInstitucionID(r *http.Request) (bool, error) {
 	var exists bool
 	if err := queryRow(r.Context(), h.DB, `
@@ -56,6 +66,42 @@ func (h SuperAdminHandler) solicitudesHasInstitucionID(r *http.Request) (bool, e
 		return false, err
 	}
 	return exists, nil
+}
+
+func (h SuperAdminHandler) institucionesSchema(r *http.Request) (institucionesSchemaSupport, error) {
+	rows, err := query(r.Context(), h.DB, `
+		select column_name
+		from information_schema.columns
+		where table_schema = 'public'
+		  and table_name = 'instituciones'
+		  and column_name in ('activo', 'estatus_validacion', 'validado_at', 'validado_por')
+	`)
+	if err != nil {
+		return institucionesSchemaSupport{}, err
+	}
+	defer rows.Close()
+
+	support := institucionesSchemaSupport{}
+	for rows.Next() {
+		var column string
+		if err := rows.Scan(&column); err != nil {
+			return institucionesSchemaSupport{}, err
+		}
+		switch column {
+		case "activo":
+			support.Activo = true
+		case "estatus_validacion":
+			support.EstatusValidacion = true
+		case "validado_at":
+			support.ValidadoAt = true
+		case "validado_por":
+			support.ValidadoPor = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return institucionesSchemaSupport{}, err
+	}
+	return support, nil
 }
 
 func (h SuperAdminHandler) slugExists(r *http.Request, slug string) (bool, error) {
@@ -105,6 +151,11 @@ func (h SuperAdminHandler) ListSolicitudes(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "db_error", http.StatusInternalServerError)
 		return
 	}
+	instSchema, err := h.institucionesSchema(r)
+	if err != nil {
+		http.Error(w, "db_error", http.StatusInternalServerError)
+		return
+	}
 
 	base := `
 		select
@@ -125,6 +176,14 @@ func (h SuperAdminHandler) ListSolicitudes(w http.ResponseWriter, r *http.Reques
 		from public.registro_institucional_solicitudes s
 	`
 	if hasInstitucionID {
+		instStatusExpr := `''`
+		if instSchema.EstatusValidacion {
+			instStatusExpr = `coalesce(i.estatus_validacion::text, '')`
+		}
+		instActiveExpr := `null::boolean`
+		if instSchema.Activo {
+			instActiveExpr = `i.activo`
+		}
 		base = `
 			select
 				s.id,
@@ -140,8 +199,8 @@ func (h SuperAdminHandler) ListSolicitudes(w http.ResponseWriter, r *http.Reques
 				coalesce(s.sitio_web, ''),
 				coalesce(s.slug_deseado, ''),
 				s.estatus,
-				coalesce(i.estatus_validacion::text, ''),
-				i.activo,
+				` + instStatusExpr + `,
+				` + instActiveExpr + `,
 				s.created_at::text,
 				s.updated_at::text
 			from public.registro_institucional_solicitudes s
@@ -149,11 +208,13 @@ func (h SuperAdminHandler) ListSolicitudes(w http.ResponseWriter, r *http.Reques
 		`
 	}
 
-	rows, err := query(r.Context(), h.DB, base+` order by s.created_at desc`)
-
+	listSQL := base + ` order by s.created_at desc`
+	args := []any{}
 	if statusFilter != "" && statusFilter != "all" {
-		rows, err = query(r.Context(), h.DB, base+` where s.estatus = $1 order by s.created_at desc`, statusFilter)
+		listSQL = base + ` where s.estatus = $1 order by s.created_at desc`
+		args = append(args, statusFilter)
 	}
+	rows, err := query(r.Context(), h.DB, listSQL, args...)
 	if err != nil {
 		http.Error(w, "db_error", http.StatusInternalServerError)
 		return
@@ -193,6 +254,7 @@ func (h SuperAdminHandler) ListSolicitudes(w http.ResponseWriter, r *http.Reques
 			if institucionID.Valid {
 				item.InstitucionID = ptrInt64(institucionID.Int64)
 			}
+			item.Origen = "solicitud"
 			item.EstatusInstitucion = instStatus
 			if instActive.Valid {
 				item.InstitucionActiva = &instActive.Bool
@@ -217,6 +279,7 @@ func (h SuperAdminHandler) ListSolicitudes(w http.ResponseWriter, r *http.Reques
 				http.Error(w, "db_error", http.StatusInternalServerError)
 				return
 			}
+			item.Origen = "solicitud"
 		}
 		out = append(out, item)
 	}
@@ -224,6 +287,95 @@ func (h SuperAdminHandler) ListSolicitudes(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "db_error", http.StatusInternalServerError)
 		return
 	}
+
+	if statusFilter == "" || statusFilter == "all" || statusFilter == "aprobado" {
+		instStatusExpr := `'aprobado'`
+		if instSchema.EstatusValidacion {
+			instStatusExpr = `coalesce(i.estatus_validacion::text, 'aprobado')`
+		}
+		instActiveExpr := `true`
+		if instSchema.Activo {
+			instActiveExpr = `i.activo`
+		}
+
+		institucionesSQL := `
+			select
+				i.id,
+				i.nombre,
+				i.tipo,
+				coalesce(i.email_contacto, ''),
+				coalesce(i.telefono, ''),
+				coalesce(i.estado, ''),
+				coalesce(i.ciudad, ''),
+				i.slug,
+				` + instStatusExpr + `,
+				` + instActiveExpr + `,
+				i.created_at::text,
+				i.updated_at::text
+			from public.instituciones i
+			where not exists (
+				select 1
+				from public.registro_institucional_solicitudes s
+				where s.institucion_id = i.id
+			)
+		`
+		if statusFilter == "aprobado" {
+			if instSchema.EstatusValidacion {
+				institucionesSQL += ` and coalesce(i.estatus_validacion::text, '') <> 'rechazada'`
+			}
+		}
+		institucionesSQL += ` order by i.updated_at desc, i.created_at desc`
+
+		instRows, err := query(r.Context(), h.DB, institucionesSQL)
+		if err != nil {
+			http.Error(w, "db_error", http.StatusInternalServerError)
+			return
+		}
+		defer instRows.Close()
+
+		for instRows.Next() {
+			var item RegistroSolicitudAdminDTO
+			var institucionID int64
+			var instStatus string
+			var instActive sql.NullBool
+			if err := instRows.Scan(
+				&institucionID,
+				&item.InstitucionNombre,
+				&item.Tipo,
+				&item.EmailContacto,
+				&item.TelefonoContacto,
+				&item.Estado,
+				&item.Ciudad,
+				&item.SlugDeseado,
+				&instStatus,
+				&instActive,
+				&item.CreatedAt,
+				&item.UpdatedAt,
+			); err != nil {
+				http.Error(w, "db_error", http.StatusInternalServerError)
+				return
+			}
+			item.ID = -institucionID
+			item.InstitucionID = ptrInt64(institucionID)
+			item.Origen = "institucion"
+			item.SoloLectura = true
+			item.EstatusSolicitud = "aprobado"
+			item.EstatusInstitucion = instStatus
+			item.NombreContacto = "Registro previo"
+			if instActive.Valid {
+				item.InstitucionActiva = &instActive.Bool
+			}
+			out = append(out, item)
+		}
+		if err := instRows.Err(); err != nil {
+			http.Error(w, "db_error", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].UpdatedAt > out[j].UpdatedAt
+	})
 
 	writeJSON(w, http.StatusOK, out)
 }
@@ -265,6 +417,11 @@ func (h SuperAdminHandler) UpdateSolicitud(w http.ResponseWriter, r *http.Reques
 	var state solicitudState
 	var institucionID sql.NullInt64
 	hasInstitucionID, err := h.solicitudesHasInstitucionID(r)
+	if err != nil {
+		http.Error(w, "db_error", http.StatusInternalServerError)
+		return
+	}
+	instSchema, err := h.institucionesSchema(r)
 	if err != nil {
 		http.Error(w, "db_error", http.StatusInternalServerError)
 		return
@@ -351,43 +508,99 @@ func (h SuperAdminHandler) UpdateSolicitud(w http.ResponseWriter, r *http.Reques
 
 		if state.InstitucionID == nil {
 			var newInstitucionID int64
-			if err := tx.QueryRow(r.Context(), `
-				insert into public.instituciones (
-					nombre,
-					slug,
-					tipo,
-					email_contacto,
-					telefono,
-					estado,
-					ciudad,
-					activo,
-					estatus_validacion,
-					validado_at,
-					validado_por
-				)
-				values ($1,$2,$3,$4,$5,$6,$7,true,'activa',$8,$9::uuid)
+			insertCols := []string{
+				"nombre",
+				"slug",
+				"tipo",
+				"email_contacto",
+				"telefono",
+				"estado",
+				"ciudad",
+			}
+			insertVals := []string{"$1", "$2", "$3", "$4", "$5", "$6", "$7"}
+			args := []any{
+				state.InstitucionNombre,
+				slugFinal,
+				state.Tipo,
+				state.EmailContacto,
+				state.TelefonoContacto,
+				state.Estado,
+				state.Ciudad,
+			}
+			nextArg := 8
+			if instSchema.Activo {
+				insertCols = append(insertCols, "activo")
+				insertVals = append(insertVals, "true")
+			}
+			if instSchema.EstatusValidacion {
+				insertCols = append(insertCols, "estatus_validacion")
+				insertVals = append(insertVals, "'activa'")
+			}
+			if instSchema.ValidadoAt {
+				insertCols = append(insertCols, "validado_at")
+				insertVals = append(insertVals, fmt.Sprintf("$%d", nextArg))
+				args = append(args, now)
+				nextArg++
+			}
+			if instSchema.ValidadoPor && userID != "" {
+				insertCols = append(insertCols, "validado_por")
+				insertVals = append(insertVals, fmt.Sprintf("$%d::uuid", nextArg))
+				args = append(args, userID)
+				nextArg++
+			}
+			insertSQL := fmt.Sprintf(`
+				insert into public.instituciones (%s)
+				values (%s)
 				returning id
-			`, state.InstitucionNombre, slugFinal, state.Tipo, state.EmailContacto, state.TelefonoContacto, state.Estado, state.Ciudad, now, userID).Scan(&newInstitucionID); err != nil {
+			`, strings.Join(insertCols, ",\n\t\t\t\t\t"), strings.Join(insertVals, ","))
+			if err := tx.QueryRow(r.Context(), insertSQL, args...).Scan(&newInstitucionID); err != nil {
 				http.Error(w, "db_error", http.StatusInternalServerError)
 				return
 			}
 			state.InstitucionID = ptrInt64(newInstitucionID)
 		} else {
-			if _, err := tx.Exec(r.Context(), `
+			setClauses := []string{
+				"nombre = $2",
+				"slug = $3",
+				"tipo = $4",
+				"email_contacto = $5",
+				"telefono = $6",
+				"estado = $7",
+				"ciudad = $8",
+			}
+			args := []any{
+				*state.InstitucionID,
+				state.InstitucionNombre,
+				slugFinal,
+				state.Tipo,
+				state.EmailContacto,
+				state.TelefonoContacto,
+				state.Estado,
+				state.Ciudad,
+			}
+			nextArg := 9
+			if instSchema.Activo {
+				setClauses = append(setClauses, "activo = true")
+			}
+			if instSchema.EstatusValidacion {
+				setClauses = append(setClauses, "estatus_validacion = 'activa'")
+			}
+			if instSchema.ValidadoAt {
+				setClauses = append(setClauses, fmt.Sprintf("validado_at = $%d", nextArg))
+				args = append(args, now)
+				nextArg++
+			}
+			if instSchema.ValidadoPor && userID != "" {
+				setClauses = append(setClauses, fmt.Sprintf("validado_por = $%d::uuid", nextArg))
+				args = append(args, userID)
+				nextArg++
+			}
+			updateSQL := fmt.Sprintf(`
 				update public.instituciones
-				set nombre = $2,
-					slug = $3,
-					tipo = $4,
-					email_contacto = $5,
-					telefono = $6,
-					estado = $7,
-					ciudad = $8,
-					activo = true,
-					estatus_validacion = 'activa',
-					validado_at = $9,
-					validado_por = $10::uuid
+				set %s
 				where id = $1
-			`, *state.InstitucionID, state.InstitucionNombre, slugFinal, state.Tipo, state.EmailContacto, state.TelefonoContacto, state.Estado, state.Ciudad, now, userID); err != nil {
+			`, strings.Join(setClauses, ",\n\t\t\t\t\t"))
+			if _, err := tx.Exec(r.Context(), updateSQL, args...); err != nil {
 				http.Error(w, "db_error", http.StatusInternalServerError)
 				return
 			}
@@ -426,16 +639,35 @@ func (h SuperAdminHandler) UpdateSolicitud(w http.ResponseWriter, r *http.Reques
 			return
 		}
 		if state.InstitucionID != nil {
-			if _, err := tx.Exec(r.Context(), `
-				update public.instituciones
-				set activo = false,
-					estatus_validacion = 'rechazada',
-					validado_at = $2,
-					validado_por = $3::uuid
-				where id = $1
-			`, *state.InstitucionID, now, userID); err != nil {
-				http.Error(w, "db_error", http.StatusInternalServerError)
-				return
+			setClauses := make([]string, 0, 4)
+			args := []any{*state.InstitucionID}
+			nextArg := 2
+			if instSchema.Activo {
+				setClauses = append(setClauses, "activo = false")
+			}
+			if instSchema.EstatusValidacion {
+				setClauses = append(setClauses, "estatus_validacion = 'rechazada'")
+			}
+			if instSchema.ValidadoAt {
+				setClauses = append(setClauses, fmt.Sprintf("validado_at = $%d", nextArg))
+				args = append(args, now)
+				nextArg++
+			}
+			if instSchema.ValidadoPor && userID != "" {
+				setClauses = append(setClauses, fmt.Sprintf("validado_por = $%d::uuid", nextArg))
+				args = append(args, userID)
+				nextArg++
+			}
+			if len(setClauses) > 0 {
+				updateSQL := fmt.Sprintf(`
+					update public.instituciones
+					set %s
+					where id = $1
+				`, strings.Join(setClauses, ",\n\t\t\t\t\t"))
+				if _, err := tx.Exec(r.Context(), updateSQL, args...); err != nil {
+					http.Error(w, "db_error", http.StatusInternalServerError)
+					return
+				}
 			}
 		}
 
@@ -452,16 +684,35 @@ func (h SuperAdminHandler) UpdateSolicitud(w http.ResponseWriter, r *http.Reques
 			http.Error(w, "db_error", http.StatusInternalServerError)
 			return
 		}
-		if _, err := tx.Exec(r.Context(), `
-			update public.instituciones
-			set activo = true,
-				estatus_validacion = 'activa',
-				validado_at = $2,
-				validado_por = $3::uuid
-			where id = $1
-		`, *state.InstitucionID, now, userID); err != nil {
-			http.Error(w, "db_error", http.StatusInternalServerError)
-			return
+		setClauses := make([]string, 0, 4)
+		args := []any{*state.InstitucionID}
+		nextArg := 2
+		if instSchema.Activo {
+			setClauses = append(setClauses, "activo = true")
+		}
+		if instSchema.EstatusValidacion {
+			setClauses = append(setClauses, "estatus_validacion = 'activa'")
+		}
+		if instSchema.ValidadoAt {
+			setClauses = append(setClauses, fmt.Sprintf("validado_at = $%d", nextArg))
+			args = append(args, now)
+			nextArg++
+		}
+		if instSchema.ValidadoPor && userID != "" {
+			setClauses = append(setClauses, fmt.Sprintf("validado_por = $%d::uuid", nextArg))
+			args = append(args, userID)
+			nextArg++
+		}
+		if len(setClauses) > 0 {
+			updateSQL := fmt.Sprintf(`
+				update public.instituciones
+				set %s
+				where id = $1
+			`, strings.Join(setClauses, ",\n\t\t\t\t"))
+			if _, err := tx.Exec(r.Context(), updateSQL, args...); err != nil {
+				http.Error(w, "db_error", http.StatusInternalServerError)
+				return
+			}
 		}
 
 	case "desactivar":
@@ -469,16 +720,35 @@ func (h SuperAdminHandler) UpdateSolicitud(w http.ResponseWriter, r *http.Reques
 			http.Error(w, "institution_missing", http.StatusConflict)
 			return
 		}
-		if _, err := tx.Exec(r.Context(), `
-			update public.instituciones
-			set activo = false,
-				estatus_validacion = 'inactiva',
-				validado_at = $2,
-				validado_por = $3::uuid
-			where id = $1
-		`, *state.InstitucionID, now, userID); err != nil {
-			http.Error(w, "db_error", http.StatusInternalServerError)
-			return
+		setClauses := make([]string, 0, 4)
+		args := []any{*state.InstitucionID}
+		nextArg := 2
+		if instSchema.Activo {
+			setClauses = append(setClauses, "activo = false")
+		}
+		if instSchema.EstatusValidacion {
+			setClauses = append(setClauses, "estatus_validacion = 'inactiva'")
+		}
+		if instSchema.ValidadoAt {
+			setClauses = append(setClauses, fmt.Sprintf("validado_at = $%d", nextArg))
+			args = append(args, now)
+			nextArg++
+		}
+		if instSchema.ValidadoPor && userID != "" {
+			setClauses = append(setClauses, fmt.Sprintf("validado_por = $%d::uuid", nextArg))
+			args = append(args, userID)
+			nextArg++
+		}
+		if len(setClauses) > 0 {
+			updateSQL := fmt.Sprintf(`
+				update public.instituciones
+				set %s
+				where id = $1
+			`, strings.Join(setClauses, ",\n\t\t\t\t"))
+			if _, err := tx.Exec(r.Context(), updateSQL, args...); err != nil {
+				http.Error(w, "db_error", http.StatusInternalServerError)
+				return
+			}
 		}
 	}
 
@@ -496,13 +766,26 @@ func (h SuperAdminHandler) GetSolicitud(w http.ResponseWriter, r *http.Request, 
 		http.Error(w, "db_error", http.StatusInternalServerError)
 		return
 	}
+	instSchema, err := h.institucionesSchema(r)
+	if err != nil {
+		http.Error(w, "db_error", http.StatusInternalServerError)
+		return
+	}
 	var item RegistroSolicitudAdminDTO
 	var instID sql.NullInt64
 	var instStatus string
 	var instActive sql.NullBool
 
 	if hasInstitucionID {
-		err = queryRow(r.Context(), h.DB, `
+		instStatusExpr := `''`
+		if instSchema.EstatusValidacion {
+			instStatusExpr = `coalesce(i.estatus_validacion::text, '')`
+		}
+		instActiveExpr := `null::boolean`
+		if instSchema.Activo {
+			instActiveExpr = `i.activo`
+		}
+		querySQL := `
 			select
 				s.id,
 				s.institucion_id,
@@ -517,14 +800,15 @@ func (h SuperAdminHandler) GetSolicitud(w http.ResponseWriter, r *http.Request, 
 				coalesce(s.sitio_web, ''),
 				coalesce(s.slug_deseado, ''),
 				s.estatus,
-				coalesce(i.estatus_validacion::text, ''),
-				i.activo,
+				` + instStatusExpr + `,
+				` + instActiveExpr + `,
 				s.created_at::text,
 				s.updated_at::text
 			from public.registro_institucional_solicitudes s
 			left join public.instituciones i on i.id = s.institucion_id
 			where s.id = $1
-		`, id).Scan(
+		`
+		err = queryRow(r.Context(), h.DB, querySQL, id).Scan(
 			&item.ID,
 			&instID,
 			&item.InstitucionNombre,

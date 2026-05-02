@@ -44,9 +44,23 @@ function initials(name: string) {
 export default function SuperAdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [user] = useState<AuthUser | null>(() => readAuth().user);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [sessionChecked, setSessionChecked] = useState(false);
 
   useEffect(() => {
+    const { user: authUser, token } = readAuth();
+    if (!authUser || !token) {
+      setUser(null);
+      setSessionChecked(true);
+      router.replace("/");
+      return;
+    }
+    setUser(authUser);
+    setSessionChecked(true);
+  }, [router]);
+
+  useEffect(() => {
+    if (!sessionChecked) return;
     if (!user) {
       router.replace("/");
       return;
@@ -54,14 +68,14 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
     if (user.rol !== "super_admin") {
       router.replace("/");
     }
-  }, [router, user]);
+  }, [router, sessionChecked, user]);
 
   function onLogout() {
     clearAuth();
     router.replace("/");
   }
 
-  if (!user) return null;
+  if (!sessionChecked || !user) return null;
 
   return (
     <main className="min-h-dvh bg-[#f7f4ef] text-slate-900">

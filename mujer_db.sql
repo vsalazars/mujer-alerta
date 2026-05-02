@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict IJmbSPmuHx8cnGmhfwjlE9hh53cxSvRW4pUGKtgQHj9Msfoc0Edbifk6Ix6YDeB
+\restrict 1IygOhrU1dAgo1O0r1BmwCKm9w8XrHkkgW27V7gaOO00Ma6xNYLrczehPd7bZBl
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
@@ -1957,5 +1957,5 @@ ALTER TABLE public.usuarios ENABLE ROW LEVEL SECURITY;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict IJmbSPmuHx8cnGmhfwjlE9hh53cxSvRW4pUGKtgQHj9Msfoc0Edbifk6Ix6YDeB
+\unrestrict 1IygOhrU1dAgo1O0r1BmwCKm9w8XrHkkgW27V7gaOO00Ma6xNYLrczehPd7bZBl
 

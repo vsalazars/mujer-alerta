@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { ArrowRight, Lock } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Lock } from "lucide-react";
 
 import { Button } from "../components/ui/button";
 import {
@@ -46,6 +46,7 @@ export default function LandingPage() {
   const [registrationOpen, setRegistrationOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
 
   async function onGlobalLogin(e: React.FormEvent) {
@@ -79,6 +80,7 @@ export default function LandingPage() {
 
       setGlobalLoginOpen(false);
       setPassword("");
+      setShowPassword(false);
 
       if (data.rol === "super_admin") {
         router.push("/super-admin");
@@ -193,24 +195,35 @@ export default function LandingPage() {
 
                     <div className="grid gap-2">
                       <Label htmlFor="password">Contraseña</Label>
-                      <Input
-                        id="password"
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="••••••••"
-                        disabled={loginLoading}
-                        style={
-                          {
-                            "--ring": BRAND,
-                            "--input": BRAND_BORDER,
-                            "--primary": BRAND,
-                            "--primary-foreground": "#FFFFFF",
-                            accentColor: BRAND,
-                            caretColor: BRAND,
-                          } as React.CSSProperties
-                        }
-                      />
+                      <div className="relative">
+                        <Input
+                          id="password"
+                          type={showPassword ? "text" : "password"}
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="••••••••"
+                          disabled={loginLoading}
+                          className="pr-11"
+                          style={
+                            {
+                              "--ring": BRAND,
+                              "--input": BRAND_BORDER,
+                              "--primary": BRAND,
+                              "--primary-foreground": "#FFFFFF",
+                              accentColor: BRAND,
+                              caretColor: BRAND,
+                            } as React.CSSProperties
+                          }
+                        />
+                        <button
+                          type="button"
+                          aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-slate-600 focus:outline-none"
+                          onClick={() => setShowPassword((value) => !value)}
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
                     </div>
 
                     <Button

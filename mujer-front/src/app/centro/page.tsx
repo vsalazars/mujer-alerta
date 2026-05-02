@@ -309,6 +309,7 @@ export default function CentroPage() {
   const generoBars = useMemo(() => {
     if (!data) return [];
     return safeArr(data.stats.encuestas_por_genero)
+      .filter((item) => Number(item?.total || 0) > 0)
       .slice()
       .sort((a, b) => (b.total || 0) - (a.total || 0))
       .map((item) => ({ label: item.label, total: item.total || 0 }));
@@ -317,8 +318,9 @@ export default function CentroPage() {
   const edadBars = useMemo(() => {
     if (!data) return [];
     return safeArr(data.stats.encuestas_por_edad)
+      .filter((item) => Number(item?.total || 0) > 0)
       .slice()
-      .sort((a, b) => a.label.localeCompare(b.label, "es", { numeric: true }))
+      .sort((a, b) => b.label.localeCompare(a.label, "es", { numeric: true }))
       .map((item) => ({ label: item.label, total: item.total || 0 }));
   }, [data]);
 

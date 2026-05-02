@@ -214,10 +214,13 @@
         label: String(item.label || ""),
         total: Number(item.total || 0),
       }))
-      .filter((item) => item.label);
+      .filter((item) => item.label && item.total > 0);
+
+    const chartKey = rows.map((row) => `${row.label}:${row.total}`).join("|") || "empty";
 
     return (
       <Plot
+        key={chartKey}
         data={[
           {
             type: "bar",
@@ -252,7 +255,10 @@
             tickfont: axisFont("#64748B", 12),
           },
           yaxis: {
+            type: "category",
             autorange: "reversed",
+            categoryorder: "array",
+            categoryarray: rows.map((row) => row.label),
             showgrid: false,
             zeroline: false,
             fixedrange: true,

@@ -13,6 +13,8 @@ import { toast } from "sonner";
 type Solicitud = {
   id: number;
   institucion_id?: number;
+  origen?: string;
+  solo_lectura?: boolean;
   institucion_nombre: string;
   tipo: string;
   nombre_contacto: string;
@@ -193,6 +195,7 @@ export default function SuperAdminPage() {
           {items.map((item) => {
             const isApproved = item.estatus_solicitud === "aprobado";
             const isBusy = busyId === item.id;
+            const isReadOnlyInstitution = item.origen === "institucion" || item.solo_lectura;
             return (
               <article key={item.id} className="rounded-[1.75rem] border border-white/80 bg-white p-6 shadow-sm">
                 <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
@@ -204,6 +207,11 @@ export default function SuperAdminPage() {
                       {item.estatus_institucion ? (
                         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
                           Institución: {item.estatus_institucion}
+                        </span>
+                      ) : null}
+                      {isReadOnlyInstitution ? (
+                        <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                          Institución existente
                         </span>
                       ) : null}
                     </div>
@@ -226,49 +234,58 @@ export default function SuperAdminPage() {
                   </div>
 
                   <div className="flex min-w-[240px] flex-col gap-3">
-                    <Button
-                      type="button"
-                      className="rounded-full font-semibold"
-                      style={{ backgroundColor: BRAND }}
-                      disabled={isBusy}
-                      onClick={() => runAction(item.id, "aprobar")}
-                    >
-                      <CheckCircle2 className="mr-2 h-4 w-4" />
-                      Aprobar y activar
-                    </Button>
+                    {!isReadOnlyInstitution ? (
+                      <>
+                        <Button
+                          type="button"
+                          className="rounded-full font-semibold"
+                          style={{ backgroundColor: BRAND }}
+                          disabled={isBusy}
+                          onClick={() => runAction(item.id, "aprobar")}
+                        >
+                          <CheckCircle2 className="mr-2 h-4 w-4" />
+                          Aprobar y activar
+                        </Button>
 
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="rounded-full font-semibold"
-                      disabled={isBusy}
-                      onClick={() => runAction(item.id, "rechazar")}
-                    >
-                      <XCircle className="mr-2 h-4 w-4" />
-                      Rechazar
-                    </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="rounded-full font-semibold"
+                          disabled={isBusy}
+                          onClick={() => runAction(item.id, "rechazar")}
+                        >
+                          <XCircle className="mr-2 h-4 w-4" />
+                          Rechazar
+                        </Button>
 
-                    {isApproved ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="rounded-full font-semibold"
-                        disabled={isBusy}
-                        onClick={() => runAction(item.id, item.institucion_activa ? "desactivar" : "activar")}
-                      >
-                        {item.institucion_activa ? (
-                          <>
-                            <Power className="mr-2 h-4 w-4" />
-                            Desactivar institución
-                          </>
-                        ) : (
-                          <>
-                            <Clock3 className="mr-2 h-4 w-4" />
-                            Reactivar institución
-                          </>
-                        )}
-                      </Button>
-                    ) : null}
+                        {isApproved ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="rounded-full font-semibold"
+                            disabled={isBusy}
+                            onClick={() => runAction(item.id, item.institucion_activa ? "desactivar" : "activar")}
+                          >
+                            {item.institucion_activa ? (
+                              <>
+                                <Power className="mr-2 h-4 w-4" />
+                                Desactivar institución
+                              </>
+                            ) : (
+                              <>
+                                <Clock3 className="mr-2 h-4 w-4" />
+                                Reactivar institución
+                              </>
+                            )}
+                          </Button>
+                        ) : null}
+                      </>
+                    ) : (
+                      <div className="rounded-2xl bg-slate-50 px-4 py-3 text-xs text-slate-500">
+                        <Building2 className="mb-2 h-4 w-4 text-slate-400" />
+                        Esta institución ya existe en el sistema y se muestra como referencia.
+                      </div>
+                    )}
 
                     {item.institucion_id ? (
                       <div className="rounded-2xl bg-slate-50 px-4 py-3 text-xs text-slate-500">
