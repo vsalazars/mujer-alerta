@@ -35,8 +35,22 @@
       };
 
       syncColors();
+      const source =
+        document.querySelector("main[style*='--brand-primary']") ||
+        document.querySelector("main") ||
+        document.documentElement;
+
+      const observer = new MutationObserver(() => {
+        syncColors();
+      });
+      observer.observe(source, {
+        attributes: true,
+        attributeFilter: ["style", "class"],
+      });
+
       window.addEventListener("institucion-config-updated", syncColors);
       return () => {
+        observer.disconnect();
         window.removeEventListener("institucion-config-updated", syncColors);
       };
     }, []);

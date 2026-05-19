@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { RefreshCw } from "lucide-react";
 
@@ -31,18 +31,11 @@ import type {
 } from "@/components/centro/dashboard/types";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
-import { themeFromBranding } from "@/lib/branding";
 import { extractInstitutionSlug } from "@/lib/routing";
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
 }
-
-type ConfiguracionInstitucion = {
-  color_primario?: string;
-  color_secundario?: string;
-  color_apoyo?: string;
-};
 
 export default function CentroPage() {
   const pathname = usePathname();
@@ -64,23 +57,6 @@ export default function CentroPage() {
   const [nlpOverviewLoading, setNLPOverviewLoading] = useState(false);
   const [nlpStatus, setNLPStatus] = useState<NLPJobStatus | null>(null);
   const [nlpProcessError, setNLPProcessError] = useState("");
-  const [branding, setBranding] = useState<ConfiguracionInstitucion | null>(null);
-
-  const brandTheme = useMemo(() => themeFromBranding(branding), [branding]);
-  const brandVars = useMemo(
-    () =>
-      ({
-        "--brand-primary": brandTheme.primary,
-        "--brand-secondary": brandTheme.secondary,
-        "--brand-support": brandTheme.support,
-        "--brand-soft": brandTheme.soft,
-        "--brand-soft-strong": brandTheme.softStrong,
-        "--brand-support-soft": brandTheme.supportSoft,
-        "--brand-border": brandTheme.border,
-        "--brand-glow": brandTheme.glow,
-      }) as CSSProperties,
-    [brandTheme]
-  );
 
   async function load(selectedYear?: string) {
     const targetYear = selectedYear ?? year;
@@ -179,38 +155,6 @@ export default function CentroPage() {
         setCentroLabel(parsed.centros.map((id) => `Centro #${id}`).join(" / "));
       }
     } catch {}
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-
-    async function loadBranding() {
-      try {
-        const response = await api<ConfiguracionInstitucion>("/api/admin/configuracion");
-        if (!active) return;
-        setBranding(response);
-      } catch {
-        if (!active) return;
-        setBranding(null);
-      }
-    }
-
-    void loadBranding();
-
-    const syncBranding = (event: Event) => {
-      const detail = event instanceof CustomEvent ? (event.detail as ConfiguracionInstitucion | undefined) : undefined;
-      if (detail) {
-        setBranding(detail);
-        return;
-      }
-      void loadBranding();
-    };
-
-    window.addEventListener("institucion-config-updated", syncBranding);
-    return () => {
-      active = false;
-      window.removeEventListener("institucion-config-updated", syncBranding);
-    };
   }, []);
 
   useEffect(() => {
@@ -441,7 +385,7 @@ export default function CentroPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center" style={brandVars}>
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="flex items-center gap-3 text-slate-500 font-semibold">
           <RefreshCw className="h-5 w-5 animate-spin" />
           Cargando resultados…
@@ -452,7 +396,7 @@ export default function CentroPage() {
 
   if (!data) {
     return (
-      <div className="min-h-screen bg-white px-6 py-10 lg:px-12 text-slate-900" style={brandVars}>
+      <div className="min-h-screen bg-white px-6 py-10 lg:px-12 text-slate-900">
         <div className="mx-auto max-w-[1400px]">
           <section
             className="overflow-hidden rounded-[32px] border bg-white"
@@ -600,7 +544,7 @@ export default function CentroPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white px-6 py-10 lg:px-12 text-slate-900" style={brandVars}>
+    <div className="min-h-screen bg-white px-6 py-10 lg:px-12 text-slate-900">
         <DashboardHero
           data={data}
           centerLabel={centroLabel}
