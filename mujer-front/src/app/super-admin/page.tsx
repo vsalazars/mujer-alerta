@@ -44,6 +44,7 @@ type Solicitud = {
   estatus_solicitud: string;
   estatus_institucion?: string;
   institucion_activa?: boolean;
+  contacto_password_configurada: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -54,6 +55,7 @@ type EditForm = {
   nombre_contacto: string;
   cargo_contacto: string;
   email_contacto: string;
+  password_contacto: string;
   telefono_contacto: string;
   estado: string;
   ciudad: string;
@@ -100,6 +102,7 @@ export default function SuperAdminPage() {
     nombre_contacto: "",
     cargo_contacto: "",
     email_contacto: "",
+    password_contacto: "",
     telefono_contacto: "",
     estado: "",
     ciudad: "",
@@ -184,6 +187,7 @@ export default function SuperAdminPage() {
       nombre_contacto: item.nombre_contacto || "",
       cargo_contacto: item.cargo_contacto || "",
       email_contacto: item.email_contacto || "",
+      password_contacto: "",
       telefono_contacto: item.telefono_contacto || "",
       estado: item.estado || "",
       ciudad: item.ciudad || "",
@@ -195,6 +199,14 @@ export default function SuperAdminPage() {
   async function saveEdit(e: React.FormEvent) {
     e.preventDefault();
     if (!editingItem) return;
+    if (
+      !(editingItem.origen === "institucion" || editingItem.solo_lectura) &&
+      editForm.password_contacto.trim() &&
+      editForm.password_contacto.trim().length < 8
+    ) {
+      toast.error("La contraseña del contacto debe tener al menos 8 caracteres.");
+      return;
+    }
     setEditLoading(true);
     try {
       const isExistingInstitution = editingItem.origen === "institucion" || editingItem.solo_lectura;
@@ -213,6 +225,7 @@ export default function SuperAdminPage() {
       if (msg.includes("slug_exists")) toast.error("El slug ya está en uso.");
       else if (msg.includes("bad_email")) toast.error("El correo no es válido.");
       else if (msg.includes("missing_required_fields")) toast.error("Completa los campos obligatorios.");
+      else if (msg.includes("weak_password")) toast.error("La contraseña del contacto debe tener al menos 8 caracteres.");
       else if (msg.includes("method_not_allowed")) toast.error("El backend aún no permite esta edición. Reinicia el servidor.");
       else if (msg.includes("Failed to fetch")) toast.error("La edición fue bloqueada por conexión o CORS. Reinicia el backend y vuelve a intentar.");
       else toast.error("No se pudo guardar la información.");
@@ -329,6 +342,25 @@ export default function SuperAdminPage() {
                 />
               </div>
 
+              {!editingExistingInstitution ? (
+                <div className="grid gap-2">
+                  <Label htmlFor="password_contacto">Contraseña del contacto</Label>
+                  <Input
+                    id="password_contacto"
+                    type="password"
+                    value={editForm.password_contacto}
+                    onChange={(e) =>
+                      setEditForm((current) => ({ ...current, password_contacto: e.target.value }))
+                    }
+                    placeholder="Mínimo 8 caracteres"
+                    disabled={editLoading}
+                  />
+                  <p className="text-xs text-slate-500">
+                    Se guardará de forma segura y se usará para la cuenta admin del contacto al aprobar.
+                  </p>
+                </div>
+              ) : null}
+
               <div className="grid gap-2">
                 <Label htmlFor="telefono_contacto">Teléfono</Label>
                 <Input
@@ -435,6 +467,7 @@ export default function SuperAdminPage() {
             const isApproved = item.estatus_solicitud === "aprobado";
             const isBusy = busyId === item.id;
             const isReadOnlyInstitution = item.origen === "institucion" || item.solo_lectura;
+            const needsContactPassword = !isReadOnlyInstitution && !item.contacto_password_configurada;
             return (
               <article key={item.id} className="rounded-[1.75rem] border border-white/80 bg-white p-6 shadow-sm">
                 <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
@@ -451,6 +484,19 @@ export default function SuperAdminPage() {
                       {isReadOnlyInstitution ? (
                         <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
                           Institución existente
+                        </span>
+                      ) : null}
+                      {!isReadOnlyInstitution ? (
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                            item.contacto_password_configurada
+                              ? "bg-emerald-50 text-emerald-700"
+                              : "bg-amber-50 text-amber-700"
+                          }`}
+                        >
+                          {item.contacto_password_configurada
+                            ? "Contraseña del contacto lista"
+                            : "Falta contraseña del contacto"}
                         </span>
                       ) : null}
                     </div>
@@ -491,12 +537,17 @@ export default function SuperAdminPage() {
                               type="button"
                               className="rounded-full font-semibold"
                               style={{ backgroundColor: BRAND }}
-                              disabled={isBusy}
+                              disabled={isBusy || needsContactPassword}
                               onClick={() => runAction(item.id, "aprobar")}
                             >
                               <CheckCircle2 className="mr-2 h-4 w-4" />
                               Aprobar y activar
                             </Button>
+                            {needsContactPassword ? (
+                              <p className="text-xs text-amber-700">
+                                Define la contraseña del contacto antes de aprobar.
+                              </p>
+                            ) : null}
 
                             <Button
                               type="button"

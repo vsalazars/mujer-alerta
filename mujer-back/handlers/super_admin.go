@@ -10,7 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type SuperAdminHandler struct {
@@ -35,6 +37,7 @@ type RegistroSolicitudAdminDTO struct {
 	EstatusSolicitud   string `json:"estatus_solicitud"`
 	EstatusInstitucion string `json:"estatus_institucion,omitempty"`
 	InstitucionActiva  *bool  `json:"institucion_activa,omitempty"`
+	ContactoPasswordOK bool   `json:"contacto_password_configurada"`
 	CreatedAt          string `json:"created_at"`
 	UpdatedAt          string `json:"updated_at"`
 }
@@ -49,6 +52,7 @@ type EditarSolicitudRegistroReq struct {
 	NombreContacto    string `json:"nombre_contacto"`
 	CargoContacto     string `json:"cargo_contacto"`
 	EmailContacto     string `json:"email_contacto"`
+	PasswordContacto  string `json:"password_contacto"`
 	TelefonoContacto  string `json:"telefono_contacto"`
 	Estado            string `json:"estado"`
 	Ciudad            string `json:"ciudad"`
@@ -65,20 +69,41 @@ type institucionesSchemaSupport struct {
 	ValidadoPor       bool
 }
 
-func (h SuperAdminHandler) solicitudesHasInstitucionID(r *http.Request) (bool, error) {
-	var exists bool
-	if err := queryRow(r.Context(), h.DB, `
-		select exists (
-			select 1
-			from information_schema.columns
-			where table_schema = 'public'
-			  and table_name = 'registro_institucional_solicitudes'
-			  and column_name = 'institucion_id'
-		)
-	`).Scan(&exists); err != nil {
-		return false, err
+type solicitudesSchemaSupport struct {
+	InstitucionID        bool
+	ContactoPasswordHash bool
+}
+
+func (h SuperAdminHandler) solicitudesSchema(r *http.Request) (solicitudesSchemaSupport, error) {
+	rows, err := query(r.Context(), h.DB, `
+		select column_name
+		from information_schema.columns
+		where table_schema = 'public'
+		  and table_name = 'registro_institucional_solicitudes'
+		  and column_name in ('institucion_id', 'contacto_password_hash')
+	`)
+	if err != nil {
+		return solicitudesSchemaSupport{}, err
 	}
-	return exists, nil
+	defer rows.Close()
+
+	support := solicitudesSchemaSupport{}
+	for rows.Next() {
+		var column string
+		if err := rows.Scan(&column); err != nil {
+			return solicitudesSchemaSupport{}, err
+		}
+		switch column {
+		case "institucion_id":
+			support.InstitucionID = true
+		case "contacto_password_hash":
+			support.ContactoPasswordHash = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return solicitudesSchemaSupport{}, err
+	}
+	return support, nil
 }
 
 func (h SuperAdminHandler) institucionesSchema(r *http.Request) (institucionesSchemaSupport, error) {
@@ -115,6 +140,74 @@ func (h SuperAdminHandler) institucionesSchema(r *http.Request) (institucionesSc
 		return institucionesSchemaSupport{}, err
 	}
 	return support, nil
+}
+
+func hashSolicitudPassword(pass string) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(pass), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(hash), nil
+}
+
+func (h SuperAdminHandler) upsertContactoAdminUser(
+	r *http.Request,
+	tx pgx.Tx,
+	institucionID int64,
+	nombreContacto string,
+	emailContacto string,
+	passwordHash string,
+) error {
+	emailContacto = strings.ToLower(strings.TrimSpace(emailContacto))
+	nombreContacto = strings.TrimSpace(nombreContacto)
+
+	if institucionID <= 0 || emailContacto == "" || nombreContacto == "" {
+		return fmt.Errorf("missing_contact_user_data")
+	}
+
+	var userID string
+	err := tx.QueryRow(r.Context(), `
+		select id::text
+		from public.usuarios
+		where institucion_id = $1
+		  and lower(email) = $2
+		order by created_at asc
+		limit 1
+	`, institucionID, emailContacto).Scan(&userID)
+
+	if err == nil {
+		if passwordHash != "" {
+			_, err = tx.Exec(r.Context(), `
+				update public.usuarios
+				set email = $2,
+					nombre = $3,
+					rol = 'admin',
+					activo = true,
+					password_hash = $4
+				where id = $1::uuid
+			`, userID, emailContacto, nombreContacto, passwordHash)
+		} else {
+			_, err = tx.Exec(r.Context(), `
+				update public.usuarios
+				set email = $2,
+					nombre = $3,
+					rol = 'admin',
+					activo = true
+				where id = $1::uuid
+			`, userID, emailContacto, nombreContacto)
+		}
+		return err
+	}
+
+	if passwordHash == "" {
+		return fmt.Errorf("contact_password_required")
+	}
+
+	_, err = tx.Exec(r.Context(), `
+		insert into public.usuarios (email, nombre, rol, password_hash, activo, institucion_id)
+		values ($1, $2, 'admin', $3, true, $4)
+	`, emailContacto, nombreContacto, passwordHash, institucionID)
+	return err
 }
 
 func (h SuperAdminHandler) slugExists(r *http.Request, slug string) (bool, error) {
@@ -159,7 +252,7 @@ func (h SuperAdminHandler) buildUniqueSlug(r *http.Request, institucionNombre st
 
 func (h SuperAdminHandler) ListSolicitudes(w http.ResponseWriter, r *http.Request) {
 	statusFilter := strings.TrimSpace(r.URL.Query().Get("estatus"))
-	hasInstitucionID, err := h.solicitudesHasInstitucionID(r)
+	solicitudesSchema, err := h.solicitudesSchema(r)
 	if err != nil {
 		http.Error(w, "db_error", http.StatusInternalServerError)
 		return
@@ -188,7 +281,7 @@ func (h SuperAdminHandler) ListSolicitudes(w http.ResponseWriter, r *http.Reques
 			s.updated_at::text
 		from public.registro_institucional_solicitudes s
 	`
-	if hasInstitucionID {
+	if solicitudesSchema.InstitucionID {
 		instStatusExpr := `''`
 		if instSchema.EstatusValidacion {
 			instStatusExpr = `coalesce(i.estatus_validacion::text, '')`
@@ -196,6 +289,10 @@ func (h SuperAdminHandler) ListSolicitudes(w http.ResponseWriter, r *http.Reques
 		instActiveExpr := `null::boolean`
 		if instSchema.Activo {
 			instActiveExpr = `i.activo`
+		}
+		passwordConfiguredExpr := `false`
+		if solicitudesSchema.ContactoPasswordHash {
+			passwordConfiguredExpr = `(coalesce(s.contacto_password_hash, '') <> '')`
 		}
 		base = `
 			select
@@ -212,6 +309,7 @@ func (h SuperAdminHandler) ListSolicitudes(w http.ResponseWriter, r *http.Reques
 				coalesce(s.sitio_web, ''),
 				coalesce(s.slug_deseado, ''),
 				s.estatus,
+				` + passwordConfiguredExpr + `,
 				` + instStatusExpr + `,
 				` + instActiveExpr + `,
 				s.created_at::text,
@@ -238,10 +336,11 @@ func (h SuperAdminHandler) ListSolicitudes(w http.ResponseWriter, r *http.Reques
 	for rows.Next() {
 		var item RegistroSolicitudAdminDTO
 		var institucionID sql.NullInt64
+		var contactoPasswordOK bool
 		var instStatus string
 		var instActive sql.NullBool
 
-		if hasInstitucionID {
+		if solicitudesSchema.InstitucionID {
 			if err := rows.Scan(
 				&item.ID,
 				&institucionID,
@@ -256,6 +355,7 @@ func (h SuperAdminHandler) ListSolicitudes(w http.ResponseWriter, r *http.Reques
 				&item.SitioWeb,
 				&item.SlugDeseado,
 				&item.EstatusSolicitud,
+				&contactoPasswordOK,
 				&instStatus,
 				&instActive,
 				&item.CreatedAt,
@@ -268,6 +368,7 @@ func (h SuperAdminHandler) ListSolicitudes(w http.ResponseWriter, r *http.Reques
 				item.InstitucionID = ptrInt64(institucionID.Int64)
 			}
 			item.Origen = "solicitud"
+			item.ContactoPasswordOK = contactoPasswordOK
 			item.EstatusInstitucion = instStatus
 			if instActive.Valid {
 				item.InstitucionActiva = &instActive.Bool
@@ -373,6 +474,7 @@ func (h SuperAdminHandler) ListSolicitudes(w http.ResponseWriter, r *http.Reques
 			item.Origen = "institucion"
 			item.SoloLectura = true
 			item.EstatusSolicitud = "aprobado"
+			item.ContactoPasswordOK = true
 			item.EstatusInstitucion = instStatus
 			item.NombreContacto = "Registro previo"
 			if instActive.Valid {
@@ -419,7 +521,9 @@ func (h SuperAdminHandler) UpdateSolicitud(w http.ResponseWriter, r *http.Reques
 		InstitucionID     *int64
 		InstitucionNombre string
 		Tipo              string
+		NombreContacto    string
 		EmailContacto     string
+		PasswordHash      string
 		TelefonoContacto  string
 		Estado            string
 		Ciudad            string
@@ -429,7 +533,7 @@ func (h SuperAdminHandler) UpdateSolicitud(w http.ResponseWriter, r *http.Reques
 
 	var state solicitudState
 	var institucionID sql.NullInt64
-	hasInstitucionID, err := h.solicitudesHasInstitucionID(r)
+	solicitudesSchema, err := h.solicitudesSchema(r)
 	if err != nil {
 		http.Error(w, "db_error", http.StatusInternalServerError)
 		return
@@ -440,26 +544,33 @@ func (h SuperAdminHandler) UpdateSolicitud(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	stateQuery := `
-		select
-			s.institucion_nombre,
-			s.tipo,
-			s.email_contacto,
-			coalesce(s.telefono_contacto, ''),
-			coalesce(s.estado, ''),
-			coalesce(s.ciudad, ''),
-			coalesce(s.slug_deseado, ''),
-			s.estatus
+			select
+				s.institucion_nombre,
+				s.tipo,
+				s.nombre_contacto,
+				s.email_contacto,
+				coalesce(s.telefono_contacto, ''),
+				coalesce(s.estado, ''),
+				coalesce(s.ciudad, ''),
+				coalesce(s.slug_deseado, ''),
+				s.estatus
 		from public.registro_institucional_solicitudes s
 		where s.id = $1
 	`
 	var scanErr error
-	if hasInstitucionID {
+	if solicitudesSchema.InstitucionID {
+		passwordSelect := `''`
+		if solicitudesSchema.ContactoPasswordHash {
+			passwordSelect = `coalesce(s.contacto_password_hash, '')`
+		}
 		scanErr = tx.QueryRow(r.Context(), `
 			select
 				s.institucion_id,
 				s.institucion_nombre,
 				s.tipo,
+				s.nombre_contacto,
 				s.email_contacto,
+				`+passwordSelect+`,
 				coalesce(s.telefono_contacto, ''),
 				coalesce(s.estado, ''),
 				coalesce(s.ciudad, ''),
@@ -471,7 +582,9 @@ func (h SuperAdminHandler) UpdateSolicitud(w http.ResponseWriter, r *http.Reques
 			&institucionID,
 			&state.InstitucionNombre,
 			&state.Tipo,
+			&state.NombreContacto,
 			&state.EmailContacto,
+			&state.PasswordHash,
 			&state.TelefonoContacto,
 			&state.Estado,
 			&state.Ciudad,
@@ -482,6 +595,7 @@ func (h SuperAdminHandler) UpdateSolicitud(w http.ResponseWriter, r *http.Reques
 		scanErr = tx.QueryRow(r.Context(), stateQuery, id).Scan(
 			&state.InstitucionNombre,
 			&state.Tipo,
+			&state.NombreContacto,
 			&state.EmailContacto,
 			&state.TelefonoContacto,
 			&state.Estado,
@@ -619,7 +733,7 @@ func (h SuperAdminHandler) UpdateSolicitud(w http.ResponseWriter, r *http.Reques
 			}
 		}
 
-		if hasInstitucionID {
+		if solicitudesSchema.InstitucionID {
 			if _, err := tx.Exec(r.Context(), `
 				update public.registro_institucional_solicitudes
 				set estatus = 'aprobado',
@@ -640,6 +754,22 @@ func (h SuperAdminHandler) UpdateSolicitud(w http.ResponseWriter, r *http.Reques
 				http.Error(w, "db_error", http.StatusInternalServerError)
 				return
 			}
+		}
+
+		if err := h.upsertContactoAdminUser(
+			r,
+			tx,
+			*state.InstitucionID,
+			state.NombreContacto,
+			state.EmailContacto,
+			state.PasswordHash,
+		); err != nil {
+			if err.Error() == "contact_password_required" {
+				http.Error(w, "contact_password_required", http.StatusConflict)
+				return
+			}
+			http.Error(w, "db_error", http.StatusInternalServerError)
+			return
 		}
 
 	case "rechazar":
@@ -785,6 +915,7 @@ func (h SuperAdminHandler) EditSolicitud(w http.ResponseWriter, r *http.Request,
 	nombreContacto := normalizeOptional(req.NombreContacto)
 	cargoContacto := normalizeOptional(req.CargoContacto)
 	emailContacto := normalizeEmailRegistro(req.EmailContacto)
+	passwordContacto := strings.TrimSpace(req.PasswordContacto)
 	telefonoContacto := normalizeOptional(req.TelefonoContacto)
 	estado := normalizeOptional(req.Estado)
 	ciudad := normalizeOptional(req.Ciudad)
@@ -814,6 +945,19 @@ func (h SuperAdminHandler) EditSolicitud(w http.ResponseWriter, r *http.Request,
 		http.Error(w, "bad_slug", http.StatusBadRequest)
 		return
 	}
+	passwordHash := ""
+	if passwordContacto != "" {
+		if len(passwordContacto) < 8 {
+			http.Error(w, "weak_password", http.StatusBadRequest)
+			return
+		}
+		hashedPassword, hashErr := hashSolicitudPassword(passwordContacto)
+		if hashErr != nil {
+			http.Error(w, "hash_error", http.StatusInternalServerError)
+			return
+		}
+		passwordHash = hashedPassword
+	}
 
 	tx, err := begin(r.Context(), h.DB)
 	if err != nil {
@@ -825,6 +969,11 @@ func (h SuperAdminHandler) EditSolicitud(w http.ResponseWriter, r *http.Request,
 	var linkedInstitucionID sql.NullInt64
 	var currentSlug string
 	var currentStatus string
+	solicitudesSchema, err := h.solicitudesSchema(r)
+	if err != nil {
+		http.Error(w, "db_error", http.StatusInternalServerError)
+		return
+	}
 	if err := tx.QueryRow(r.Context(), `
 		select institucion_id, coalesce(slug_deseado, ''), estatus
 		from public.registro_institucional_solicitudes
@@ -846,20 +995,29 @@ func (h SuperAdminHandler) EditSolicitud(w http.ResponseWriter, r *http.Request,
 		}
 	}
 
-	if _, err := tx.Exec(r.Context(), `
+	updateClauses := []string{
+		"institucion_nombre = $2",
+		"tipo = $3",
+		"nombre_contacto = $4",
+		"cargo_contacto = $5",
+		"email_contacto = $6",
+		"telefono_contacto = $7",
+		"estado = $8",
+		"ciudad = $9",
+		"sitio_web = $10",
+		"slug_deseado = $11",
+	}
+	args := []any{id, institucionNombre, tipo, nombreContacto, cargoContacto, emailContacto, telefonoContacto, estado, ciudad, sitioWeb, slugDeseado}
+	if solicitudesSchema.ContactoPasswordHash && passwordHash != "" {
+		updateClauses = append(updateClauses, "contacto_password_hash = $12")
+		args = append(args, passwordHash)
+	}
+	updateSQL := fmt.Sprintf(`
 		update public.registro_institucional_solicitudes
-		set institucion_nombre = $2,
-			tipo = $3,
-			nombre_contacto = $4,
-			cargo_contacto = $5,
-			email_contacto = $6,
-			telefono_contacto = $7,
-			estado = $8,
-			ciudad = $9,
-			sitio_web = $10,
-			slug_deseado = $11
+		set %s
 		where id = $1
-	`, id, institucionNombre, tipo, nombreContacto, cargoContacto, emailContacto, telefonoContacto, estado, ciudad, sitioWeb, slugDeseado); err != nil {
+	`, strings.Join(updateClauses, ",\n\t\t\t"))
+	if _, err := tx.Exec(r.Context(), updateSQL, args...); err != nil {
 		http.Error(w, "db_error", http.StatusInternalServerError)
 		return
 	}
@@ -878,6 +1036,12 @@ func (h SuperAdminHandler) EditSolicitud(w http.ResponseWriter, r *http.Request,
 		`, linkedInstitucionID.Int64, institucionNombre, slugDeseado, tipo, emailContacto, telefonoContacto, estado, ciudad); err != nil {
 			http.Error(w, "db_error", http.StatusInternalServerError)
 			return
+		}
+		if passwordHash != "" {
+			if err := h.upsertContactoAdminUser(r, tx, linkedInstitucionID.Int64, nombreContacto, emailContacto, passwordHash); err != nil {
+				http.Error(w, "db_error", http.StatusInternalServerError)
+				return
+			}
 		}
 	}
 
@@ -1012,7 +1176,7 @@ func (h SuperAdminHandler) EditInstitucion(w http.ResponseWriter, r *http.Reques
 }
 
 func (h SuperAdminHandler) GetSolicitud(w http.ResponseWriter, r *http.Request, id int64) {
-	hasInstitucionID, err := h.solicitudesHasInstitucionID(r)
+	solicitudesSchema, err := h.solicitudesSchema(r)
 	if err != nil {
 		http.Error(w, "db_error", http.StatusInternalServerError)
 		return
@@ -1027,7 +1191,7 @@ func (h SuperAdminHandler) GetSolicitud(w http.ResponseWriter, r *http.Request, 
 	var instStatus string
 	var instActive sql.NullBool
 
-	if hasInstitucionID {
+	if solicitudesSchema.InstitucionID {
 		instStatusExpr := `''`
 		if instSchema.EstatusValidacion {
 			instStatusExpr = `coalesce(i.estatus_validacion::text, '')`
@@ -1035,6 +1199,10 @@ func (h SuperAdminHandler) GetSolicitud(w http.ResponseWriter, r *http.Request, 
 		instActiveExpr := `null::boolean`
 		if instSchema.Activo {
 			instActiveExpr = `i.activo`
+		}
+		passwordConfiguredExpr := `false`
+		if solicitudesSchema.ContactoPasswordHash {
+			passwordConfiguredExpr = `(coalesce(s.contacto_password_hash, '') <> '')`
 		}
 		querySQL := `
 			select
@@ -1051,6 +1219,7 @@ func (h SuperAdminHandler) GetSolicitud(w http.ResponseWriter, r *http.Request, 
 				coalesce(s.sitio_web, ''),
 				coalesce(s.slug_deseado, ''),
 				s.estatus,
+				` + passwordConfiguredExpr + `,
 				` + instStatusExpr + `,
 				` + instActiveExpr + `,
 				s.created_at::text,
@@ -1073,6 +1242,7 @@ func (h SuperAdminHandler) GetSolicitud(w http.ResponseWriter, r *http.Request, 
 			&item.SitioWeb,
 			&item.SlugDeseado,
 			&item.EstatusSolicitud,
+			&item.ContactoPasswordOK,
 			&instStatus,
 			&instActive,
 			&item.CreatedAt,
