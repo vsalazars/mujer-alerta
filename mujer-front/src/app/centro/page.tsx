@@ -476,7 +476,7 @@ export default function CentroPage() {
                         background: "var(--brand-support-soft, rgba(234,213,241,0.55))",
                       }}
                     >
-                      Ver todos los anos
+                      Ver todos los periodos
                     </Button>
                   </div>
                 </div>
@@ -513,7 +513,7 @@ export default function CentroPage() {
                       className="rounded-2xl px-4 py-4"
                       style={{ background: "var(--brand-soft, rgba(127,1,127,0.10))" }}
                     >
-                      <p className="font-bold text-slate-900">2. Revisa el ano seleccionado</p>
+                      <p className="font-bold text-slate-900">2. Revisa el periodo seleccionado</p>
                       <p className="mt-1">
                         Si las respuestas existen pero pertenecen a otro periodo, cambia el filtro de ano para ubicarlas.
                       </p>
