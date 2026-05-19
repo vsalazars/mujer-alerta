@@ -62,7 +62,7 @@ type DeltaLayerBar = {
 };
 
 type DeltaLayerProps = {
-  bars: DeltaLayerBar[];
+  bars: readonly DeltaLayerBar[];
   innerWidth: number;
 };
 
