@@ -433,8 +433,8 @@ export default function CentroPage() {
                   </h1>
                   <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600 md:text-lg">
                     {centroLabel
-                      ? `El centro ${centroLabel} todavia no tiene encuestas finalizadas, por eso el tablero aparece vacio.`
-                      : "Todavia no hay encuestas finalizadas para este centro, por eso el tablero aparece vacio."}
+                      ? `El centro ${centroLabel} todavia no tiene encuestas finalizadas, por eso el tablero aparece vacío.`
+                      : "Todavia no hay encuestas finalizadas para este centro, por eso el tablero aparece vacío."}
                   </p>
 
                   <div className="mt-6 flex flex-wrap gap-3">
@@ -450,7 +450,7 @@ export default function CentroPage() {
                       </span>
                     ) : null}
                     <span className="inline-flex items-center rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-[0_8px_24px_rgba(15,23,42,0.06)] ring-1 ring-[#E9D8F3]">
-                      Ano seleccionado: {year === "all" ? "Todos" : year}
+                      Año seleccionado: {year === "all" ? "Todos" : year}
                     </span>
                   </div>
 
@@ -515,7 +515,7 @@ export default function CentroPage() {
                     >
                       <p className="font-bold text-slate-900">2. Revisa el periodo seleccionado</p>
                       <p className="mt-1">
-                        Si las respuestas existen pero pertenecen a otro periodo, cambia el filtro de ano para ubicarlas.
+                        Si las respuestas existen pero pertenecen a otro periodo, cambia el filtro de año para ubicarlas.
                       </p>
                     </div>
                     <div
