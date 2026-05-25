@@ -735,7 +735,7 @@ export default function DiagnosticoEncuestaPage() {
           </p>
         ) : null}
 
-        <Card className="mt-4 flex min-h-0 flex-1 flex-col overflow-hidden">
+        <Card className="mt-2 flex min-h-0 flex-1 flex-col overflow-hidden sm:mt-4">
           <CardHeader className={isCommentStep ? "shrink-0 pb-3" : "min-h-[5.5rem] shrink-0 sm:min-h-[5rem]"}>
             <CardTitle
               className="text-sm font-heading font-semibold leading-snug sm:text-base"
@@ -906,7 +906,7 @@ export default function DiagnosticoEncuestaPage() {
 
             {/* ✅ INDICADOR ENTRE SCROLL Y FOOTER (NO se recorta y NO tapa) */}
             {!isCommentStep ? (
-            <div className="min-h-[2.75rem] shrink-0 px-4 pb-1 sm:px-6">
+            <div className="min-h-[2.25rem] shrink-0 px-4 pb-0 sm:min-h-[2.75rem] sm:px-6 sm:pb-1">
               <div
                 className="mx-auto flex flex-col items-center rounded-full px-3 py-1 text-[11px] font-semibold text-center transition-opacity duration-200"
                 style={{
@@ -943,7 +943,7 @@ export default function DiagnosticoEncuestaPage() {
             ) : null}
 
             {/* Footer fijo */}
-            <div className="shrink-0 border-t bg-white/90 backdrop-blur px-4 py-4 pt-5 sm:px-6">
+            <div className="shrink-0 border-t bg-white/90 px-4 py-2.5 backdrop-blur sm:px-6 sm:py-4 sm:pt-5">
               {isCommentStep ? (
                 <div className="flex gap-3">
                   <Button
