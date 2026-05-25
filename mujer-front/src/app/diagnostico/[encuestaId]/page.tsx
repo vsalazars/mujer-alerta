@@ -773,13 +773,13 @@ export default function DiagnosticoEncuestaPage() {
                         "--ring": theme.primary,
                       } as React.CSSProperties
                     }
-                    maxLength={2000}
+                    maxLength={500}
                   />
 
                   <div className="flex items-center justify-between text-[11px] text-neutral-500">
-                    <span>Máximo 2000 caracteres.</span>
+                    <span>Máximo 500 caracteres.</span>
                     <span className="tabular-nums">
-                      {Math.min(2000, comentario.length)}/2000
+                      {Math.min(500, comentario.length)}/500
                     </span>
                   </div>
                 </div>

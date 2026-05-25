@@ -611,9 +611,7 @@ export default function DiagnosticoInicioPage() {
             <Card className="mt-5 overflow-hidden border-black/5 bg-white/70 shadow-sm backdrop-blur">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">Tienes una encuesta en progreso</CardTitle>
-                <p className="text-xs text-neutral-500">
-                  Progreso guardado automáticamente en este navegador.
-                </p>
+              
               </CardHeader>
               <CardContent className="space-y-3">
                 <Button
