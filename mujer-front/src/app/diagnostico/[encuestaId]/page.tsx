@@ -656,14 +656,14 @@ export default function DiagnosticoEncuestaPage() {
   } as React.CSSProperties;
 
   return (
-    <main className="min-h-dvh bg-white overflow-x-hidden">
+    <main className="flex h-svh flex-col overflow-x-hidden bg-white sm:min-h-dvh sm:h-auto">
       <style jsx global>{`
         .scroll-area {
           -webkit-overflow-scrolling: touch;
         }
       `}</style>
 
-      <div className="fixed inset-x-0 top-0 z-30 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+      <div className="sticky top-0 z-30 shrink-0 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
         <div className="mx-auto w-full max-w-md px-4 pb-3 pt-2 sm:px-5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
@@ -727,15 +727,15 @@ export default function DiagnosticoEncuestaPage() {
         </div>
       </div>
 
-      <div className="mx-auto min-h-dvh w-full max-w-md px-4 py-4 pb-[env(safe-area-inset-bottom)] pt-28 sm:px-5 sm:py-5 sm:pt-32 flex flex-col">
+      <div className="mx-auto flex w-full max-w-md min-h-0 flex-1 flex-col px-4 py-3 pb-[env(safe-area-inset-bottom)] sm:min-h-dvh sm:px-5 sm:py-5">
 
         {(isInitialStep ? initialSection.instructions : inst.instructions) ? (
-          <p className="mt-1 text-[11px] leading-4 text-muted-foreground shrink-0">
+          <p className="mt-1 shrink-0 text-[11px] leading-5 text-muted-foreground">
             {isInitialStep ? initialSection.instructions : inst.instructions}
           </p>
         ) : null}
 
-        <Card className="mt-4 flex-1 min-h-0 flex flex-col">
+        <Card className="mt-4 flex min-h-0 flex-1 flex-col overflow-hidden">
           <CardHeader className={isCommentStep ? "shrink-0 pb-3" : "min-h-[5.5rem] shrink-0 sm:min-h-[5rem]"}>
             <CardTitle
               className="text-sm font-heading font-semibold leading-snug sm:text-base"
@@ -784,8 +784,7 @@ export default function DiagnosticoEncuestaPage() {
                   </div>
                 </div>
               ) : currentInitial ? (
-                <div className="max-h-[58vh] overflow-y-auto overscroll-contain pr-1 sm:max-h-none sm:overflow-visible">
-                  <div className="space-y-3 pb-24 sm:pb-0">
+                <div className="space-y-3 pb-24 sm:pb-0">
                   {currentInitial.options.map((opt) => {
                     const active = initialAnswers[currentInitial.question_id] === opt.option_id;
                     return (
@@ -818,7 +817,6 @@ export default function DiagnosticoEncuestaPage() {
                       </button>
                     );
                   })}
-                  </div>
                 </div>
               ) : (
                 <div className="space-y-4">
