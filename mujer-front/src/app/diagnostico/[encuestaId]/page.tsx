@@ -784,7 +784,8 @@ export default function DiagnosticoEncuestaPage() {
                   </div>
                 </div>
               ) : currentInitial ? (
-                <div className="space-y-3">
+                <div className="max-h-[58vh] overflow-y-auto overscroll-contain pr-1 sm:max-h-none sm:overflow-visible">
+                  <div className="space-y-3">
                   {currentInitial.options.map((opt) => {
                     const active = initialAnswers[currentInitial.question_id] === opt.option_id;
                     return (
@@ -817,6 +818,7 @@ export default function DiagnosticoEncuestaPage() {
                       </button>
                     );
                   })}
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-4">
