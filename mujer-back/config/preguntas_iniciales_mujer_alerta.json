@@ -4,7 +4,7 @@
   "subtitle": "Selecciona, en cada pregunta, la afirmación con la que estás más de acuerdo.",
   "version": "1.0.0",
   "language": "es-MX",
-  "instructions": "Lee cada grupo de afirmaciones y selecciona una sola opción por pregunta: aquella con la que estás más de acuerdo.",
+  "instructions": "",
   "questions": [
     {
       "question_id": "I1",
