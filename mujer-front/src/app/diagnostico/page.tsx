@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
@@ -9,6 +10,13 @@ import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Separator } from "../../components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "../../components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -67,6 +75,7 @@ type SavedProgress = {
   updated_at: number;
   qIndex: number;
   comentario: string;
+  initialAnswers?: Record<string, string>;
   answers: Record<string, number>;
 };
 
@@ -106,6 +115,7 @@ function findLatestInProgress(): { encuestaId: string; progress: SavedProgress }
       if (!prog) continue;
 
       const hasSomething =
+        (prog.initialAnswers && Object.keys(prog.initialAnswers).length > 0) ||
         (prog.answers && Object.keys(prog.answers).length > 0) ||
         (prog.comentario && prog.comentario.trim().length > 0) ||
         prog.qIndex > 0;
@@ -268,6 +278,7 @@ export default function DiagnosticoInicioPage() {
 
   // ✅ NUEVO: bloqueo por “ya finalizó” en este navegador
   const [doneBlocked, setDoneBlocked] = useState<{ remainingMs: number } | null>(null);
+  const [welcomeOpen, setWelcomeOpen] = useState(true);
   const theme = themeFromBranding(branding);
 
   useEffect(() => {
@@ -401,9 +412,7 @@ export default function DiagnosticoInicioPage() {
     }
     if (blockedByLock) {
       alert(
-        `Ya se inició un diagnóstico recientemente para este centro en este navegador.\n\nPuedes continuarla o esperar ${formatRemaining(
-          lock!.remainingMs
-        )}.`
+        `Ya se inició un diagnóstico recientemente para este centro en este navegador.\n\nPuedes continuarla donde te quedaste`
       );
       return;
     }
@@ -477,6 +486,55 @@ export default function DiagnosticoInicioPage() {
 
   return (
     <main className="min-h-dvh bg-white">
+      <Dialog open={welcomeOpen} onOpenChange={setWelcomeOpen}>
+        <DialogContent
+          showCloseButton={false}
+          className="max-w-xl rounded-[2rem] border bg-white/98 p-0 shadow-[0_28px_90px_rgba(15,23,42,0.22)]"
+          style={{ borderColor: theme.border }}
+        >
+          <div
+            className="rounded-t-[2rem] px-6 py-5"
+            style={{
+              background: `linear-gradient(135deg, ${theme.soft} 0%, #ffffff 100%)`,
+            }}
+          >
+            <div className="flex items-start gap-4">
+              <div
+                className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden"
+              >
+                <Image
+                  src="/avatar.png"
+                  alt="Avatar de bienvenida"
+                  width={80}
+                  height={80}
+                  className="h-full w-full object-cover"
+                  priority
+                />
+              </div>
+              <DialogHeader className="text-left">
+                <DialogTitle style={{ color: theme.primary }}>Bienvenid@</DialogTitle>
+                <DialogDescription className="text-sm leading-7 text-neutral-700">
+                  Esta iniciativa busca identificar algunas manifestaciones de la violencia contra
+                  las mujeres por razones de género que suceden en la vida cotidiana dentro de la
+                  escuela. Te pedimos que al responder, consideres tu experiencia personal dentro
+                  del plantel. Agradecemos tu participación.
+                </DialogDescription>
+              </DialogHeader>
+            </div>
+          </div>
+
+          <div className="px-6 pb-6 pt-4">
+            <Button
+              onClick={() => setWelcomeOpen(false)}
+              className="h-12 w-full rounded-full text-base font-semibold text-white"
+              style={{ background: theme.gradient }}
+            >
+              Continuar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="relative min-h-dvh overflow-hidden">
         <div
           className="absolute inset-0"
@@ -659,8 +717,7 @@ export default function DiagnosticoInicioPage() {
                               Ya realizaste un diagnóstico reciente para este centro.
                             </p>
                             <p className="text-neutral-600">
-                              Puedes continuarla o esperar{" "}
-                              <span className="font-semibold">{formatRemaining(lock!.remainingMs)}</span>.
+                              Puedes continuarla más tarde.
                             </p>
 
                            

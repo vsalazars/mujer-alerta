@@ -11,6 +11,7 @@ import { DashboardHero } from "@/components/centro/dashboard/DashboardHero";
 import { DistributionSection } from "@/components/centro/dashboard/DistributionSection";
 import { ExecutiveSummarySection } from "@/components/centro/dashboard/ExecutiveSummarySection";
 import { HeatmapSection } from "@/components/centro/dashboard/HeatmapSection";
+import { InitialQuestionsSection } from "@/components/centro/dashboard/InitialQuestionsSection";
 import { NLPProcessingSection } from "@/components/centro/dashboard/NLPProcessingSection";
 import {
   clamp5,
@@ -562,6 +563,7 @@ export default function CentroPage() {
           edadBars={edadBars}
           generoStack={generoStack}
         />
+        <InitialQuestionsSection data={data.preguntas_iniciales} />
         <HeatmapSection heatmap={heatmap} />
         <AdvancedStatsSection
           year={year}

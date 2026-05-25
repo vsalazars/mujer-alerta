@@ -1,0 +1,163 @@
+{
+  "section_id": "mujer_alerta_inicial_v1",
+  "name": "Preguntas iniciales",
+  "subtitle": "Selecciona, en cada pregunta, la afirmación con la que estás más de acuerdo.",
+  "version": "1.0.0",
+  "language": "es-MX",
+  "instructions": "Lee cada grupo de afirmaciones y selecciona una sola opción por pregunta: aquella con la que estás más de acuerdo.",
+  "questions": [
+    {
+      "question_id": "I1",
+      "order": 1,
+      "prompt": "De las siguientes creencias, señala aquella con la que estás más de acuerdo.",
+      "selection_mode": "single",
+      "options": [
+        {
+          "option_id": "I1_O1",
+          "label": "Su debilidad física las hace más vulnerables"
+        },
+        {
+          "option_id": "I1_O2",
+          "label": "Su cerebro tiene una composición diferente a la de los hombres"
+        },
+        {
+          "option_id": "I1_O3",
+          "label": "La naturaleza femenina busca protección"
+        },
+        {
+          "option_id": "I1_O4",
+          "label": "Las mujeres toman decisiones basadas en la emoción más que en la razón"
+        },
+        {
+          "option_id": "I1_O5",
+          "label": "En actividades como la mecánica o el arreglo de autos, las mujeres tienen muchos problemas"
+        },
+        {
+          "option_id": "I1_O6",
+          "label": "Las mujeres que se dedican a las matemáticas o a la física no tienen suerte con los hombres"
+        },
+        {
+          "option_id": "I1_O7",
+          "label": "Las mujeres son infantiles casi siempre"
+        }
+      ]
+    },
+    {
+      "question_id": "I2",
+      "order": 2,
+      "prompt": "Sobre la relación entre mujeres y hombres dentro del aula, en la elaboración de trabajos y en la creación de proyectos, señala la afirmación con la que estás más de acuerdo.",
+      "selection_mode": "single",
+      "options": [
+        {
+          "option_id": "I2_O1",
+          "label": "Las mujeres trabajan mejor solas"
+        },
+        {
+          "option_id": "I2_O2",
+          "label": "Los hombres trabajan mejor si sólo son hombres"
+        },
+        {
+          "option_id": "I2_O3",
+          "label": "En los grupos mixtos, los hombres toman la iniciativa y organizan el trabajo"
+        },
+        {
+          "option_id": "I2_O4",
+          "label": "Las mejores ideas provienen de los hombres"
+        },
+        {
+          "option_id": "I2_O5",
+          "label": "Las mujeres cuidan los detalles, la redacción y la presentación"
+        },
+        {
+          "option_id": "I2_O6",
+          "label": "Cuando una mujer participa, se le escucha menos que a un hombre"
+        },
+        {
+          "option_id": "I2_O7",
+          "label": "Las mujeres son cumplidas y los hombres son inteligentes"
+        },
+        {
+          "option_id": "I2_O8",
+          "label": "Las mejores ideas provienen de las mujeres"
+        },
+        {
+          "option_id": "I2_O9",
+          "label": "Los hombres obtienen calificaciones más altas que las mujeres"
+        }
+      ]
+    },
+    {
+      "question_id": "I3",
+      "order": 3,
+      "prompt": "Sobre la relación con los profesores y profesoras, señala la afirmación con la que estás más de acuerdo.",
+      "selection_mode": "single",
+      "options": [
+        {
+          "option_id": "I3_O1",
+          "label": "Las profesoras atienden más a los alumnos"
+        },
+        {
+          "option_id": "I3_O2",
+          "label": "Los profesores pasan al pizarrón más a las alumnas que a los alumnos"
+        },
+        {
+          "option_id": "I3_O3",
+          "label": "Los profesores celebran más los proyectos elaborados por hombres"
+        },
+        {
+          "option_id": "I3_O4",
+          "label": "Los profesores hacen alusión a los aspectos corporales y funcionales de las mujeres y diversidades sexogenéricas"
+        },
+        {
+          "option_id": "I3_O5",
+          "label": "Las profesoras revisan con mayor cuidado los trabajos de los alumnos que de las alumnas"
+        },
+        {
+          "option_id": "I3_O6",
+          "label": "Los profesores esperan mejores resultados de los hombres"
+        },
+        {
+          "option_id": "I3_O7",
+          "label": "Los profesores critican con mayor rigor los trabajos de las mujeres"
+        },
+        {
+          "option_id": "I3_O8",
+          "label": "Las profesoras son más equitativas que los profesores"
+        }
+      ]
+    },
+    {
+      "question_id": "I4",
+      "order": 4,
+      "prompt": "Sobre la atención en los servicios, señala la afirmación con la que estás más de acuerdo.",
+      "selection_mode": "single",
+      "options": [
+        {
+          "option_id": "I4_O1",
+          "label": "Las mujeres brindan mejor atención a los alumnos que a las alumnas"
+        },
+        {
+          "option_id": "I4_O2",
+          "label": "Los alumnos reciben respuesta a sus peticiones con mayor rapidez"
+        },
+        {
+          "option_id": "I4_O3",
+          "label": "Las alumnas esperan más para recibir información o se les brinda menor tiempo para las indicaciones pertinentes"
+        },
+        {
+          "option_id": "I4_O4",
+          "label": "La institución no considera la condición de maternidad o trabajo de cuidados en los trámites de las alumnas"
+        },
+        {
+          "option_id": "I4_O5",
+          "label": "La institución no cuida de las mujeres"
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "required_all_questions": true,
+    "allow_skip": false,
+    "selection_mode": "single"
+  }
+}

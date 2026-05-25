@@ -41,6 +41,24 @@ func main() {
 		os.Exit(1)
 	}
 
+	preguntasIniciales, err := services.LoadPreguntasIniciales("config/preguntas_iniciales_mujer_alerta.json")
+	if err != nil {
+		fmt.Println("Preguntas iniciales error:", err)
+		os.Exit(1)
+	}
+
+	preguntasInicialesMeta, err := services.BuildPreguntasInicialesMeta(preguntasIniciales)
+	if err != nil {
+		fmt.Println("Preguntas iniciales meta error:", err)
+		os.Exit(1)
+	}
+
+	preguntasInicialesDef, err := services.ParsePreguntasInicialesDefinition(preguntasIniciales)
+	if err != nil {
+		fmt.Println("Preguntas iniciales definition error:", err)
+		os.Exit(1)
+	}
+
 	fmt.Println("Instrumento cargado:", instrumento.Name, instrumento.Version)
 
 	mux := http.NewServeMux()
@@ -61,6 +79,9 @@ func main() {
 	// ======================
 	ih := handlers.InstrumentoHandler{Data: instrumento}
 	mux.HandleFunc("/api/instrumento", ih.Get)
+
+	pih := handlers.InstrumentoHandler{Data: preguntasIniciales}
+	mux.HandleFunc("/api/preguntas-iniciales", pih.Get)
 
 	// ======================
 	// Instituciones
@@ -108,6 +129,17 @@ func main() {
 		handlers.WithPublicTenantSession(pool, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodPost {
 				rh.Save(w, r)
+				return
+			}
+			http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+		})).ServeHTTP(w, r)
+	})
+
+	rih := handlers.RespuestasInicialesHandler{DB: pool, PreguntasMeta: preguntasInicialesMeta}
+	mux.HandleFunc("/api/respuestas-iniciales", func(w http.ResponseWriter, r *http.Request) {
+		handlers.WithPublicTenantSession(pool, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost {
+				rih.Save(w, r)
 				return
 			}
 			http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
@@ -419,7 +451,10 @@ func main() {
 	// ======================
 	// Centro: Resumen agregado (ÚNICO endpoint válido)
 	// ======================
-	crh := handlers.CentroResultadosHandler{DB: pool}
+	crh := handlers.CentroResultadosHandler{
+		DB:                 pool,
+		PreguntasIniciales: preguntasInicialesDef,
+	}
 	mux.HandleFunc("/api/centro/resumen", func(w http.ResponseWriter, r *http.Request) {
 		handlers.RequireJWT(handlers.WithTenantSession(pool, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodGet {

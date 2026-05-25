@@ -1,9 +1,14 @@
 package handlers
 
-import "github.com/jackc/pgx/v5/pgxpool"
+import (
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"mujer-back/services"
+)
 
 type CentroResultadosHandler struct {
-	DB *pgxpool.Pool
+	DB                 *pgxpool.Pool
+	PreguntasIniciales services.PreguntasInicialesDefinition
 }
 
 type CountItem struct {
@@ -64,11 +69,39 @@ type CentroStats struct {
 	NLP                 NLPStats         `json:"nlp"`
 }
 
+type PreguntaInicialOpcionResumen struct {
+	OpcionID   string  `json:"opcion_id"`
+	Label      string  `json:"label"`
+	Total      int64   `json:"total"`
+	Porcentaje float64 `json:"porcentaje"`
+}
+
+type PreguntaInicialResumen struct {
+	PreguntaID      string                         `json:"pregunta_id"`
+	Prompt          string                         `json:"prompt"`
+	TotalRespuestas int64                          `json:"total_respuestas"`
+	OpcionTopID     string                         `json:"opcion_top_id"`
+	OpcionTopLabel  string                         `json:"opcion_top_label"`
+	OpcionTopTotal  int64                          `json:"opcion_top_total"`
+	OpcionTopPct    float64                        `json:"opcion_top_pct"`
+	Opciones        []PreguntaInicialOpcionResumen `json:"opciones"`
+}
+
+type PreguntasInicialesDashboardResumen struct {
+	SectionID       string                   `json:"section_id"`
+	Name            string                   `json:"name"`
+	Subtitle        string                   `json:"subtitle"`
+	Instructions    string                   `json:"instructions"`
+	TotalRespuestas int64                    `json:"total_respuestas"`
+	Preguntas       []PreguntaInicialResumen `json:"preguntas"`
+}
+
 type CentroResumenResponse struct {
-	Centros []int64       `json:"centros"`
-	Global  ResumenGlobal `json:"global"`
-	Matriz  []MatrizItem  `json:"matriz"`
-	Stats   CentroStats   `json:"stats"`
+	Centros            []int64                            `json:"centros"`
+	Global             ResumenGlobal                      `json:"global"`
+	PreguntasIniciales PreguntasInicialesDashboardResumen `json:"preguntas_iniciales"`
+	Matriz             []MatrizItem                       `json:"matriz"`
+	Stats              CentroStats                        `json:"stats"`
 }
 
 type CentroYearsResponse struct {

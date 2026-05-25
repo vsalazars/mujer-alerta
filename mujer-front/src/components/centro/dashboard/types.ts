@@ -14,6 +14,33 @@ export type MatrizItem = {
 
 export type CountItem = { clave: string; label: string; total: number };
 
+export type PreguntaInicialOpcionResumen = {
+  opcion_id: string;
+  label: string;
+  total: number;
+  porcentaje: number;
+};
+
+export type PreguntaInicialResumen = {
+  pregunta_id: string;
+  prompt: string;
+  total_respuestas: number;
+  opcion_top_id: string;
+  opcion_top_label: string;
+  opcion_top_total: number;
+  opcion_top_pct: number;
+  opciones: PreguntaInicialOpcionResumen[];
+};
+
+export type PreguntasInicialesDashboardResumen = {
+  section_id: string;
+  name: string;
+  subtitle: string;
+  instructions: string;
+  total_respuestas: number;
+  preguntas: PreguntaInicialResumen[];
+};
+
 export type GeneroDimItem = {
   clave: string;
   label: string;
@@ -135,6 +162,7 @@ export type CentroStats = {
 export type CentroResumenResponse = {
   centros: number[];
   global: ResumenGlobal;
+  preguntas_iniciales: PreguntasInicialesDashboardResumen;
   matriz: MatrizItem[];
   stats: CentroStats;
 };

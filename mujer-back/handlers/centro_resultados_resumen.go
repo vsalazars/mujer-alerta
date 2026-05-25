@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 )
@@ -117,6 +118,12 @@ func (h CentroResultadosHandler) GetResumenCentro(w http.ResponseWriter, r *http
 		  and e.finished_at is not null
 		  and ($2::int is null or extract(year from e.finished_at) = $2)
 	`, centros, year).Scan(&global.Total); err != nil {
+		http.Error(w, "db_error", http.StatusInternalServerError)
+		return
+	}
+
+	preguntasInicialesResumen, err := h.buildPreguntasInicialesResumen(ctx, centros, year)
+	if err != nil {
 		http.Error(w, "db_error", http.StatusInternalServerError)
 		return
 	}
@@ -436,9 +443,91 @@ func (h CentroResultadosHandler) GetResumenCentro(w http.ResponseWriter, r *http
 	}
 
 	writeJSONCentro(w, http.StatusOK, CentroResumenResponse{
-		Centros: centros,
-		Global:  global,
-		Matriz:  matriz,
-		Stats:   stats,
+		Centros:            centros,
+		Global:             global,
+		PreguntasIniciales: preguntasInicialesResumen,
+		Matriz:             matriz,
+		Stats:              stats,
 	})
+}
+
+func (h CentroResultadosHandler) buildPreguntasInicialesResumen(ctx context.Context, centros []int64, year *int) (PreguntasInicialesDashboardResumen, error) {
+	resumen := PreguntasInicialesDashboardResumen{
+		SectionID:    h.PreguntasIniciales.SectionID,
+		Name:         h.PreguntasIniciales.Name,
+		Subtitle:     h.PreguntasIniciales.Subtitle,
+		Instructions: h.PreguntasIniciales.Instructions,
+		Preguntas:    make([]PreguntaInicialResumen, 0, len(h.PreguntasIniciales.Questions)),
+	}
+
+	rows, err := query(ctx, h.DB, `
+		select ri.pregunta_id, ri.opcion_id, count(*)::bigint
+		from respuestas_iniciales ri
+		join encuestas e on e.id = ri.encuesta_id
+		where e.centro_id = any($1::bigint[])
+		  and e.finished_at is not null
+		  and ($2::int is null or extract(year from e.finished_at) = $2)
+		group by ri.pregunta_id, ri.opcion_id
+	`, centros, year)
+	if err != nil {
+		return resumen, err
+	}
+	defer rows.Close()
+
+	type optionCount struct {
+		total int64
+	}
+
+	countsByQuestion := make(map[string]map[string]optionCount, len(h.PreguntasIniciales.Questions))
+	for rows.Next() {
+		var questionID string
+		var optionID string
+		var total int64
+		if err := rows.Scan(&questionID, &optionID, &total); err != nil {
+			return resumen, err
+		}
+		if _, ok := countsByQuestion[questionID]; !ok {
+			countsByQuestion[questionID] = make(map[string]optionCount)
+		}
+		countsByQuestion[questionID][optionID] = optionCount{total: total}
+	}
+	if err := rows.Err(); err != nil {
+		return resumen, err
+	}
+
+	for _, question := range h.PreguntasIniciales.Questions {
+		item := PreguntaInicialResumen{
+			PreguntaID: question.QuestionID,
+			Prompt:     question.Prompt,
+			Opciones:   make([]PreguntaInicialOpcionResumen, 0, len(question.Options)),
+		}
+
+		for _, option := range question.Options {
+			total := countsByQuestion[question.QuestionID][option.OptionID].total
+			item.TotalRespuestas += total
+			item.Opciones = append(item.Opciones, PreguntaInicialOpcionResumen{
+				OpcionID: option.OptionID,
+				Label:    option.Label,
+				Total:    total,
+			})
+		}
+
+		for idx := range item.Opciones {
+			option := &item.Opciones[idx]
+			if item.TotalRespuestas > 0 {
+				option.Porcentaje = float64(option.Total) * 100 / float64(item.TotalRespuestas)
+			}
+			if option.Total > item.OpcionTopTotal {
+				item.OpcionTopID = option.OpcionID
+				item.OpcionTopLabel = option.Label
+				item.OpcionTopTotal = option.Total
+				item.OpcionTopPct = option.Porcentaje
+			}
+		}
+
+		resumen.TotalRespuestas += item.TotalRespuestas
+		resumen.Preguntas = append(resumen.Preguntas, item)
+	}
+
+	return resumen, nil
 }

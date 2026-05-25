@@ -55,6 +55,29 @@ type Instrumento = {
   scoring?: { total_responses_expected?: number };
 };
 
+type PreguntaInicialOption = {
+  option_id: string;
+  label: string;
+};
+
+type PreguntaInicial = {
+  question_id: string;
+  order: number;
+  prompt: string;
+  selection_mode: "single";
+  options: PreguntaInicialOption[];
+};
+
+type PreguntasInicialesSection = {
+  section_id: string;
+  name: string;
+  subtitle?: string;
+  version: string;
+  language?: string;
+  instructions?: string;
+  questions: PreguntaInicial[];
+};
+
 // === PROGRESS BAR PRO (Glow + Gradient) ===
 const TRACK_H = 10; // px
 const DOT_SIZE = 14; // px
@@ -127,6 +150,7 @@ type SavedProgress = {
   updated_at: number;
   qIndex: number;
   comentario: string;
+  initialAnswers: Record<string, string>;
   answers: Record<string, number>;
 };
 
@@ -145,12 +169,23 @@ function safeReadProgress(key: string): SavedProgress | null {
       typeof (parsed as any).comentario === "string"
         ? (parsed as any).comentario
         : "";
+    const initialAnswersRaw = (parsed as any).initialAnswers;
     const answersRaw = (parsed as any).answers;
 
     if (!Number.isFinite(v) || v !== LS_VERSION) return null;
     if (!Number.isFinite(updated_at)) return null;
     if (!Number.isFinite(qIndex)) return null;
+    if (initialAnswersRaw && !isObject(initialAnswersRaw)) return null;
     if (!isObject(answersRaw)) return null;
+
+    const initialAnswers: Record<string, string> = {};
+    if (isObject(initialAnswersRaw)) {
+      for (const [k, val] of Object.entries(initialAnswersRaw)) {
+        if (typeof k === "string" && typeof val === "string" && val.trim()) {
+          initialAnswers[k] = val;
+        }
+      }
+    }
 
     const answers: Record<string, number> = {};
     for (const [k, val] of Object.entries(answersRaw)) {
@@ -158,7 +193,7 @@ function safeReadProgress(key: string): SavedProgress | null {
       if (typeof k === "string" && Number.isFinite(n)) answers[k] = n;
     }
 
-    return { v, updated_at, qIndex, comentario, answers };
+    return { v, updated_at, qIndex, comentario, initialAnswers, answers };
   } catch {
     return null;
   }
@@ -190,6 +225,7 @@ export default function DiagnosticoEncuestaPage() {
   const institucionSlug = extractInstitutionSlug(pathname);
 
   const [inst, setInst] = useState<Instrumento | null>(null);
+  const [initialSection, setInitialSection] = useState<PreguntasInicialesSection | null>(null);
   const [rawKeys, setRawKeys] = useState<string[]>([]);
   const [tovKind, setTovKind] = useState<string>("(no cargado)");
   const [loading, setLoading] = useState(true);
@@ -198,6 +234,7 @@ export default function DiagnosticoEncuestaPage() {
   const theme = themeFromBranding(branding);
 
   const [answers, setAnswers] = useState<Record<string, number>>({});
+  const [initialAnswers, setInitialAnswers] = useState<Record<string, string>>({});
   const [qIndex, setQIndex] = useState(0);
 
   const [comentario, setComentario] = useState<string>("");
@@ -225,7 +262,10 @@ export default function DiagnosticoEncuestaPage() {
   useEffect(() => {
     (async () => {
       try {
-        const raw = await api<any>("/api/instrumento");
+        const [rawInitial, raw] = await Promise.all([
+          api<PreguntasInicialesSection>("/api/preguntas-iniciales"),
+          api<any>("/api/instrumento"),
+        ]);
         const payload = pickInstPayload(raw);
 
         if (isObject(payload)) {
@@ -243,9 +283,11 @@ export default function DiagnosticoEncuestaPage() {
           setTovKind(typeof payload);
         }
 
+        setInitialSection(rawInitial);
         setInst(payload as Instrumento);
       } catch (e: any) {
         console.error("instrumento error:", e);
+        setInitialSection(null);
         setInst(null);
         setRawKeys([]);
         setTovKind("(error)");
@@ -268,6 +310,11 @@ export default function DiagnosticoEncuestaPage() {
       alive = false;
     };
   }, [institucionSlug]);
+
+  const initialQuestions = useMemo(() => {
+    if (!initialSection?.questions || !Array.isArray(initialSection.questions)) return [];
+    return [...initialSection.questions].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  }, [initialSection]);
 
   const questions = useMemo(() => {
     if (!inst) return [];
@@ -299,16 +346,26 @@ export default function DiagnosticoEncuestaPage() {
   }, [inst]);
 
   const totalQuestions = questions.length || 16;
-
-  const isCommentStep = qIndex === totalQuestions;
-  const current = !isCommentStep ? questions[qIndex] : null;
+  const totalPromptQuestions = initialQuestions.length + totalQuestions;
+  const isInitialStep = qIndex < initialQuestions.length;
+  const instrumentIndex = qIndex - initialQuestions.length;
+  const isCommentStep = qIndex === totalPromptQuestions;
+  const currentInitial = isInitialStep ? initialQuestions[qIndex] : null;
+  const current = !isInitialStep && !isCommentStep ? questions[instrumentIndex] : null;
 
   const totalExpected =
     (inst as any)?.scoring?.total_responses_expected ?? totalQuestions * 3;
 
+  const initialAnsweredCount = useMemo(
+    () => Object.keys(initialAnswers).filter((key) => typeof initialAnswers[key] === "string" && initialAnswers[key]).length,
+    [initialAnswers]
+  );
   const answeredCount = useMemo(() => Object.keys(answers).length, [answers]);
 
   const currentDone = useMemo(() => {
+    if (currentInitial) {
+      return typeof initialAnswers[currentInitial.question_id] === "string" && initialAnswers[currentInitial.question_id].trim().length > 0;
+    }
     if (!current) return false;
     if (!Array.isArray(current.cards)) return false;
 
@@ -316,12 +373,17 @@ export default function DiagnosticoEncuestaPage() {
       const k = `${current.question_id}:${c.dimension}`;
       return typeof answers[k] === "number";
     });
-  }, [current, answers]);
+  }, [currentInitial, initialAnswers, current, answers]);
 
   const allDone = useMemo(
-    () => answeredCount >= totalExpected,
-    [answeredCount, totalExpected]
+    () => initialAnsweredCount >= initialQuestions.length && answeredCount >= totalExpected,
+    [initialAnsweredCount, initialQuestions.length, answeredCount, totalExpected]
   );
+
+  function setInitialAnswer(questionId: string, optionId: string) {
+    setInitialAnswers((prev) => ({ ...prev, [questionId]: optionId }));
+    requestAnimationFrame(() => updateScrollHint());
+  }
 
   function setAnswer(
     questionId: string,
@@ -342,7 +404,7 @@ export default function DiagnosticoEncuestaPage() {
   }
 
   function goNext() {
-    setQIndex((i) => Math.min(totalQuestions, i + 1));
+    setQIndex((i) => Math.min(totalPromptQuestions, i + 1));
     requestAnimationFrame(() => {
       scrollContentTop();
       updateScrollHint();
@@ -350,13 +412,20 @@ export default function DiagnosticoEncuestaPage() {
   }
 
   function findFirstIncompleteIndex(): number {
+    for (let i = 0; i < initialQuestions.length; i++) {
+      const q = initialQuestions[i];
+      if (typeof initialAnswers[q.question_id] !== "string" || initialAnswers[q.question_id].trim().length === 0) {
+        return i;
+      }
+    }
+
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
-      if (!Array.isArray(q.cards)) return i;
+      if (!Array.isArray(q.cards)) return initialQuestions.length + i;
       for (const c of q.cards) {
         if (!c.required) continue;
         const k = `${q.question_id}:${c.dimension}`;
-        if (typeof answers[k] !== "number") return i;
+        if (typeof answers[k] !== "number") return initialQuestions.length + i;
       }
     }
     return -1;
@@ -365,16 +434,17 @@ export default function DiagnosticoEncuestaPage() {
   // hidratar progreso
   useEffect(() => {
     if (!encuestaId) return;
-    if (!inst) return;
-    if (!questions.length) return;
+    if (!inst || !initialSection) return;
+    if (!questions.length || !initialQuestions.length) return;
 
     const key = storageKey(encuestaId);
     const saved = safeReadProgress(key);
 
     if (saved && !hydratedRef.current) {
-      const maxIdx = totalQuestions;
+      const maxIdx = totalPromptQuestions;
       const nextIdx = clamp(saved.qIndex, 0, maxIdx);
 
+      setInitialAnswers(saved.initialAnswers || {});
       setAnswers(saved.answers || {});
       setComentario(typeof saved.comentario === "string" ? saved.comentario : "");
       setQIndex(nextIdx);
@@ -394,7 +464,7 @@ export default function DiagnosticoEncuestaPage() {
       scrollContentTop();
       updateScrollHint();
     });
-  }, [encuestaId, inst, questions.length, totalQuestions]);
+  }, [encuestaId, inst, initialSection, questions.length, initialQuestions.length, totalPromptQuestions]);
 
   // autoguardado debounced
   useEffect(() => {
@@ -414,6 +484,7 @@ export default function DiagnosticoEncuestaPage() {
         updated_at: Date.now(),
         qIndex,
         comentario,
+        initialAnswers,
         answers,
       });
     }, 250);
@@ -424,10 +495,10 @@ export default function DiagnosticoEncuestaPage() {
         saveTimerRef.current = null;
       }
     };
-  }, [encuestaId, qIndex, comentario, answers]);
+  }, [encuestaId, qIndex, comentario, initialAnswers, answers]);
 
   async function onSubmitAll() {
-    if (!inst) return;
+    if (!inst || !initialSection) return;
     if (saving) return;
 
     const firstBad = findFirstIncompleteIndex();
@@ -442,6 +513,11 @@ export default function DiagnosticoEncuestaPage() {
     }
 
     const respuestas: RespuestaItem[] = [];
+    const respuestasIniciales = initialQuestions.map((q) => ({
+      pregunta_id: q.question_id,
+      opcion_id: initialAnswers[q.question_id],
+    }));
+
     questions.forEach((q) => {
       if (!Array.isArray(q.cards)) return;
       q.cards.forEach((c) => {
@@ -458,6 +534,14 @@ export default function DiagnosticoEncuestaPage() {
     setSaving(true);
     try {
       const cleanComment = comentario.trim();
+
+      await api<{ ok: boolean }>("/api/respuestas-iniciales", {
+        method: "POST",
+        body: JSON.stringify({
+          encuesta_id: encuestaId,
+          respuestas: respuestasIniciales,
+        }),
+      });
 
       await api<{ ok: boolean }>("/api/respuestas", {
         method: "POST",
@@ -483,6 +567,16 @@ export default function DiagnosticoEncuestaPage() {
       <main className="min-h-dvh bg-white">
         <div className="mx-auto w-full max-w-md px-5 py-8">
           <p className="text-sm text-neutral-600">Cargando instrumento…</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (initialSection && initialQuestions.length === 0) {
+    return (
+      <main className="min-h-dvh bg-white">
+        <div className="mx-auto w-full max-w-md px-5 py-8">
+          <p className="text-sm text-neutral-600">No se pudieron cargar las preguntas iniciales.</p>
         </div>
       </main>
     );
@@ -521,7 +615,7 @@ export default function DiagnosticoEncuestaPage() {
     );
   }
 
-  if (!inst || (!current && !isCommentStep)) {
+  if (!inst || !initialSection || (!currentInitial && !current && !isCommentStep)) {
     return (
       <main className="min-h-dvh bg-white">
         <div className="mx-auto w-full max-w-md px-5 py-8">
@@ -539,7 +633,7 @@ export default function DiagnosticoEncuestaPage() {
   }
 
   // progreso general
-  const steps = Math.max(1, totalQuestions + 1);
+  const steps = Math.max(1, totalPromptQuestions + 1);
   const denom = Math.max(1, steps - 1);
   const snapPct = clamp((qIndex / denom) * 100, 0, 100);
 
@@ -549,7 +643,7 @@ export default function DiagnosticoEncuestaPage() {
 
   const stepLabel = isCommentStep
     ? `Comentario (opcional)`
-    : `Paso ${qIndex + 1} de ${totalQuestions}`;
+    : `Paso ${qIndex + 1} de ${totalPromptQuestions}`;
 
   const railWidthExpr = `(100% - ${DOT_SIZE}px)`;
   const dotLeft = `calc(${DOT_R}px + (${snapPct} / 100) * ${railWidthExpr})`;
@@ -635,9 +729,9 @@ export default function DiagnosticoEncuestaPage() {
 
       <div className="mx-auto min-h-dvh w-full max-w-md px-4 py-4 pb-[env(safe-area-inset-bottom)] pt-28 sm:px-5 sm:py-5 sm:pt-32 flex flex-col">
 
-        {inst.instructions ? (
+        {(isInitialStep ? initialSection.instructions : inst.instructions) ? (
           <p className="mt-1 text-[11px] leading-4 text-muted-foreground shrink-0">
-            {inst.instructions}
+            {isInitialStep ? initialSection.instructions : inst.instructions}
           </p>
         ) : null}
 
@@ -649,6 +743,8 @@ export default function DiagnosticoEncuestaPage() {
             >
               {isCommentStep
                 ? "Comentario final (opcional)"
+                : currentInitial
+                ? `${currentInitial.question_id}. ${currentInitial.prompt}`
                 : `${current!.question_id}. ${current!.stem}`}
             </CardTitle>
           </CardHeader>
@@ -686,6 +782,41 @@ export default function DiagnosticoEncuestaPage() {
                       {Math.min(2000, comentario.length)}/2000
                     </span>
                   </div>
+                </div>
+              ) : currentInitial ? (
+                <div className="space-y-3">
+                  {currentInitial.options.map((opt) => {
+                    const active = initialAnswers[currentInitial.question_id] === opt.option_id;
+                    return (
+                      <button
+                        key={opt.option_id}
+                        type="button"
+                        onClick={() => setInitialAnswer(currentInitial.question_id, opt.option_id)}
+                        aria-pressed={active}
+                        className="w-full rounded-2xl border px-4 py-3 text-left text-sm transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2"
+                        style={{
+                          backgroundColor: active ? theme.soft : "white",
+                          color: "#111827",
+                          borderColor: active ? theme.primary : theme.border,
+                          boxShadow: active ? `0 0 0 3px ${theme.softStrong}` : "none",
+                        } as React.CSSProperties}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div
+                            className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px] font-bold"
+                            style={{
+                              backgroundColor: active ? theme.primary : "transparent",
+                              color: active ? "white" : theme.primary,
+                              borderColor: active ? theme.primary : theme.border,
+                            }}
+                          >
+                            {active ? "✓" : ""}
+                          </div>
+                          <span className="leading-5">{opt.label}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -849,7 +980,7 @@ export default function DiagnosticoEncuestaPage() {
                     onClick={goNext}
                     disabled={!currentDone}
                   >
-                    {qIndex < totalQuestions - 1 ? "Siguiente" : "Continuar"}
+                    {qIndex < totalPromptQuestions - 1 ? "Siguiente" : "Continuar"}
                   </Button>
                 </div>
               )}

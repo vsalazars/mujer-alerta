@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import ReactECharts from "echarts-for-react";
 
@@ -9,6 +10,13 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Drawer,
   DrawerContent,
@@ -294,6 +302,7 @@ export default function ResultadosEncuestaPage() {
   const [branding, setBranding] = useState<TenantBranding | null>(null);
   const theme = themeFromBranding(branding);
 
+  const [farewellOpen, setFarewellOpen] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<{
     tipoIndex: number;
@@ -538,6 +547,50 @@ export default function ResultadosEncuestaPage() {
         backgroundImage: `linear-gradient(180deg, #ffffff 0%, ${theme.soft} 22%, #ffffff 100%)`,
       }}
     >
+      <Dialog open={farewellOpen} onOpenChange={setFarewellOpen}>
+        <DialogContent
+          showCloseButton={false}
+          className="max-w-xl rounded-[2rem] border bg-white/98 p-0 shadow-[0_28px_90px_rgba(15,23,42,0.22)]"
+          style={{ borderColor: theme.border }}
+        >
+          <div
+            className="rounded-t-[2rem] px-6 py-5"
+            style={{
+              background: `linear-gradient(135deg, ${theme.soft} 0%, #ffffff 100%)`,
+            }}
+          >
+            <div className="flex items-start gap-4">
+              <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden">
+                <Image
+                  src="/avatar.png"
+                  alt="Avatar de despedida"
+                  width={80}
+                  height={80}
+                  className="h-full w-full object-cover"
+                  priority
+                />
+              </div>
+              <DialogHeader className="text-left">
+                <DialogTitle style={{ color: theme.primary }}>Gracias</DialogTitle>
+                <DialogDescription className="text-sm leading-7 text-neutral-700">
+                  Por compartir tu tiempo, opinión y experiencia con nosotros.
+                </DialogDescription>
+              </DialogHeader>
+            </div>
+          </div>
+
+          <div className="px-6 pb-6 pt-4">
+            <Button
+              onClick={() => setFarewellOpen(false)}
+              className="h-12 w-full rounded-full text-base font-semibold text-white"
+              style={{ background: theme.gradient }}
+            >
+              Ver resultados
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="sticky top-0 z-20 -mx-4 mb-6 bg-white/92 px-4 py-4 backdrop-blur supports-[backdrop-filter]:bg-white/80 sm:-mx-6 sm:mb-8 sm:px-6 lg:-mx-8 lg:px-8">
