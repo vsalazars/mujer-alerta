@@ -1,7 +1,7 @@
 {
   "section_id": "mujer_alerta_inicial_v1",
   "name": "Preguntas iniciales",
-  "subtitle": "Selecciona, en cada pregunta, la afirmación con la que estás más de acuerdo.",
+  "subtitle": "Selecciona, en cada pregunta, la afirmación que has observado en tu entorno académico.",
   "version": "1.0.0",
   "language": "es-MX",
   "instructions": "",
@@ -9,7 +9,7 @@
     {
       "question_id": "I1",
       "order": 1,
-      "prompt": "De las siguientes creencias, señala aquella con la que estás más de acuerdo.",
+      "prompt": "De las siguientes creencias, señala aquella que has observado en tu entorno académico.",
       "selection_mode": "single",
       "options": [
         {
@@ -45,7 +45,7 @@
     {
       "question_id": "I2",
       "order": 2,
-      "prompt": "Sobre la relación entre mujeres y hombres dentro del aula, en la elaboración de trabajos y en la creación de proyectos, señala la afirmación con la que estás más de acuerdo.",
+      "prompt": "Sobre la relación entre mujeres y hombres dentro del aula, en la elaboración de trabajos y en la creación de proyectos, señala la afirmación que has observado en tu entorno académico.",
       "selection_mode": "single",
       "options": [
         {
@@ -89,7 +89,7 @@
     {
       "question_id": "I3",
       "order": 3,
-      "prompt": "Sobre la relación con los profesores y profesoras, señala la afirmación con la que estás más de acuerdo.",
+      "prompt": "Sobre la relación con los profesores y profesoras, señala la afirmación que has observado en tu entorno académico",
       "selection_mode": "single",
       "options": [
         {
@@ -129,7 +129,7 @@
     {
       "question_id": "I4",
       "order": 4,
-      "prompt": "Sobre la atención en los servicios, señala la afirmación con la que estás más de acuerdo.",
+      "prompt": "Sobre la atención en los servicios, señala la afirmación que has observado en tu entorno académico.",
       "selection_mode": "single",
       "options": [
         {
