@@ -9,29 +9,32 @@ import (
 	"strings"
 	"time"
 
-	"github.com/joho/godotenv"
-
+	"mujer-back/config"
 	"mujer-back/db"
 	"mujer-back/handlers"
 	"mujer-back/services"
 )
 
 func main() {
-	_ = godotenv.Load()
-
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		fmt.Println("Falta DATABASE_URL")
-		os.Exit(1)
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Println("Config error:", err)
+		return
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	pool, err := db.NewPool(ctx, dsn)
+	pool, err := db.NewPool(ctx, cfg.DatabaseURL, db.PoolOptions{
+		MaxConns:          cfg.DBMaxConns,
+		MinConns:          cfg.DBMinConns,
+		MaxConnIdleTime:   cfg.DBMaxConnIdleTime,
+		MaxConnLifetime:   cfg.DBMaxConnLifetime,
+		HealthCheckPeriod: cfg.DBHealthCheckPeriod,
+	})
 	if err != nil {
 		fmt.Println("DB error:", err)
-		os.Exit(1)
+		return
 	}
 	defer pool.Close()
 
@@ -62,7 +65,7 @@ func main() {
 	fmt.Println("Instrumento cargado:", instrumento.Name, instrumento.Version)
 
 	mux := http.NewServeMux()
-	nlpRunner := services.NewNLPRunner(dsn)
+	nlpRunner := services.NewNLPRunner(cfg.DatabaseURL)
 	nlpJobs := services.NewNLPJobManager(nlpRunner)
 
 	// ======================
@@ -543,27 +546,13 @@ func main() {
 	// CORS
 	// ======================
 	handler := handlers.CORS(mux, handlers.CORSOptions{
-		AllowedOrigins: []string{
-			"http://localhost:3000",
-			"http://127.0.0.1:3000",
-
-			// ✅ Vercel (producción + previews)
-			"https://mujer-alerta.vercel.app",
-			"https://mujer-alerta-git-main-vidal-salazars-projects.vercel.app",
-			"https://mujer-alerta-92958pdcf-vidal-salazars-projects.vercel.app",
-		},
+		AllowedOrigins: cfg.CORSAllowedOrigins,
 		AllowedMethods: "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 		AllowedHeaders: "Content-Type, Authorization, X-Institucion-Slug",
 	})
 
-	addr := os.Getenv("ADDR")
-	if addr == "" {
-		addr = ":8080"
-	}
-
-	fmt.Println("Listening on", addr)
-	if err := http.ListenAndServe(addr, handler); err != nil {
+	fmt.Println("Listening on", cfg.Address)
+	if err := http.ListenAndServe(cfg.Address, handler); err != nil {
 		fmt.Println("HTTP error:", err)
-		os.Exit(1)
 	}
 }
