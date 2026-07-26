@@ -2,11 +2,14 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"mujer-back/config"
@@ -71,11 +74,15 @@ func main() {
 	// ======================
 	// Health
 	// ======================
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok"))
-	})
+	healthHandler := handlers.HealthHandler{
+		DB:           pool,
+		ReadyTimeout: 2 * time.Second,
+	}
+
+	// Se conserva /health por compatibilidad.
+	mux.HandleFunc("/health", healthHandler.Health)
+	mux.HandleFunc("/healthz", healthHandler.Health)
+	mux.HandleFunc("/readyz", healthHandler.Ready)
 
 	// ======================
 	// Instrumento
@@ -551,8 +558,48 @@ func main() {
 		AllowedHeaders: "Content-Type, Authorization, X-Institucion-Slug",
 	})
 
-	fmt.Println("Listening on", cfg.Address)
-	if err := http.ListenAndServe(cfg.Address, handler); err != nil {
-		fmt.Println("HTTP error:", err)
+	server := &http.Server{
+		Addr:              cfg.Address,
+		Handler:           handler,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
+
+	serverErrors := make(chan error, 1)
+
+	go func() {
+		fmt.Println("Listening on", cfg.Address)
+		serverErrors <- server.ListenAndServe()
+	}()
+
+	signalContext, stopSignals := signal.NotifyContext(
+		context.Background(),
+		os.Interrupt,
+		syscall.SIGTERM,
+	)
+	defer stopSignals()
+
+	select {
+	case err := <-serverErrors:
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			fmt.Println("HTTP error:", err)
+		}
+	case <-signalContext.Done():
+		fmt.Println("Shutdown signal received")
+	}
+
+	shutdownContext, cancelShutdown := context.WithTimeout(
+		context.Background(),
+		15*time.Second,
+	)
+	defer cancelShutdown()
+
+	if err := server.Shutdown(shutdownContext); err != nil {
+		fmt.Println("HTTP shutdown error:", err)
+		_ = server.Close()
+	}
+
+	fmt.Println("HTTP server stopped")
 }
