@@ -99,13 +99,27 @@ func (h CentroNLPHandler) Process(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	start := h.Jobs.Start(r.Context(), services.NLPRunOptions{
-		Limit:      req.Limit,
-		EncuestaID: req.EncuestaID,
-		CentroIDs:  centros,
-		Year:       req.Year,
-		DryRun:     req.DryRun,
+	institucionID, ok := UserInstitucionIDFromCtx(r.Context())
+	if !ok || institucionID <= 0 {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	start, err := h.Jobs.Start(r.Context(), services.NLPJobStartRequest{
+		InstitucionID: institucionID,
+		RequestedBy:   UserIDFromCtx(r.Context()),
+		Options: services.NLPRunOptions{
+			Limit:      req.Limit,
+			EncuestaID: req.EncuestaID,
+			CentroIDs:  centros,
+			Year:       req.Year,
+			DryRun:     req.DryRun,
+		},
 	})
+	if err != nil {
+		http.Error(w, "nlp_job_error", http.StatusInternalServerError)
+		return
+	}
 
 	statusCode := http.StatusAccepted
 	if !start.Started {
@@ -137,10 +151,27 @@ func (h CentroNLPHandler) Status(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	institucionID, ok := UserInstitucionIDFromCtx(r.Context())
+	if !ok || institucionID <= 0 {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	status, err := h.Jobs.GetStatus(
+		r.Context(),
+		institucionID,
+		centros,
+		year,
+	)
+	if err != nil {
+		http.Error(w, "nlp_job_error", http.StatusInternalServerError)
+		return
+	}
+
 	writeJSONCentro(w, http.StatusOK, CentroNLPStatusResponse{
 		Centros: centros,
 		Year:    year,
-		Status:  h.Jobs.GetStatus(centros, year),
+		Status:  status,
 	})
 }
 

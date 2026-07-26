@@ -69,7 +69,11 @@ func main() {
 
 	mux := http.NewServeMux()
 	nlpRunner := services.NewNLPRunner(cfg.DatabaseURL)
-	nlpJobs := services.NewNLPJobManager(nlpRunner)
+	nlpJobRepository := services.NewNLPJobRepository(pool)
+	nlpJobs := services.NewNLPJobManager(
+		nlpRunner,
+		nlpJobRepository,
+	)
 
 	// ======================
 	// Health

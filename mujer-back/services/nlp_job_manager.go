@@ -2,15 +2,13 @@ package services
 
 import (
 	"context"
-	"fmt"
-	"sort"
-	"strconv"
-	"strings"
+	"errors"
 	"sync"
 	"time"
 )
 
 type NLPJobStatus struct {
+	ID             string        `json:"-"`
 	Key            string        `json:"key"`
 	Centros        []int64       `json:"centros"`
 	Year           *int          `json:"year,omitempty"`
@@ -29,230 +27,154 @@ type NLPJobStatus struct {
 	UpdatedAt      time.Time     `json:"updated_at"`
 }
 
+type NLPJobStartRequest struct {
+	InstitucionID int64
+	RequestedBy   string
+	Options       NLPRunOptions
+}
+
 type NLPJobStartResult struct {
 	Status  NLPJobStatus
 	Started bool
 }
 
+type NLPJobStore interface {
+	Create(
+		ctx context.Context,
+		request NLPJobCreateRequest,
+	) (NLPJobStatus, bool, error)
+
+	GetLatest(
+		ctx context.Context,
+		institucionID int64,
+		centros []int64,
+		year *int,
+	) (NLPJobStatus, error)
+
+	ApplyEvent(
+		ctx context.Context,
+		jobID string,
+		event map[string]any,
+	) error
+
+	Finish(
+		ctx context.Context,
+		jobID string,
+		runErr error,
+	) error
+}
+
 type NLPJobManager struct {
 	runner NLPRunner
-
-	mu   sync.RWMutex
-	jobs map[string]*NLPJobStatus
+	store  NLPJobStore
 }
 
-func NewNLPJobManager(runner NLPRunner) *NLPJobManager {
+func NewNLPJobManager(
+	runner NLPRunner,
+	store NLPJobStore,
+) *NLPJobManager {
 	return &NLPJobManager{
 		runner: runner,
-		jobs:   map[string]*NLPJobStatus{},
+		store:  store,
 	}
 }
 
-func BuildNLPJobKey(centros []int64, year *int) string {
-	sorted := append([]int64{}, centros...)
-	sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
-
-	parts := make([]string, 0, len(sorted)+1)
-	for _, centro := range sorted {
-		parts = append(parts, strconv.FormatInt(centro, 10))
+func (m *NLPJobManager) GetStatus(
+	ctx context.Context,
+	institucionID int64,
+	centros []int64,
+	year *int,
+) (NLPJobStatus, error) {
+	if m == nil || m.store == nil {
+		return NLPJobStatus{}, errors.New("nlp job manager is not configured")
 	}
 
-	yearPart := "all"
-	if year != nil {
-		yearPart = strconv.Itoa(*year)
-	}
-	return fmt.Sprintf("centros:%s|year:%s", strings.Join(parts, ","), yearPart)
+	return m.store.GetLatest(
+		ctx,
+		institucionID,
+		centros,
+		year,
+	)
 }
 
-func (m *NLPJobManager) GetStatus(centros []int64, year *int) NLPJobStatus {
-	key := BuildNLPJobKey(centros, year)
-
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	if job, ok := m.jobs[key]; ok {
-		return cloneNLPJobStatus(job)
+func (m *NLPJobManager) Start(
+	ctx context.Context,
+	request NLPJobStartRequest,
+) (NLPJobStartResult, error) {
+	if m == nil || m.store == nil {
+		return NLPJobStartResult{}, errors.New("nlp job manager is not configured")
 	}
 
-	return NLPJobStatus{
-		Key:       key,
-		Centros:   append([]int64{}, centros...),
-		Year:      cloneOptionalInt(year),
-		Status:    "idle",
-		UpdatedAt: time.Now().UTC(),
-	}
-}
-
-func (m *NLPJobManager) Start(ctx context.Context, opts NLPRunOptions) NLPJobStartResult {
-	key := BuildNLPJobKey(opts.CentroIDs, opts.Year)
-	now := time.Now().UTC()
-
-	m.mu.Lock()
-	if existing, ok := m.jobs[key]; ok && existing.Running {
-		status := cloneNLPJobStatus(existing)
-		m.mu.Unlock()
-		return NLPJobStartResult{Status: status, Started: false}
+	job, started, err := m.store.Create(ctx, NLPJobCreateRequest{
+		InstitucionID: request.InstitucionID,
+		RequestedBy:   request.RequestedBy,
+		Options:       request.Options,
+	})
+	if err != nil {
+		return NLPJobStartResult{}, err
 	}
 
-	job := &NLPJobStatus{
-		Key:       key,
-		Centros:   append([]int64{}, opts.CentroIDs...),
-		Year:      cloneOptionalInt(opts.Year),
-		Running:   true,
-		Status:    "queued",
-		StartedAt: &now,
-		UpdatedAt: now,
+	if !started {
+		return NLPJobStartResult{
+			Status:  job,
+			Started: false,
+		}, nil
 	}
-	m.jobs[key] = job
-	m.mu.Unlock()
 
-	go m.run(context.WithoutCancel(ctx), key, opts)
+	go m.run(job.ID, request.Options)
 
 	return NLPJobStartResult{
-		Status:  cloneNLPJobStatus(job),
+		Status:  job,
 		Started: true,
-	}
+	}, nil
 }
 
-func (m *NLPJobManager) run(ctx context.Context, key string, opts NLPRunOptions) {
-	result, err := m.runner.RunAnalyzeCommentsWithProgress(ctx, opts, func(event map[string]any) {
-		m.applyEvent(key, event)
-	})
+func (m *NLPJobManager) run(
+	jobID string,
+	options NLPRunOptions,
+) {
+	ctx := context.Background()
 
-	now := time.Now().UTC()
+	var (
+		persistenceMu  sync.Mutex
+		persistenceErr error
+	)
 
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	job, ok := m.jobs[key]
-	if !ok {
-		return
-	}
-
-	job.Running = false
-	job.UpdatedAt = now
-	job.FinishedAt = &now
-	job.Result = &result
-
-	if err != nil {
-		job.Status = "failed"
-		job.LastError = err.Error()
-		return
-	}
-
-	if job.Status == "queued" {
-		job.Status = "completed"
-	}
-}
-
-func (m *NLPJobManager) applyEvent(key string, event map[string]any) {
-	now := time.Now().UTC()
-
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	job, ok := m.jobs[key]
-	if !ok {
-		return
-	}
-
-	job.UpdatedAt = now
-	job.LastEvent = toString(event["event"])
-
-	if total := toInt(event["total"]); total > 0 {
-		job.Total = total
-	}
-	if current := toInt(event["current"]); current > 0 {
-		job.Current = current
-	}
-	if processed := toInt(event["processed"]); processed >= 0 {
-		job.Processed = processed
-	}
-	if errors := toInt(event["errors"]); errors >= 0 {
-		job.Errors = errors
-	}
-	if encuestaID := toString(event["encuesta_id"]); encuestaID != "" {
-		job.LastEncuestaID = encuestaID
-	}
-
-	switch toString(event["event"]) {
-	case "start":
-		job.Status = "running"
-		if job.Total == 0 {
-			job.Total = toInt(event["total"])
-		}
-	case "progress":
-		job.Status = "running"
-		status := toString(event["status"])
-		switch status {
-		case "processed", "dry-run":
-			job.Processed++
-		case "error":
-			job.Errors++
-			job.LastError = toString(event["error"])
-		}
-	case "complete":
-		job.Status = "completed"
-		job.Processed = toInt(event["processed"])
-		job.Errors = toInt(event["errors"])
-		if job.Total == 0 {
-			job.Total = toInt(event["total"])
-		}
-		job.Current = job.Total
-	}
-}
-
-func cloneNLPJobStatus(job *NLPJobStatus) NLPJobStatus {
-	clone := *job
-	clone.Centros = append([]int64{}, job.Centros...)
-	clone.Year = cloneOptionalInt(job.Year)
-	if job.Result != nil {
-		resultCopy := *job.Result
-		resultCopy.Command = append([]string{}, job.Result.Command...)
-		resultCopy.Stderr = append([]string{}, job.Result.Stderr...)
-		if len(job.Result.Events) > 0 {
-			resultCopy.Events = make([]map[string]any, 0, len(job.Result.Events))
-			for _, event := range job.Result.Events {
-				eventCopy := map[string]any{}
-				for k, v := range event {
-					eventCopy[k] = v
+	result, runErr := m.runner.RunAnalyzeCommentsWithProgress(
+		ctx,
+		options,
+		func(event map[string]any) {
+			if err := m.store.ApplyEvent(ctx, jobID, event); err != nil {
+				persistenceMu.Lock()
+				if persistenceErr == nil {
+					persistenceErr = err
 				}
-				resultCopy.Events = append(resultCopy.Events, eventCopy)
+				persistenceMu.Unlock()
 			}
-		}
-		clone.Result = &resultCopy
+		},
+	)
+
+	persistenceMu.Lock()
+	storedErr := persistenceErr
+	persistenceMu.Unlock()
+
+	finalErr := runErr
+	if finalErr == nil && storedErr != nil {
+		finalErr = storedErr
 	}
-	return clone
+
+	if err := m.store.Finish(ctx, jobID, finalErr); err != nil {
+		return
+	}
+
+	_ = result
 }
 
 func cloneOptionalInt(value *int) *int {
 	if value == nil {
 		return nil
 	}
+
 	copyValue := *value
 	return &copyValue
-}
-
-func toInt(value any) int {
-	switch v := value.(type) {
-	case int:
-		return v
-	case int32:
-		return int(v)
-	case int64:
-		return int(v)
-	case float64:
-		return int(v)
-	case float32:
-		return int(v)
-	default:
-		return 0
-	}
-}
-
-func toString(value any) string {
-	if v, ok := value.(string); ok {
-		return v
-	}
-	return ""
 }
