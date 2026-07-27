@@ -10,6 +10,37 @@ type BrandingLike = {
   color_apoyo?: string;
 };
 
+const BRANDING_CACHE_PREFIX = "mujer_alerta:branding:";
+
+function brandingCacheKey(institucionSlug?: string) {
+  return `${BRANDING_CACHE_PREFIX}${String(institucionSlug || "default").trim().toLowerCase()}`;
+}
+
+/**
+ * Persiste sólo datos visuales públicos. Sirve para pintar el tema correcto
+ * desde el primer render del cliente mientras se valida contra la API.
+ */
+export function readCachedBranding<T extends BrandingLike>(institucionSlug?: string): T | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(brandingCacheKey(institucionSlug));
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? (parsed as T) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function cacheBranding<T extends BrandingLike>(branding: T, institucionSlug?: string) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(brandingCacheKey(institucionSlug), JSON.stringify(branding));
+  } catch {
+    // La caché es una optimización; el branding remoto sigue siendo la fuente de verdad.
+  }
+}
+
 function expandShortHex(value: string) {
   if (value.length !== 4) return value;
   return `#${value[1]}${value[1]}${value[2]}${value[2]}${value[3]}${value[3]}`;

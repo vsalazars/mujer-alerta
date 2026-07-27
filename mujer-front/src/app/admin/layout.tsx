@@ -6,7 +6,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { isAdminRole, type UserRole } from "@/lib/auth";
 import { api } from "@/lib/api";
-import { themeFromBranding } from "@/lib/branding";
+import { cacheBranding, readCachedBranding, themeFromBranding } from "@/lib/branding";
 import { extractInstitutionSlug, withInstitutionSlug } from "@/lib/routing";
 
 import { Button } from "@/components/ui/button";
@@ -103,7 +103,10 @@ export default function AdminLayout({
   const pathname = usePathname();
   const institucionSlug = extractInstitutionSlug(pathname);
   const [user] = useState<AuthUser | null>(() => readAuth().user);
-  const [config, setConfig] = useState<ConfiguracionInstitucion | null>(null);
+  const [config, setConfig] = useState<ConfiguracionInstitucion | null>(() =>
+    readCachedBranding<ConfiguracionInstitucion>(institucionSlug)
+  );
+  const [brandingReady, setBrandingReady] = useState(() => config !== null);
 
   const theme = themeFromBranding(config);
 
@@ -113,16 +116,21 @@ export default function AdminLayout({
         const payload = await api<ConfiguracionInstitucion>(
           "/api/admin/configuracion"
         );
+        cacheBranding(payload, institucionSlug);
         setConfig(payload);
       } catch {
         setConfig(null);
+      } finally {
+        setBrandingReady(true);
       }
     }
 
     function onConfigUpdated(event: Event) {
       const customEvent = event as CustomEvent<ConfiguracionInstitucion>;
       if (customEvent.detail) {
+        cacheBranding(customEvent.detail, institucionSlug);
         setConfig(customEvent.detail);
+        setBrandingReady(true);
         return;
       }
       void loadConfig();
@@ -153,7 +161,8 @@ export default function AdminLayout({
     router.replace("/");
   }
 
-  if (!user) return null;
+  // Nunca mostramos el tema predeterminado mientras llega el branding del tenant.
+  if (!user || !brandingReady) return null;
 
   const nav = [
     { label: "Dashboard", href: withInstitutionSlug(institucionSlug, "/admin"), icon: LayoutDashboard, exact: true },

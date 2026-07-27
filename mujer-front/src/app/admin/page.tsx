@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import { themeFromBranding } from "@/lib/branding";
+import { cacheBranding, readCachedBranding, themeFromBranding } from "@/lib/branding";
 import { extractInstitutionSlug, withInstitutionSlug } from "@/lib/routing";
 
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,9 @@ export default function AdminPage() {
   const router = useRouter();
   const pathname = usePathname();
   const institucionSlug = extractInstitutionSlug(pathname);
-  const [config, setConfig] = useState<ConfiguracionInstitucion | null>(null);
+  const [config, setConfig] = useState<ConfiguracionInstitucion | null>(() =>
+    readCachedBranding<ConfiguracionInstitucion>(institucionSlug)
+  );
 
   const theme = themeFromBranding(config);
 
@@ -31,6 +33,7 @@ export default function AdminPage() {
     async function loadConfig() {
       try {
         const payload = await api<ConfiguracionInstitucion>("/api/admin/configuracion");
+        cacheBranding(payload, institucionSlug);
         setConfig(payload);
       } catch {
         setConfig(null);
@@ -40,6 +43,7 @@ export default function AdminPage() {
     function onConfigUpdated(event: Event) {
       const customEvent = event as CustomEvent<ConfiguracionInstitucion>;
       if (customEvent.detail) {
+        cacheBranding(customEvent.detail, institucionSlug);
         setConfig(customEvent.detail);
         return;
       }
@@ -51,7 +55,7 @@ export default function AdminPage() {
     return () => {
       window.removeEventListener("institucion-config-updated", onConfigUpdated);
     };
-  }, []);
+  }, [institucionSlug]);
 
   return (
     <div className="grid gap-6">

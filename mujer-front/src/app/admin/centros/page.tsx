@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { isAdminRole, type UserRole } from "@/lib/auth";
-import { themeFromBranding } from "@/lib/branding";
+import { cacheBranding, readCachedBranding, themeFromBranding } from "@/lib/branding";
 import { extractInstitutionSlug, withInstitutionSlug } from "@/lib/routing";
 
 import { Button } from "@/components/ui/button";
@@ -105,7 +105,9 @@ export default function AdminCentrosPage() {
 
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState("");
-  const [config, setConfig] = useState<ConfiguracionInstitucion | null>(null);
+  const [config, setConfig] = useState<ConfiguracionInstitucion | null>(() =>
+    readCachedBranding<ConfiguracionInstitucion>(institucionSlug)
+  );
 
   const [items, setItems] = useState<Centro[]>([]);
   const [loading, setLoading] = useState(true);
@@ -154,6 +156,7 @@ export default function AdminCentrosPage() {
         const payload = await api<ConfiguracionInstitucion>("/api/admin/configuracion", {
           headers: { Authorization: `Bearer ${token}` },
         });
+        cacheBranding(payload, institucionSlug);
         setConfig(payload);
       } catch {
         setConfig(null);
@@ -162,7 +165,7 @@ export default function AdminCentrosPage() {
 
     if (!token) return;
     void loadConfig();
-  }, [token]);
+  }, [institucionSlug, token]);
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
