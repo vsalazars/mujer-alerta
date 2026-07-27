@@ -231,8 +231,8 @@ export function NLPProcessingSection({
             colorByKey={SENTIMENT_COLOR_BY_KEY}
           />
           <DonutCard
-            title="Emocion"
-            subtitle="Clasificacion de las emociones identificadas"
+            title="Emoción"
+            subtitle="Clasificación de las emociones identificadas"
             data={safeArr(overview?.por_emocion)}
             colors={EMOTION_COLORS}
           />
@@ -298,7 +298,7 @@ function DonutCard({
         </Badge>
       </div>
 
-      <div className="mt-4 flex flex-col gap-5 xl:grid xl:grid-cols-[minmax(320px,1.1fr)_minmax(0,0.9fr)] xl:items-start xl:gap-6">
+      <div className="mt-4 flex flex-col gap-5 xl:grid xl:grid-cols-[minmax(260px,0.85fr)_minmax(220px,1.15fr)] xl:items-start xl:gap-5">
         <div className="flex h-[280px] items-center justify-center sm:h-[300px] xl:h-[340px] xl:w-full">
           {total === 0 ? (
             <div className="flex h-full w-full items-center justify-center rounded-2xl border border-dashed border-slate-200 text-sm font-semibold text-slate-500">
@@ -341,16 +341,16 @@ function DonutCard({
             return (
               <div
                 key={item.clave}
-                className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3"
+                className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-2xl border border-slate-100 bg-slate-50/70 px-3 py-3"
               >
-                <div className="flex min-w-0 items-center gap-3">
+                <div className="flex min-w-0 items-center gap-2.5">
                   <span
                     className="inline-flex h-3 w-3 shrink-0 rounded-full"
                     style={{
                       background: colorByKey?.[item.clave] ?? colors[index % colors.length],
                     }}
                   />
-                  <span className="min-w-0 break-words text-[15px] font-semibold leading-5 text-slate-700">
+                  <span className="min-w-0 whitespace-normal break-normal text-sm font-semibold leading-5 text-slate-700 [overflow-wrap:normal]">
                     {item.label}
                   </span>
                 </div>
