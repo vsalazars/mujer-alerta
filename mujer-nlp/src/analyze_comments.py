@@ -621,8 +621,8 @@ def persist_job_event(
                         running = false,
                         current_value = greatest(current_value, %s),
                         total_value = greatest(total_value, %s),
-                        processed_value = %s,
-                        errors_value = %s,
+                        processed_value = greatest(processed_value, %s),
+                        errors_value = greatest(errors_value, %s),
                         last_event = 'complete',
                         finished_at = now(),
                         updated_at = now()
@@ -645,116 +645,197 @@ def report_event(
     emit_event(json_progress, payload, text)
 
 
-def main() -> None:
-    args = parse_args()
-    if not settings.database_url:
-        raise SystemExit("Falta DATABASE_URL en el entorno.")
-
-    progress_conn: psycopg.Connection[Any] | None = None
-    if args.job_id:
-        try:
-            progress_conn = psycopg.connect(settings.database_url, autocommit=True)
-            mark_job_phase(progress_conn, args.job_id, "loading-models")
-        except Exception as exc:
-            print(
-                f"No se pudo abrir conexión de progreso NLP: {type(exc).__name__}: {exc}",
-                flush=True,
-                file=sys.stderr,
-            )
-
+def load_models() -> tuple[Any, Any, Any]:
     print("Cargando modelos NLP...", flush=True, file=sys.stderr)
     nlp = spacy.load(settings.spacy_model)
     sentiment_analyzer = load_sentiment_analyzer()
     theme_classifier = load_theme_classifier()
     print("Modelos listos.", flush=True, file=sys.stderr)
+    return nlp, sentiment_analyzer, theme_classifier
+
+
+def open_progress_connection(job_id: str | None) -> psycopg.Connection[Any] | None:
+    if not job_id:
+        return None
+
+    try:
+        return psycopg.connect(settings.database_url, autocommit=True)
+    except Exception as exc:
+        print(
+            f"No se pudo abrir conexión de progreso NLP: {type(exc).__name__}: {exc}",
+            flush=True,
+            file=sys.stderr,
+        )
+        return None
+
+
+def mark_job_failed(job_id: str | None, error: Exception) -> None:
+    if not job_id or not settings.database_url:
+        return
+
+    message = f"{type(error).__name__}: {error}"[:2000]
+    try:
+        with psycopg.connect(settings.database_url, autocommit=True) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    update public.nlp_jobs
+                    set status = 'failed',
+                        running = false,
+                        last_event = 'failed',
+                        last_error = %s,
+                        finished_at = now(),
+                        updated_at = now()
+                    where id = %s::uuid
+                      and running = true
+                    """,
+                    (message, job_id),
+                )
+    except Exception as exc:
+        print(
+            f"No se pudo marcar error NLP: {type(exc).__name__}: {exc}",
+            flush=True,
+            file=sys.stderr,
+        )
+
+
+def run_analysis(
+    args: argparse.Namespace,
+    nlp: Any,
+    sentiment_analyzer: Any,
+    theme_classifier: Any,
+    progress_conn: psycopg.Connection[Any] | None = None,
+) -> dict[str, int]:
+    if not settings.database_url:
+        raise SystemExit("Falta DATABASE_URL en el entorno.")
+
+    owns_progress_connection = progress_conn is None
+    if progress_conn is None:
+        progress_conn = open_progress_connection(args.job_id)
+
     mark_job_phase(progress_conn, args.job_id, "fetching-comments")
 
-    with psycopg.connect(settings.database_url, autocommit=False) as conn:
-        pending_comments = fetch_pending_comments(
-            conn, args.limit, args.encuesta_id, args.centro_ids, args.year
-        )
-        if not pending_comments:
+    try:
+        with psycopg.connect(settings.database_url, autocommit=False) as conn:
+            pending_comments = fetch_pending_comments(
+                conn, args.limit, args.encuesta_id, args.centro_ids, args.year
+            )
+            if not pending_comments:
+                result = {"total": 0, "processed": 0, "errors": 0}
+                report_event(
+                    args.json_progress,
+                    {"event": "complete", **result},
+                    progress_conn,
+                    args.job_id,
+                    "No hay comentarios pendientes.",
+                )
+                return result
+
+            total = len(pending_comments)
             report_event(
                 args.json_progress,
-                {"event": "complete", "total": 0, "processed": 0, "errors": 0},
+                {"event": "start", "total": total},
                 progress_conn,
                 args.job_id,
-                "No hay comentarios pendientes.",
+                f"Comentarios pendientes: {total}",
             )
-            return
 
-        total = len(pending_comments)
-        report_event(
-            args.json_progress,
-            {"event": "start", "total": total},
-            progress_conn,
-            args.job_id,
-            f"Comentarios pendientes: {total}",
-        )
+            processed = 0
+            errors = 0
 
-        processed = 0
-        errors = 0
-
-        for index, pending in enumerate(pending_comments, start=1):
-            try:
-                result = process_comment(nlp, pending, sentiment_analyzer, theme_classifier)
-
-                if args.dry_run:
-                    payload = {
-                        "event": "progress",
-                        "current": index,
-                        "total": total,
-                        "encuesta_id": pending.encuesta_id,
-                        "status": "dry-run",
-                        "summary": result["summary"],
-                        "keywords": result["keywords"],
-                        "themes": [theme["tema_clave"] for theme in result["themes"]],
-                        "sentiment": result["sentiment"]["label"],
-                        "sentiment_score": result["sentiment"]["score"],
-                        "sentiment_probs": result["sentiment"]["probabilities"],
-                        "emotion": result["emotion"]["label"],
-                        "emotion_score": result["emotion"]["score"],
-                        "emotion_probs": result["emotion"]["probabilities"],
-                        "adjusted_by_themes": result["sentiment"].get(
-                            "adjusted_by_themes", False
-                        ),
-                    }
-                    report_event(
-                        args.json_progress,
-                        payload,
-                        progress_conn,
-                        args.job_id,
-                    )
-                    if not args.json_progress:
-                        sentiment = result["sentiment"]
-                        emotion = result["emotion"]
-                        print(f"\nencuesta_id     = {pending.encuesta_id}")
-                        print(f"resumen         = {result['summary'][:90]}")
-                        print(f"temas           = {[t['tema_clave'] for t in result['themes']]}")
-                        print(
-                            f"sentimiento     = {sentiment['label']:10}  score={sentiment['score']:+.3f}"
-                        )
-                        print(
-                            f"emocion         = {emotion['label']:15}  score={emotion['score']:.3f}"
-                        )
-                        print(f"emotion_probs   = {emotion['probabilities']}")
-                        print(
-                            f"adjusted        = {sentiment.get('adjusted_by_themes', False)}"
-                        )
-                else:
-                    save_success(
-                        conn,
+            for index, pending in enumerate(pending_comments, start=1):
+                try:
+                    result = process_comment(
+                        nlp,
                         pending,
-                        result["normalized_text"],
-                        result["summary"],
-                        result["keywords"],
-                        result["entities"],
-                        result["themes"],
-                        result["sentiment"],
-                        result["emotion"],
-                        result["token_count"],
-                        result["char_count"],
+                        sentiment_analyzer,
+                        theme_classifier,
                     )
+
+                    if args.dry_run:
+                        payload = {
+                            "event": "progress",
+                            "current": index,
+                            "total": total,
+                            "encuesta_id": pending.encuesta_id,
+                            "status": "dry-run",
+                            "summary": result["summary"],
+                            "keywords": result["keywords"],
+                            "themes": [
+                                theme["tema_clave"] for theme in result["themes"]
+                            ],
+                            "sentiment": result["sentiment"]["label"],
+                            "sentiment_score": result["sentiment"]["score"],
+                            "sentiment_probs": result["sentiment"]["probabilities"],
+                            "emotion": result["emotion"]["label"],
+                            "emotion_score": result["emotion"]["score"],
+                            "emotion_probs": result["emotion"]["probabilities"],
+                            "adjusted_by_themes": result["sentiment"].get(
+                                "adjusted_by_themes",
+                                False,
+                            ),
+                        }
+                        report_event(
+                            args.json_progress,
+                            payload,
+                            progress_conn,
+                            args.job_id,
+                        )
+                        if not args.json_progress:
+                            sentiment = result["sentiment"]
+                            emotion = result["emotion"]
+                            print(f"\nencuesta_id     = {pending.encuesta_id}")
+                            print(f"resumen         = {result['summary'][:90]}")
+                            print(
+                                "temas           = "
+                                f"{[t['tema_clave'] for t in result['themes']]}"
+                            )
+                            print(
+                                "sentimiento     = "
+                                f"{sentiment['label']:10}  "
+                                f"score={sentiment['score']:+.3f}"
+                            )
+                            print(
+                                "emocion         = "
+                                f"{emotion['label']:15}  "
+                                f"score={emotion['score']:.3f}"
+                            )
+                            print(f"emotion_probs   = {emotion['probabilities']}")
+                            print(
+                                "adjusted        = "
+                                f"{sentiment.get('adjusted_by_themes', False)}"
+                            )
+                    else:
+                        save_success(
+                            conn,
+                            pending,
+                            result["normalized_text"],
+                            result["summary"],
+                            result["keywords"],
+                            result["entities"],
+                            result["themes"],
+                            result["sentiment"],
+                            result["emotion"],
+                            result["token_count"],
+                            result["char_count"],
+                        )
+                        report_event(
+                            args.json_progress,
+                            {
+                                "event": "progress",
+                                "current": index,
+                                "total": total,
+                                "encuesta_id": pending.encuesta_id,
+                                "status": "processed",
+                            },
+                            progress_conn,
+                            args.job_id,
+                        )
+                    processed += 1
+
+                except Exception as exc:
+                    errors += 1
+                    message = f"{type(exc).__name__}: {exc}"
                     report_event(
                         args.json_progress,
                         {
@@ -762,43 +843,51 @@ def main() -> None:
                             "current": index,
                             "total": total,
                             "encuesta_id": pending.encuesta_id,
-                            "status": "processed",
+                            "status": "error",
+                            "error": message,
                         },
                         progress_conn,
                         args.job_id,
                     )
-                processed += 1
+                    if not args.json_progress:
+                        print(f"[error] encuesta_id={pending.encuesta_id} {message}")
+                    if not args.dry_run:
+                        save_error(conn, pending, message)
 
-            except Exception as exc:
-                errors += 1
-                message = f"{type(exc).__name__}: {exc}"
-                report_event(
-                    args.json_progress,
-                    {
-                        "event": "progress",
-                        "current": index,
-                        "total": total,
-                        "encuesta_id": pending.encuesta_id,
-                        "status": "error",
-                        "error": message,
-                    },
-                    progress_conn,
-                    args.job_id,
-                )
-                if not args.json_progress:
-                    print(f"[error] encuesta_id={pending.encuesta_id} {message}")
-                if not args.dry_run:
-                    save_error(conn, pending, message)
+            result = {
+                "total": total,
+                "processed": processed,
+                "errors": errors,
+            }
+            report_event(
+                args.json_progress,
+                {"event": "complete", **result},
+                progress_conn,
+                args.job_id,
+            )
+            if not args.json_progress:
+                print(f"\nProcesados: {processed}  Errores: {errors}")
+            sys.stdout.flush()
+            return result
+    finally:
+        if owns_progress_connection and progress_conn is not None:
+            progress_conn.close()
 
-        report_event(
-            args.json_progress,
-            {"event": "complete", "total": total, "processed": processed, "errors": errors},
-            progress_conn,
-            args.job_id,
-        )
-        if not args.json_progress:
-            print(f"\nProcesados: {processed}  Errores: {errors}")
-        sys.stdout.flush()
+
+def main() -> None:
+    args = parse_args()
+    progress_conn = open_progress_connection(args.job_id)
+    mark_job_phase(progress_conn, args.job_id, "loading-models")
+
+    try:
+        models = load_models()
+        run_analysis(args, *models, progress_conn=progress_conn)
+    except Exception as exc:
+        mark_job_failed(args.job_id, exc)
+        raise
+    finally:
+        if progress_conn is not None:
+            progress_conn.close()
 
 
 if __name__ == "__main__":

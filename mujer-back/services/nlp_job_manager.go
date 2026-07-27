@@ -9,9 +9,22 @@ import (
 )
 
 const (
-	NLPExecutionModeLocal    = "local"
-	NLPExecutionModeCloudRun = "cloud-run"
+	NLPExecutionModeLocal      = "local"
+	NLPExecutionModeCloudRun   = "cloud-run"
+	NLPExecutionModeCloudTasks = "cloud-tasks"
 )
+
+type NLPAsyncClient interface {
+	Start(
+		ctx context.Context,
+		options NLPRunOptions,
+	) (NLPExecutionState, error)
+
+	GetExecution(
+		ctx context.Context,
+		executionName string,
+	) (NLPExecutionState, error)
+}
 
 type NLPJobStatus struct {
 	ID             string        `json:"-"`
@@ -85,14 +98,14 @@ type NLPJobStore interface {
 
 type NLPJobManager struct {
 	localRunner NLPRunner
-	cloudClient *NLPCloudRunClient
+	asyncClient NLPAsyncClient
 	store       NLPJobStore
 	mode        string
 }
 
 func NewNLPJobManager(
 	localRunner NLPRunner,
-	cloudClient *NLPCloudRunClient,
+	asyncClient NLPAsyncClient,
 	store NLPJobStore,
 	mode string,
 ) *NLPJobManager {
@@ -100,7 +113,7 @@ func NewNLPJobManager(
 
 	return &NLPJobManager{
 		localRunner: localRunner,
-		cloudClient: cloudClient,
+		asyncClient: asyncClient,
 		store:       store,
 		mode:        mode,
 	}
@@ -110,6 +123,8 @@ func normalizeNLPExecutionMode(mode string) string {
 	switch strings.ToLower(strings.TrimSpace(mode)) {
 	case "cloud", "cloud-run", "cloud_run", "cloudrun":
 		return NLPExecutionModeCloudRun
+	case "cloud-tasks", "cloud_tasks", "cloudtasks", "tasks":
+		return NLPExecutionModeCloudTasks
 	default:
 		return NLPExecutionModeLocal
 	}
@@ -143,13 +158,13 @@ func (m *NLPJobManager) GetStatus(
 		return job, nil
 	}
 
-	if m.cloudClient == nil {
+	if m.asyncClient == nil {
 		return NLPJobStatus{}, errors.New(
-			"nlp cloud run client is not configured",
+			"nlp async client is not configured",
 		)
 	}
 
-	state, err := m.cloudClient.GetExecution(
+	state, err := m.asyncClient.GetExecution(
 		ctx,
 		job.CloudExecution,
 	)
@@ -199,8 +214,9 @@ func (m *NLPJobManager) Start(
 		}, nil
 	}
 
-	if m.mode == NLPExecutionModeCloudRun {
-		return m.startCloudRun(
+	if m.mode == NLPExecutionModeCloudRun ||
+		m.mode == NLPExecutionModeCloudTasks {
+		return m.startAsync(
 			ctx,
 			job,
 			request,
@@ -215,14 +231,14 @@ func (m *NLPJobManager) Start(
 	}, nil
 }
 
-func (m *NLPJobManager) startCloudRun(
+func (m *NLPJobManager) startAsync(
 	ctx context.Context,
 	job NLPJobStatus,
 	request NLPJobStartRequest,
 ) (NLPJobStartResult, error) {
-	if m.cloudClient == nil {
+	if m.asyncClient == nil {
 		err := errors.New(
-			"nlp cloud run client is not configured",
+			"nlp async client is not configured",
 		)
 		_ = m.store.Finish(ctx, job.ID, err)
 		return NLPJobStartResult{}, err
@@ -231,7 +247,7 @@ func (m *NLPJobManager) startCloudRun(
 	cloudOptions := request.Options
 	cloudOptions.JobID = job.ID
 
-	state, err := m.cloudClient.Start(
+	state, err := m.asyncClient.Start(
 		ctx,
 		cloudOptions,
 	)

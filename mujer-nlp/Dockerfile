@@ -27,9 +27,6 @@ COPY requirements.txt ./
 RUN python -m pip install --requirement requirements.txt \
     && python -m pip check
 
-# Los pesos quedan dentro de la imagen para evitar descargarlos en cada ejecución.
-RUN python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='pysentimiento/robertuito-sentiment-analysis'); snapshot_download(repo_id='MoritzLaurer/mDeBERTa-v3-base-mnli-xnli')"
-
 COPY src ./src
 
 ENTRYPOINT ["python", "-m", "src.analyze_comments"]

@@ -70,7 +70,6 @@ func main() {
 	mux := http.NewServeMux()
 
 	nlpRunner := services.NewNLPRunner(cfg.DatabaseURL)
-	nlpCloudRunClient := services.NewNLPCloudRunClientFromEnv()
 	nlpJobRepository := services.NewNLPJobRepository(pool)
 
 	nlpExecutionMode := strings.TrimSpace(
@@ -79,10 +78,13 @@ func main() {
 	if nlpExecutionMode == "" {
 		nlpExecutionMode = services.NLPExecutionModeLocal
 	}
+	nlpAsyncClient := services.NewNLPAsyncClientFromEnv(
+		nlpExecutionMode,
+	)
 
 	nlpJobs := services.NewNLPJobManager(
 		nlpRunner,
-		nlpCloudRunClient,
+		nlpAsyncClient,
 		nlpJobRepository,
 		nlpExecutionMode,
 	)

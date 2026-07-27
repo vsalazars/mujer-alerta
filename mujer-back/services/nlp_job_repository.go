@@ -389,8 +389,8 @@ func (r *NLPJobRepository) ApplyEvent(
 			    running = false,
 			    current_value = greatest(current_value, $2),
 			    total_value = greatest(total_value, $2),
-			    processed_value = $3,
-			    errors_value = $4,
+			    processed_value = greatest(processed_value, $3),
+			    errors_value = greatest(errors_value, $4),
 			    last_event = 'complete',
 			    finished_at = now()
 			where id = $1::uuid
@@ -424,15 +424,35 @@ func (r *NLPJobRepository) SetCloudExecution(
 	_, err := r.DB.Exec(ctx, `
 		update public.nlp_jobs
 		set cloud_execution = $2,
-		    status = $3,
-		    running = $4,
-		    last_event = 'cloud-run-started',
+		    status = case
+		        when running = false
+		          and status in ('completed', 'failed', 'cancelled')
+		        then status
+		        else $3
+		    end,
+		    running = case
+		        when running = false
+		          and status in ('completed', 'failed', 'cancelled')
+		        then false
+		        else $4
+		    end,
+		    last_event = case
+		        when running = false
+		          and status in ('completed', 'failed', 'cancelled')
+		        then last_event
+		        when $3 = 'queued' then 'queued'
+		        else 'cloud-run-started'
+		    end,
 		    last_error = nullif($5, ''),
 		    started_at = coalesce(started_at, $6, now()),
 		    finished_at = case
+		        when running = false
+		          and status in ('completed', 'failed', 'cancelled')
+		        then finished_at
 		        when $4 then null
 		        else coalesce($7, now())
-		    end
+		    end,
+		    updated_at = now()
 		where id = $1::uuid
 	`,
 		jobID,
