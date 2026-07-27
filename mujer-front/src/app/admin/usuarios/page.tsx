@@ -496,7 +496,7 @@ export default function AdminUsuariosPage() {
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-neutral-500">
-                    * Solo se muestran centros activos (lista pública).
+                    * Solo se muestran centros activos.
                   </p>
                 </div>
 
