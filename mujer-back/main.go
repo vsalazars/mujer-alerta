@@ -100,10 +100,9 @@ func main() {
 		ReadyTimeout: 2 * time.Second,
 	}
 
-	// Se conserva /health por compatibilidad.
+	// Endpoints de salud sin sufijo "z", reservado parcialmente por Cloud Run.
 	mux.HandleFunc("/health", healthHandler.Health)
-	mux.HandleFunc("/healthz", healthHandler.Health)
-	mux.HandleFunc("/readyz", healthHandler.Ready)
+	mux.HandleFunc("/ready", healthHandler.Ready)
 
 	// ======================
 	// Instrumento

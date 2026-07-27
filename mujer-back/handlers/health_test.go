@@ -20,7 +20,7 @@ func (p healthTestPinger) Ping(context.Context) error {
 func TestHealthHandlerHealth(t *testing.T) {
 	handler := HealthHandler{}
 
-	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	res := httptest.NewRecorder()
 
 	handler.Health(res, req)
@@ -37,7 +37,7 @@ func TestHealthHandlerHealth(t *testing.T) {
 func TestHealthHandlerRejectsUnsupportedMethod(t *testing.T) {
 	handler := HealthHandler{}
 
-	req := httptest.NewRequest(http.MethodPost, "/healthz", nil)
+	req := httptest.NewRequest(http.MethodPost, "/health", nil)
 	res := httptest.NewRecorder()
 
 	handler.Health(res, req)
@@ -57,7 +57,7 @@ func TestHealthHandlerReady(t *testing.T) {
 		ReadyTimeout: time.Second,
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+	req := httptest.NewRequest(http.MethodGet, "/ready", nil)
 	res := httptest.NewRecorder()
 
 	handler.Ready(res, req)
@@ -77,7 +77,7 @@ func TestHealthHandlerReadyWhenDatabaseFails(t *testing.T) {
 		ReadyTimeout: time.Second,
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+	req := httptest.NewRequest(http.MethodGet, "/ready", nil)
 	res := httptest.NewRecorder()
 
 	handler.Ready(res, req)

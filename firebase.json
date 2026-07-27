@@ -8,6 +8,20 @@
     ],
     "rewrites": [
       {
+        "source": "/health",
+        "run": {
+          "serviceId": "mujer-alerta-backend",
+          "region": "us-east4"
+        }
+      },
+      {
+        "source": "/ready",
+        "run": {
+          "serviceId": "mujer-alerta-backend",
+          "region": "us-east4"
+        }
+      },
+      {
         "source": "/api/**",
         "run": {
           "serviceId": "mujer-alerta-backend",
