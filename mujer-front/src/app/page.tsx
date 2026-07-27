@@ -51,13 +51,31 @@ export default function LandingPage() {
 
   async function onGlobalLogin(e: React.FormEvent) {
     e.preventDefault();
+
+    const emailValue = email.trim();
+
+    if (!emailValue) {
+      toast.error("Ingresa tu correo.");
+      return;
+    }
+
+    if (!/^\S+@\S+\.\S+$/.test(emailValue)) {
+      toast.error("Escribe un correo electrónico válido.");
+      return;
+    }
+
+    if (!password) {
+      toast.error("Ingresa tu contraseña.");
+      return;
+    }
+
     setLoginLoading(true);
 
     try {
       const data = await api<LoginResponse>("/api/auth/login-global", {
         method: "POST",
         body: JSON.stringify({
-          email: email.trim(),
+          email: emailValue,
           password,
         }),
       });
@@ -94,12 +112,19 @@ export default function LandingPage() {
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "";
-      if (msg.includes("invalid_credentials")) toast.error("Correo o contraseña incorrectos.");
-      else if (msg.includes("user_inactive")) toast.error("Tu usuario está desactivado. Contacta al administrador.");
-      else if (msg.includes("multiple_accounts_same_email")) toast.error("Tu correo existe en varias instituciones. Usa el acceso por institución o solicita soporte.");
-      else if (msg.includes("missing_jwt_secret")) toast.error("Falta JWT_SECRET en el backend.");
-      else if (msg.includes("Failed to fetch")) toast.error("Sin conexión con el servidor.");
-      else toast.error(msg || "No se pudo iniciar sesión.");
+      if (msg.includes("bad_request")) {
+        toast.error("Ingresa tu correo y contraseña.");
+      } else if (msg.includes("invalid_credentials")) {
+        toast.error("Correo o contraseña incorrectos.");
+      } else if (msg.includes("user_inactive")) {
+        toast.error("Tu usuario está desactivado. Contacta al administrador.");
+      } else if (msg.includes("multiple_accounts_same_email")) {
+        toast.error("Tu correo existe en varias instituciones. Usa el acceso por institución o solicita soporte.");
+      } else if (msg.includes("Failed to fetch")) {
+        toast.error("No fue posible conectarse con el servidor.");
+      } else {
+        toast.error("No fue posible iniciar sesión. Verifica tus datos e inténtalo nuevamente.");
+      }
     } finally {
       setLoginLoading(false);
     }
