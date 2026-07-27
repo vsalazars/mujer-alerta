@@ -468,15 +468,45 @@ func (r *NLPJobRepository) SyncCloudExecution(
 
 	_, err := r.DB.Exec(ctx, `
 		update public.nlp_jobs
-		set status = $2,
-		    running = $3,
-		    last_event = $4,
+		set status = case
+		        when running = false
+		          and status in ('completed', 'failed', 'cancelled')
+		          and $3 = true
+		        then status
+		        else $2
+		    end,
+		    running = case
+		        when running = false
+		          and status in ('completed', 'failed', 'cancelled')
+		          and $3 = true
+		        then false
+		        else $3
+		    end,
+		    last_event = case
+		        when running = false
+		          and status in ('completed', 'failed', 'cancelled')
+		          and $3 = true
+		        then last_event
+		        when $3 = true
+		          and last_event in (
+		              'loading-models',
+		              'fetching-comments',
+		              'start',
+		              'progress'
+		          )
+		        then last_event
+		        else $4
+		    end,
 		    last_error = case
 		        when nullif($5, '') is null then last_error
 		        else $5
 		    end,
 		    started_at = coalesce(started_at, $6),
 		    finished_at = case
+		        when running = false
+		          and status in ('completed', 'failed', 'cancelled')
+		          and $3 = true
+		        then finished_at
 		        when $3 then finished_at
 		        else coalesce($7, finished_at, now())
 		    end

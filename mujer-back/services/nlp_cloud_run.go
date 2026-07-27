@@ -425,6 +425,14 @@ func (c *NLPCloudRunClient) accessToken(
 func buildNLPCloudRunArguments(options NLPRunOptions) []string {
 	arguments := []string{"--json-progress"}
 
+	if jobID := strings.TrimSpace(options.JobID); jobID != "" {
+		arguments = append(
+			arguments,
+			"--job-id",
+			jobID,
+		)
+	}
+
 	if options.Limit != nil {
 		arguments = append(
 			arguments,

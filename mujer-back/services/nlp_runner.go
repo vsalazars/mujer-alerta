@@ -24,6 +24,7 @@ type NLPRunOptions struct {
 	CentroIDs  []int64
 	Year       *int
 	DryRun     bool
+	JobID      string
 }
 
 type NLPRunResult struct {

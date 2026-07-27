@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { RefreshCw } from "lucide-react";
 
@@ -58,6 +58,7 @@ export default function CentroPage() {
   const [nlpOverviewLoading, setNLPOverviewLoading] = useState(false);
   const [nlpStatus, setNLPStatus] = useState<NLPJobStatus | null>(null);
   const [nlpProcessError, setNLPProcessError] = useState("");
+  const nlpPollInFlightRef = useRef(false);
 
   async function load(selectedYear?: string) {
     const targetYear = selectedYear ?? year;
@@ -220,12 +221,36 @@ export default function CentroPage() {
   useEffect(() => {
     if (!nlpStatus?.running) return;
 
-    const timer = window.setInterval(() => {
-      void loadNLPStatus(year);
-      void loadNLPOverview(year, { silent: true });
-    }, 1000);
+    let cancelled = false;
+    let timer: number | null = null;
 
-    return () => window.clearInterval(timer);
+    async function pollNLPStatus() {
+      if (cancelled || nlpPollInFlightRef.current) return;
+
+      nlpPollInFlightRef.current = true;
+      try {
+        await Promise.all([
+          loadNLPStatus(year),
+          loadNLPOverview(year, { silent: true }),
+        ]);
+      } finally {
+        nlpPollInFlightRef.current = false;
+        if (!cancelled) {
+          timer = window.setTimeout(() => {
+            void pollNLPStatus();
+          }, 3000);
+        }
+      }
+    }
+
+    timer = window.setTimeout(() => {
+      void pollNLPStatus();
+    }, 1500);
+
+    return () => {
+      cancelled = true;
+      if (timer !== null) window.clearTimeout(timer);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nlpStatus?.running, year]);
 
@@ -255,7 +280,6 @@ export default function CentroPage() {
       });
       setNLPStatus(response.status);
       await loadNLPOverview(year, { silent: true });
-      await loadNLPStatus(year);
     } catch (error: unknown) {
       setNLPProcessError(getErrorMessage(error, "No se pudo ejecutar el procesamiento NLP"));
     }

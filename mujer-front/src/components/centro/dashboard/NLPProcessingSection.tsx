@@ -53,7 +53,11 @@ export function NLPProcessingSection({
   const progresoBatchTexto =
     batchTotal > 0
       ? `${fmtInt(batchCurrent)} de ${fmtInt(batchTotal)}`
-      : "Preparando lote...";
+      : status?.last_event === "loading-models"
+        ? "Cargando modelos..."
+        : status?.last_event === "fetching-comments"
+          ? "Buscando comentarios..."
+          : "Preparando lote...";
   const processButtonStyle = {
     "--ring": "var(--brand-primary, #7F017F)",
     background:

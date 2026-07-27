@@ -496,6 +496,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--year", type=int, help="Filtra por año de finalizacion.")
     parser.add_argument("--dry-run", action="store_true", help="Sin escribir en BD.")
     parser.add_argument(
+        "--job-id",
+        dest="job_id",
+        help="Identificador de nlp_jobs para persistir el avance desde Cloud Run.",
+    )
+    parser.add_argument(
         "--json-progress",
         action="store_true",
         help="Emite progreso como JSON Lines.",
@@ -510,33 +515,180 @@ def emit_event(json_progress: bool, payload: dict[str, Any], text: str | None = 
         print(text, flush=True)
 
 
+def mark_job_phase(
+    conn: psycopg.Connection[Any] | None,
+    job_id: str | None,
+    phase: str,
+) -> None:
+    if conn is None or not job_id:
+        return
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                update public.nlp_jobs
+                set status = 'running',
+                    running = true,
+                    last_event = %s,
+                    started_at = coalesce(started_at, now()),
+                    updated_at = now()
+                where id = %s::uuid
+                  and running = true
+                """,
+                (phase, job_id),
+            )
+    except Exception as exc:
+        print(f"No se pudo guardar fase NLP: {type(exc).__name__}: {exc}", file=sys.stderr)
+
+
+def persist_job_event(
+    conn: psycopg.Connection[Any] | None,
+    job_id: str | None,
+    payload: dict[str, Any],
+) -> None:
+    if conn is None or not job_id:
+        return
+
+    event = str(payload.get("event") or "")
+    current = int(payload.get("current") or 0)
+    total = int(payload.get("total") or 0)
+    processed = int(payload.get("processed") or 0)
+    errors = int(payload.get("errors") or 0)
+    status = str(payload.get("status") or "")
+    encuesta_id = str(payload.get("encuesta_id") or "")
+    error = str(payload.get("error") or "")
+
+    try:
+        with conn.cursor() as cur:
+            if event == "start":
+                cur.execute(
+                    """
+                    update public.nlp_jobs
+                    set status = 'running',
+                        running = true,
+                        total_value = greatest(total_value, %s),
+                        last_event = 'start',
+                        started_at = coalesce(started_at, now()),
+                        updated_at = now()
+                    where id = %s::uuid
+                      and running = true
+                    """,
+                    (total, job_id),
+                )
+            elif event == "progress":
+                processed_increment = 1 if status in {"processed", "dry-run"} else 0
+                error_increment = 1 if status == "error" else 0
+                cur.execute(
+                    """
+                    update public.nlp_jobs
+                    set status = 'running',
+                        running = true,
+                        current_value = greatest(current_value, %s),
+                        total_value = greatest(total_value, %s),
+                        processed_value = processed_value + %s,
+                        errors_value = errors_value + %s,
+                        last_encuesta_id = case
+                            when nullif(%s, '') is null then last_encuesta_id
+                            else %s::uuid
+                        end,
+                        last_event = 'progress',
+                        last_error = case
+                            when nullif(%s, '') is null then last_error
+                            else %s
+                        end,
+                        updated_at = now()
+                    where id = %s::uuid
+                      and running = true
+                    """,
+                    (
+                        current,
+                        total,
+                        processed_increment,
+                        error_increment,
+                        encuesta_id,
+                        encuesta_id,
+                        error,
+                        error,
+                        job_id,
+                    ),
+                )
+            elif event == "complete":
+                cur.execute(
+                    """
+                    update public.nlp_jobs
+                    set status = 'completed',
+                        running = false,
+                        current_value = greatest(current_value, %s),
+                        total_value = greatest(total_value, %s),
+                        processed_value = %s,
+                        errors_value = %s,
+                        last_event = 'complete',
+                        finished_at = now(),
+                        updated_at = now()
+                    where id = %s::uuid
+                    """,
+                    (total, total, processed, errors, job_id),
+                )
+    except Exception as exc:
+        print(f"No se pudo guardar progreso NLP: {type(exc).__name__}: {exc}", file=sys.stderr)
+
+
+def report_event(
+    json_progress: bool,
+    payload: dict[str, Any],
+    progress_conn: psycopg.Connection[Any] | None,
+    job_id: str | None,
+    text: str | None = None,
+) -> None:
+    persist_job_event(progress_conn, job_id, payload)
+    emit_event(json_progress, payload, text)
+
+
 def main() -> None:
     args = parse_args()
     if not settings.database_url:
         raise SystemExit("Falta DATABASE_URL en el entorno.")
+
+    progress_conn: psycopg.Connection[Any] | None = None
+    if args.job_id:
+        try:
+            progress_conn = psycopg.connect(settings.database_url, autocommit=True)
+            mark_job_phase(progress_conn, args.job_id, "loading-models")
+        except Exception as exc:
+            print(
+                f"No se pudo abrir conexión de progreso NLP: {type(exc).__name__}: {exc}",
+                flush=True,
+                file=sys.stderr,
+            )
 
     print("Cargando modelos NLP...", flush=True, file=sys.stderr)
     nlp = spacy.load(settings.spacy_model)
     sentiment_analyzer = load_sentiment_analyzer()
     theme_classifier = load_theme_classifier()
     print("Modelos listos.", flush=True, file=sys.stderr)
+    mark_job_phase(progress_conn, args.job_id, "fetching-comments")
 
     with psycopg.connect(settings.database_url, autocommit=False) as conn:
         pending_comments = fetch_pending_comments(
             conn, args.limit, args.encuesta_id, args.centro_ids, args.year
         )
         if not pending_comments:
-            emit_event(
+            report_event(
                 args.json_progress,
                 {"event": "complete", "total": 0, "processed": 0, "errors": 0},
+                progress_conn,
+                args.job_id,
                 "No hay comentarios pendientes.",
             )
             return
 
         total = len(pending_comments)
-        emit_event(
+        report_event(
             args.json_progress,
             {"event": "start", "total": total},
+            progress_conn,
+            args.job_id,
             f"Comentarios pendientes: {total}",
         )
 
@@ -567,7 +719,12 @@ def main() -> None:
                             "adjusted_by_themes", False
                         ),
                     }
-                    emit_event(args.json_progress, payload)
+                    report_event(
+                        args.json_progress,
+                        payload,
+                        progress_conn,
+                        args.job_id,
+                    )
                     if not args.json_progress:
                         sentiment = result["sentiment"]
                         emotion = result["emotion"]
@@ -598,7 +755,7 @@ def main() -> None:
                         result["token_count"],
                         result["char_count"],
                     )
-                    emit_event(
+                    report_event(
                         args.json_progress,
                         {
                             "event": "progress",
@@ -607,13 +764,15 @@ def main() -> None:
                             "encuesta_id": pending.encuesta_id,
                             "status": "processed",
                         },
+                        progress_conn,
+                        args.job_id,
                     )
                 processed += 1
 
             except Exception as exc:
                 errors += 1
                 message = f"{type(exc).__name__}: {exc}"
-                emit_event(
+                report_event(
                     args.json_progress,
                     {
                         "event": "progress",
@@ -623,15 +782,19 @@ def main() -> None:
                         "status": "error",
                         "error": message,
                     },
+                    progress_conn,
+                    args.job_id,
                 )
                 if not args.json_progress:
                     print(f"[error] encuesta_id={pending.encuesta_id} {message}")
                 if not args.dry_run:
                     save_error(conn, pending, message)
 
-        emit_event(
+        report_event(
             args.json_progress,
             {"event": "complete", "total": total, "processed": processed, "errors": errors},
+            progress_conn,
+            args.job_id,
         )
         if not args.json_progress:
             print(f"\nProcesados: {processed}  Errores: {errors}")

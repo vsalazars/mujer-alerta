@@ -228,9 +228,12 @@ func (m *NLPJobManager) startCloudRun(
 		return NLPJobStartResult{}, err
 	}
 
+	cloudOptions := request.Options
+	cloudOptions.JobID = job.ID
+
 	state, err := m.cloudClient.Start(
 		ctx,
-		request.Options,
+		cloudOptions,
 	)
 	if err != nil {
 		_ = m.store.Finish(ctx, job.ID, err)

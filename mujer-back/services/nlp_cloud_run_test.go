@@ -19,10 +19,12 @@ func TestBuildNLPCloudRunArguments(t *testing.T) {
 		CentroIDs:  []int64{8, 2, 8, 0, -1},
 		Year:       &year,
 		DryRun:     true,
+		JobID:      "11111111-1111-1111-1111-111111111111",
 	})
 
 	want := []string{
 		"--json-progress",
+		"--job-id", "11111111-1111-1111-1111-111111111111",
 		"--limit", "15",
 		"--encuesta-id", "encuesta-uno",
 		"--centro-id", "2",
