@@ -15,7 +15,12 @@ type PublicAccessResolution = {
   target_path: string;
 };
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080").replace(/\/$/, "");
+const configuredApiUrl = (process.env.NEXT_PUBLIC_API_URL || "").trim();
+
+const API_BASE = (
+  configuredApiUrl ||
+  (process.env.NODE_ENV === "production" ? "" : "http://localhost:8080")
+).replace(/\/$/, "");
 
 export default function TenantLayout({ children }: TenantLayoutProps) {
   const params = useParams<{ institucionSlug: string }>();

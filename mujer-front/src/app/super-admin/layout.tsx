@@ -49,14 +49,17 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
 
   useEffect(() => {
     const { user: authUser, token } = readAuth();
-    if (!authUser || !token) {
-      setUser(null);
+    const frame = window.requestAnimationFrame(() => {
+      if (!authUser || !token) {
+        setUser(null);
+        setSessionChecked(true);
+        router.replace("/");
+        return;
+      }
+      setUser(authUser);
       setSessionChecked(true);
-      router.replace("/");
-      return;
-    }
-    setUser(authUser);
-    setSessionChecked(true);
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [router]);
 
   useEffect(() => {

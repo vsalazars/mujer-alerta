@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element */
+
 import { useEffect, useState, type CSSProperties } from "react";
 import { Upload, Image as ImageIcon, Save, Trash2 } from "lucide-react";
 

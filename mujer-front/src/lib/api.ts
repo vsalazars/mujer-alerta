@@ -1,8 +1,16 @@
 // src/lib/api.ts
 import { extractInstitutionSlug } from "./routing";
 
-export const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080").replace(/\/$/, "");
-export const PUBLIC_INSTITUCION_SLUG = (process.env.NEXT_PUBLIC_INSTITUCION_SLUG || "").trim();
+const configuredApiUrl = (process.env.NEXT_PUBLIC_API_URL || "").trim();
+
+export const API_BASE = (
+  configuredApiUrl ||
+  (process.env.NODE_ENV === "production" ? "" : "http://localhost:8080")
+).replace(/\/$/, "");
+
+export const PUBLIC_INSTITUCION_SLUG = (
+  process.env.NEXT_PUBLIC_INSTITUCION_SLUG || ""
+).trim();
 
 function getToken() {
   if (typeof window === "undefined") return "";

@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable @typescript-eslint/no-explicit-any, @next/next/no-img-element */
+
 import React, { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useParams, usePathname, useRouter } from "next/navigation";

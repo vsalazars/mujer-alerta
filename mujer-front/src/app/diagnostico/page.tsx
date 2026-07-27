@@ -1,6 +1,8 @@
 // src/app/diagnostico/page.tsx
 "use client";
 
+/* eslint-disable @typescript-eslint/no-explicit-any, @next/next/no-img-element */
+
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -459,17 +461,6 @@ export default function DiagnosticoInicioPage() {
       const lk = readLock(centroId);
       if (!lk) setLock(null);
     }
-  }
-
-  function onClearLock() {
-    if (!centroId) return;
-    clearLock(centroId);
-    setLock(null);
-  }
-
-  function onClearDoneBrowser() {
-    clearBrowserDone();
-    setDoneBlocked(null);
   }
 
   const tenantFieldStyle = {

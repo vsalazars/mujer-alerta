@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element */
+
 import { useEffect, useState, type CSSProperties } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { isAdminRole, type UserRole } from "@/lib/auth";
@@ -66,10 +68,6 @@ function initials(name: string) {
   return (a + b).toUpperCase();
 }
 
-function cx(...v: Array<string | false | null | undefined>) {
-  return v.filter(Boolean).join(" ");
-}
-
 function headerFor(pathname: string) {
   const clean = pathname.replace(/^\/[^/]+/, "");
   if (clean.startsWith("/admin/centros")) {
@@ -107,9 +105,6 @@ export default function AdminLayout({
   const [user] = useState<AuthUser | null>(() => readAuth().user);
   const [config, setConfig] = useState<ConfiguracionInstitucion | null>(null);
 
-  const expiresText = user?.expires_at
-    ? new Date(user.expires_at * 1000).toLocaleString()
-    : "";
   const theme = themeFromBranding(config);
 
   useEffect(() => {
