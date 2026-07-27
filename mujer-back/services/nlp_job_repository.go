@@ -143,6 +143,7 @@ func (r *NLPJobRepository) Create(
 			coalesce(last_encuesta_id::text, ''),
 			coalesce(last_event, ''),
 			coalesce(last_error, ''),
+			coalesce(cloud_execution, ''),
 			started_at,
 			finished_at,
 			updated_at
@@ -169,6 +170,7 @@ func (r *NLPJobRepository) Create(
 		&job.LastEncuestaID,
 		&job.LastEvent,
 		&job.LastError,
+		&job.CloudExecution,
 		&job.StartedAt,
 		&job.FinishedAt,
 		&job.UpdatedAt,
@@ -218,6 +220,7 @@ func (r *NLPJobRepository) GetActive(
 			coalesce(last_encuesta_id::text, ''),
 			coalesce(last_event, ''),
 			coalesce(last_error, ''),
+			coalesce(cloud_execution, ''),
 			started_at,
 			finished_at,
 			updated_at
@@ -253,6 +256,7 @@ func (r *NLPJobRepository) GetLatest(
 			coalesce(last_encuesta_id::text, ''),
 			coalesce(last_event, ''),
 			coalesce(last_error, ''),
+			coalesce(cloud_execution, ''),
 			started_at,
 			finished_at,
 			updated_at
@@ -296,6 +300,7 @@ func (r *NLPJobRepository) scanOne(
 		&job.LastEncuestaID,
 		&job.LastEvent,
 		&job.LastError,
+		&job.CloudExecution,
 		&job.StartedAt,
 		&job.FinishedAt,
 		&job.UpdatedAt,
@@ -394,6 +399,98 @@ func (r *NLPJobRepository) ApplyEvent(
 	}
 
 	return nil
+}
+
+func (r *NLPJobRepository) SetCloudExecution(
+	ctx context.Context,
+	jobID string,
+	state NLPExecutionState,
+) error {
+	executionName := strings.TrimSpace(state.Name)
+	if executionName == "" {
+		return errors.New("cloud execution name is required")
+	}
+
+	status := strings.TrimSpace(state.Status)
+	if status == "" {
+		status = "running"
+	}
+
+	running := state.Running
+	if status == "running" {
+		running = true
+	}
+
+	_, err := r.DB.Exec(ctx, `
+		update public.nlp_jobs
+		set cloud_execution = $2,
+		    status = $3,
+		    running = $4,
+		    last_event = 'cloud-run-started',
+		    last_error = nullif($5, ''),
+		    started_at = coalesce(started_at, $6, now()),
+		    finished_at = case
+		        when $4 then null
+		        else coalesce($7, now())
+		    end
+		where id = $1::uuid
+	`,
+		jobID,
+		executionName,
+		status,
+		running,
+		strings.TrimSpace(state.Error),
+		state.StartedAt,
+		state.CompletedAt,
+	)
+	return err
+}
+
+func (r *NLPJobRepository) SyncCloudExecution(
+	ctx context.Context,
+	jobID string,
+	state NLPExecutionState,
+) error {
+	status := strings.TrimSpace(state.Status)
+	if status == "" {
+		status = "running"
+	}
+
+	running := state.Running
+	if status == "running" {
+		running = true
+	}
+
+	lastEvent := "cloud-run-status"
+	if !running {
+		lastEvent = "cloud-run-" + status
+	}
+
+	_, err := r.DB.Exec(ctx, `
+		update public.nlp_jobs
+		set status = $2,
+		    running = $3,
+		    last_event = $4,
+		    last_error = case
+		        when nullif($5, '') is null then last_error
+		        else $5
+		    end,
+		    started_at = coalesce(started_at, $6),
+		    finished_at = case
+		        when $3 then finished_at
+		        else coalesce($7, finished_at, now())
+		    end
+		where id = $1::uuid
+	`,
+		jobID,
+		status,
+		running,
+		lastEvent,
+		strings.TrimSpace(state.Error),
+		state.StartedAt,
+		state.CompletedAt,
+	)
+	return err
 }
 
 func (r *NLPJobRepository) Finish(

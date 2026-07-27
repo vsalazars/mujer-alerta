@@ -68,11 +68,28 @@ func main() {
 	fmt.Println("Instrumento cargado:", instrumento.Name, instrumento.Version)
 
 	mux := http.NewServeMux()
+
 	nlpRunner := services.NewNLPRunner(cfg.DatabaseURL)
+	nlpCloudRunClient := services.NewNLPCloudRunClientFromEnv()
 	nlpJobRepository := services.NewNLPJobRepository(pool)
+
+	nlpExecutionMode := strings.TrimSpace(
+		os.Getenv("NLP_EXECUTION_MODE"),
+	)
+	if nlpExecutionMode == "" {
+		nlpExecutionMode = services.NLPExecutionModeLocal
+	}
+
 	nlpJobs := services.NewNLPJobManager(
 		nlpRunner,
+		nlpCloudRunClient,
 		nlpJobRepository,
+		nlpExecutionMode,
+	)
+
+	fmt.Println(
+		"NLP execution mode:",
+		nlpExecutionMode,
 	)
 
 	// ======================
