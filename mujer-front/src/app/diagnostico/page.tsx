@@ -40,7 +40,11 @@ import {
 } from "lucide-react";
 
 import { api } from "../../lib/api";
-import { themeFromBranding } from "../../lib/branding";
+import {
+  cacheBranding,
+  readCachedBranding,
+  themeFromBranding,
+} from "../../lib/branding";
 import { extractInstitutionSlug, withInstitutionSlug } from "../../lib/routing";
 
 type Centro = {
@@ -263,7 +267,10 @@ export default function DiagnosticoInicioPage() {
 
   const [centros, setCentros] = useState<Centro[]>([]);
   const [generos, setGeneros] = useState<Genero[]>([]);
-  const [branding, setBranding] = useState<TenantBranding | null>(null);
+  const [branding, setBranding] = useState<TenantBranding | null>(() =>
+    readCachedBranding<TenantBranding>(institucionSlug)
+  );
+  const [brandingReady, setBrandingReady] = useState(() => branding !== null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -292,14 +299,30 @@ export default function DiagnosticoInicioPage() {
         ]);
         setCentros(c);
         setGeneros(g);
-        void api<TenantBranding>("/api/tenant/branding")
-          .then((payload) => setBranding(payload))
-          .catch(() => setBranding(null));
       } finally {
         setLoading(false);
       }
     })();
   }, []);
+
+  useEffect(() => {
+    let alive = true;
+    void api<TenantBranding>("/api/tenant/branding")
+      .then((payload) => {
+        if (!alive) return;
+        cacheBranding(payload, institucionSlug);
+        setBranding(payload);
+      })
+      .catch(() => {
+        if (alive) setBranding(null);
+      })
+      .finally(() => {
+        if (alive) setBrandingReady(true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [institucionSlug]);
 
   useEffect(() => {
     if (!accessSlug || centros.length === 0) return;
@@ -475,6 +498,8 @@ export default function DiagnosticoInicioPage() {
     boxShadow: `0 18px 44px -24px ${theme.glow}`,
   } as React.CSSProperties;
 
+  if (!brandingReady) return null;
+
   return (
     <main className="min-h-dvh bg-white">
       <Dialog open={welcomeOpen} onOpenChange={setWelcomeOpen}>
@@ -484,37 +509,38 @@ export default function DiagnosticoInicioPage() {
           style={{ borderColor: theme.border }}
         >
           <div
-            className="rounded-t-[2rem] px-6 py-5"
+            className="rounded-t-[2rem] px-5 py-4 sm:px-6 sm:py-5"
             style={{
               background: `linear-gradient(135deg, ${theme.soft} 0%, #ffffff 100%)`,
             }}
           >
-            <div className="flex items-start gap-4">
+            <div className="flex flex-col items-center gap-3">
               <div
-                className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden"
+                className="flex h-24 w-24 items-center justify-center sm:h-28 sm:w-28"
               >
                 <Image
                   src="/avatar.png"
                   alt="Avatar de bienvenida"
-                  width={80}
-                  height={80}
-                  className="h-full w-full object-cover"
+                  width={112}
+                  height={112}
+                  className="h-full w-full object-contain"
+                  style={{ filter: `drop-shadow(0 12px 14px ${theme.glow})` }}
                   priority
                 />
               </div>
-              <DialogHeader className="text-left">
+              <DialogHeader className="text-center">
                 <DialogTitle style={{ color: theme.primary }}>Bienvenid@</DialogTitle>
-                <DialogDescription className="text-sm leading-7 text-neutral-700">
-                  Esta iniciativa busca identificar algunas manifestaciones de la violencia contra
-                  las mujeres por razones de género que suceden en la vida cotidiana dentro de la
-                  escuela. Te pedimos que al responder, consideres tu experiencia personal dentro
-                  del plantel. Agradecemos tu participación.
-                </DialogDescription>
               </DialogHeader>
+              <DialogDescription className="w-full text-center text-sm leading-6 text-neutral-700 sm:leading-7">
+                Esta iniciativa busca identificar algunas manifestaciones de la violencia contra
+                las mujeres por razones de género que suceden en la vida cotidiana dentro de la
+                escuela. Te pedimos que al responder, consideres tu experiencia personal dentro
+                del plantel. Agradecemos tu participación.
+              </DialogDescription>
             </div>
           </div>
 
-          <div className="px-6 pb-6 pt-4">
+          <div className="px-5 pb-5 pt-4 sm:px-6 sm:pb-6">
             <Button
               onClick={() => setWelcomeOpen(false)}
               className="h-12 w-full rounded-full text-base font-semibold text-white"

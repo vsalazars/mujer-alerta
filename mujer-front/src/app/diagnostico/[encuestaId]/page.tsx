@@ -16,7 +16,11 @@ import { Separator } from "../../../components/ui/separator";
 import { Textarea } from "../../../components/ui/textarea";
 
 import { api } from "../../../lib/api";
-import { themeFromBranding } from "../../../lib/branding";
+import {
+  cacheBranding,
+  readCachedBranding,
+  themeFromBranding,
+} from "../../../lib/branding";
 import { extractInstitutionSlug, withInstitutionSlug } from "../../../lib/routing";
 
 type LikertOption = { value: number; label: string };
@@ -232,7 +236,10 @@ export default function DiagnosticoEncuestaPage() {
   const [tovKind, setTovKind] = useState<string>("(no cargado)");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [branding, setBranding] = useState<TenantBranding | null>(null);
+  const [branding, setBranding] = useState<TenantBranding | null>(() =>
+    readCachedBranding<TenantBranding>(institucionSlug)
+  );
+  const [brandingReady, setBrandingReady] = useState(() => branding !== null);
   const theme = themeFromBranding(branding);
 
   const [answers, setAnswers] = useState<Record<string, number>>({});
@@ -303,10 +310,15 @@ export default function DiagnosticoEncuestaPage() {
     let alive = true;
     void api<TenantBranding>("/api/tenant/branding")
       .then((payload) => {
-        if (alive) setBranding(payload);
+        if (!alive) return;
+        cacheBranding(payload, institucionSlug);
+        setBranding(payload);
       })
       .catch(() => {
         if (alive) setBranding(null);
+      })
+      .finally(() => {
+        if (alive) setBrandingReady(true);
       });
     return () => {
       alive = false;
@@ -563,6 +575,8 @@ export default function DiagnosticoEncuestaPage() {
       setSaving(false);
     }
   }
+
+  if (!brandingReady) return null;
 
   if (loading) {
     return (

@@ -29,7 +29,11 @@ import {
 
 import { ShieldCheck } from "lucide-react";
 import { api } from "@/lib/api";
-import { themeFromBranding } from "@/lib/branding";
+import {
+  cacheBranding,
+  readCachedBranding,
+  themeFromBranding,
+} from "@/lib/branding";
 import { extractInstitutionSlug } from "@/lib/routing";
 import { CheckCircle } from "lucide-react";
 
@@ -301,7 +305,10 @@ export default function ResultadosEncuestaPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [data, setData] = useState<EncuestaResumenResponseBE | null>(null);
-  const [branding, setBranding] = useState<TenantBranding | null>(null);
+  const [branding, setBranding] = useState<TenantBranding | null>(() =>
+    readCachedBranding<TenantBranding>(institucionSlug)
+  );
+  const [brandingReady, setBrandingReady] = useState(() => branding !== null);
   const theme = themeFromBranding(branding);
 
   const [farewellOpen, setFarewellOpen] = useState(true);
@@ -341,10 +348,15 @@ export default function ResultadosEncuestaPage() {
     let alive = true;
     void api<TenantBranding>("/api/tenant/branding")
       .then((payload) => {
-        if (alive) setBranding(payload);
+        if (!alive) return;
+        cacheBranding(payload, institucionSlug);
+        setBranding(payload);
       })
       .catch(() => {
         if (alive) setBranding(null);
+      })
+      .finally(() => {
+        if (alive) setBrandingReady(true);
       });
     return () => {
       alive = false;
@@ -541,6 +553,8 @@ export default function ResultadosEncuestaPage() {
     borderColor: theme.border,
     background: `linear-gradient(180deg, #ffffff 0%, ${theme.soft} 100%)`,
   } as React.CSSProperties;
+
+  if (!brandingReady) return null;
 
   return (
     <main
