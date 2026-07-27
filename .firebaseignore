@@ -1,0 +1,12 @@
+.git
+.git/**
+mujer-back
+mujer-back/**
+mujer-front
+mujer-front/**
+mujer-nlp
+mujer-nlp/**
+docs
+docs/**
+*.log
+/tmp

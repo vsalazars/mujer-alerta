@@ -1,0 +1,37 @@
+{
+  "hosting": {
+    "public": "firebase-hosting-public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/api/**",
+        "run": {
+          "serviceId": "mujer-alerta-backend",
+          "region": "us-east4"
+        }
+      },
+      {
+        "source": "**",
+        "run": {
+          "serviceId": "mujer-alerta-frontend",
+          "region": "us-east4"
+        }
+      }
+    ],
+    "headers": [
+      {
+        "source": "/api/**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-store"
+          }
+        ]
+      }
+    ]
+  }
+}
