@@ -30,7 +30,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-import { Building2, Plus, RefreshCw, Search, Trash2, Pencil, Users } from "lucide-react";
+import {
+  Building2,
+  Eye,
+  EyeOff,
+  Plus,
+  RefreshCw,
+  Search,
+  Trash2,
+  Pencil,
+  Users,
+} from "lucide-react";
 
 type AuthUser = {
   user_id: string;
@@ -76,7 +86,8 @@ type UserForm = {
   nombre: string;
   email: string;
   centro_id: string; // select -> string
-  password: string; // opcional; si vacío, back puede generar
+  password: string;
+  repeat_password: string;
 };
 
 type SaveUserPayload = {
@@ -134,11 +145,14 @@ export default function AdminUsuariosPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const [saving, setSaving] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showRepeatPassword, setShowRepeatPassword] = useState(false);
   const [form, setForm] = useState<UserForm>({
     nombre: "",
     email: "",
     centro_id: "",
     password: "",
+    repeat_password: "",
   });
   const theme = themeFromBranding(config);
   const fieldStyle = {
@@ -254,7 +268,10 @@ export default function AdminUsuariosPage() {
       email: "",
       centro_id: "",
       password: "",
+      repeat_password: "",
     });
+    setShowPassword(false);
+    setShowRepeatPassword(false);
     setOpen(true);
   }
 
@@ -266,7 +283,10 @@ export default function AdminUsuariosPage() {
       email: u.email || "",
       centro_id: String(u.centros?.[0] || ""),
       password: "", // vacío -> no cambiar password
+      repeat_password: "",
     });
+    setShowPassword(false);
+    setShowRepeatPassword(false);
     setOpen(true);
   }
 
@@ -279,13 +299,16 @@ export default function AdminUsuariosPage() {
     if (!email || !/^\S+@\S+\.\S+$/.test(email)) return "Email inválido.";
     if (!centroId) return "Selecciona un centro.";
 
-    // En create, si mandas password, valida mínimo
-    if (mode === "create" && form.password.trim() && form.password.trim().length < 8) {
-      return "Si defines contraseña, debe tener al menos 8 caracteres.";
+    if (mode === "create" && !form.password.trim()) {
+      return "La contraseña es obligatoria.";
     }
-    // En edit, si se define password, valida mínimo
-    if (mode === "edit" && form.password.trim() && form.password.trim().length < 8) {
-      return "La nueva contraseña debe tener al menos 8 caracteres.";
+    if (form.password.trim() && form.password.trim().length < 8) {
+      return mode === "create"
+        ? "La contraseña debe tener al menos 8 caracteres."
+        : "La nueva contraseña debe tener al menos 8 caracteres.";
+    }
+    if (form.password.trim() !== form.repeat_password.trim()) {
+      return "Las contraseñas no coinciden.";
     }
     return "";
   }
@@ -479,25 +502,101 @@ export default function AdminUsuariosPage() {
 
                 <div className="grid min-w-0 gap-2">
                   <Label htmlFor="password">
-                    Contraseña {mode === "edit" ? "(opcional)" : "(opcional)"}
+                    {mode === "edit" ? "Nueva contraseña (opcional)" : "Contraseña"}
                   </Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    style={fieldStyle}
-                    className="min-w-0"
-                    value={form.password}
-                    onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-                    placeholder={
-                      mode === "create"
-                        ? "Deja vacío para autogenerar"
-                        : "Deja vacío para no cambiar"
-                    }
-                    disabled={saving}
-                  />
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      autoComplete="new-password"
+                      style={fieldStyle}
+                      className="min-w-0 pr-11"
+                      value={form.password}
+                      onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                      placeholder={
+                        mode === "create"
+                          ? "Mínimo 8 caracteres"
+                          : "Deja vacío para no cambiar"
+                      }
+                      required={mode === "create"}
+                      minLength={form.password ? 8 : undefined}
+                      disabled={saving}
+                    />
+                    <button
+                      type="button"
+                      aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 transition-colors hover:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
+                      onClick={() => setShowPassword((current) => !current)}
+                      disabled={saving}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" aria-hidden="true" />
+                      ) : (
+                        <Eye className="h-4 w-4" aria-hidden="true" />
+                      )}
+                    </button>
+                  </div>
                   <p className="text-xs text-neutral-500">
-                    Si la dejas vacía: en creación el backend puede generar una temporal; en edición no se modifica.
+                    {mode === "create"
+                      ? "Debe tener al menos 8 caracteres."
+                      : "Si la dejas vacía, la contraseña actual no se modifica."}
                   </p>
+                </div>
+
+                <div className="grid min-w-0 gap-2">
+                  <Label htmlFor="repeat_password">
+                    {mode === "edit" ? "Repetir nueva contraseña" : "Repetir contraseña"}
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="repeat_password"
+                      type={showRepeatPassword ? "text" : "password"}
+                      autoComplete="new-password"
+                      style={fieldStyle}
+                      className="min-w-0 pr-11"
+                      value={form.repeat_password}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, repeat_password: e.target.value }))
+                      }
+                      placeholder="Escribe nuevamente la contraseña"
+                      required={mode === "create" || Boolean(form.password)}
+                      aria-invalid={
+                        Boolean(form.repeat_password) &&
+                        form.password.trim() !== form.repeat_password.trim()
+                      }
+                      disabled={saving || (mode === "edit" && !form.password)}
+                    />
+                    <button
+                      type="button"
+                      aria-label={
+                        showRepeatPassword ? "Ocultar contraseña repetida" : "Mostrar contraseña repetida"
+                      }
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 transition-colors hover:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] disabled:cursor-not-allowed disabled:opacity-50"
+                      onClick={() => setShowRepeatPassword((current) => !current)}
+                      disabled={saving || (mode === "edit" && !form.password)}
+                    >
+                      {showRepeatPassword ? (
+                        <EyeOff className="h-4 w-4" aria-hidden="true" />
+                      ) : (
+                        <Eye className="h-4 w-4" aria-hidden="true" />
+                      )}
+                    </button>
+                  </div>
+                  {form.repeat_password ? (
+                    <p
+                      className="text-xs font-medium"
+                      style={{
+                        color:
+                          form.password.trim() === form.repeat_password.trim()
+                            ? theme.primary
+                            : "rgb(185 28 28)",
+                      }}
+                    >
+                      {form.password.trim() === form.repeat_password.trim()
+                        ? "Las contraseñas coinciden."
+                        : "Las contraseñas no coinciden."}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="flex items-center justify-end gap-2 pt-1">
                   <Button
